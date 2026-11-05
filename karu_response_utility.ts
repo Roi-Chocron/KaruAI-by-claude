@@ -34,6 +34,9 @@ export interface CarouselSlide {
     title: string;
     content: string;
     imagePrompt: string;
+    // Set only by the user's local uploads in the UI (a base64 data URL). Deliberately not part of
+    // CAROUSEL_RESPONSE_SCHEMA: the model never generates images.
+    imageUrl?: string;
 }
 
 export interface CarouselData {

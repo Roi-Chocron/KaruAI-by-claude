@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, AtSign, Download, Edit2, ChevronLeft, ChevronRight, 
-  Plus, Bot, Send, Mail, Lock, User, Cookie
+  Plus, Bot, Send, Mail, Lock, User, Cookie, ImagePlus, Trash2
 } from 'lucide-react';
 import type {
   KaruResponse, CarouselData, CarouselSlide, CarouselSlideType, CarouselTheme
@@ -198,12 +198,91 @@ const parseCarousel = (responseText: string): CarouselData => {
 
 const padNumber = (n: number) => String(n).padStart(2, '0');
 
-const CANVAS_FRAME = 'w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5] shadow-2xl rounded-sm relative p-8 flex flex-col overflow-hidden border border-gray-100';
+// Reads a user-picked image as a base64 data URL so it can live in React state
+const readImageAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Please choose an image file.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
 
-const SlideCanvas = ({ slide, theme, index, total }: {
-  slide: CarouselSlide; theme: CarouselTheme; index: number; total: number;
+// Inline-editable text for the canvas. The DOM is owned by the browser while editing, so the
+// element is keyed by its value: every committed change remounts it with fresh, React-rendered
+// text instead of React trying to patch text nodes the user has already rewritten.
+const EditableText = ({
+  as: Tag = 'span', value, field, onCommit, normalize, multiline = false, className = '', style,
+}: {
+  as?: 'h1' | 'p' | 'span';
+  value: string;
+  field: string; // shown as the "Empty <field>" placeholder
+  onCommit: (next: string) => void;
+  normalize?: (raw: string) => string | null; // return null to reject the edit and restore the old value
+  multiline?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}) => (
+  <Tag
+    key={value}
+    contentEditable={true}
+    suppressContentEditableWarning={true}
+    spellCheck={false}
+    data-placeholder={`Empty ${field}`}
+    title={`Click to edit ${field}`}
+    style={style}
+    className={`${className} cursor-text rounded-sm outline-none outline-offset-4 hover:outline-dashed hover:outline-1 focus:outline-dashed focus:outline-2 empty:before:content-[attr(data-placeholder)] empty:before:italic empty:before:opacity-40`}
+    onBlur={e => {
+      const raw = e.currentTarget.innerText.replace(/ /g, ' ').trim();
+      const next = normalize ? normalize(raw) : raw;
+      if (next === null) {
+        e.currentTarget.innerText = value; // rejected: put the previous text back
+      } else if (next !== value) {
+        onCommit(next);
+      }
+    }}
+    onKeyDown={e => {
+      if (e.key === 'Escape') {
+        e.currentTarget.innerText = value; // cancel the edit
+        e.currentTarget.blur();
+      } else if (e.key === 'Enter' && !multiline && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        e.currentTarget.blur();
+      }
+    }}
+    onPaste={e => {
+      // Paste as plain text so no foreign HTML/styles end up inside the slide
+      e.preventDefault();
+      document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+    }}
+  >
+    {value}
+  </Tag>
+);
+
+// innerText reflects the badge's CSS uppercase, so compare case-insensitively
+const normalizeSlideType = (raw: string): CarouselSlideType | null => {
+  const type = raw.toLowerCase() as CarouselSlideType;
+  return SLIDE_TYPES.includes(type) ? type : null;
+};
+
+// overflow-clip (not hidden): the decorative blobs stick out of the frame, and a hidden-overflow
+// frame would scroll itself when an inline-edited element near the edge takes focus
+const CANVAS_FRAME = 'w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5] shadow-2xl rounded-sm relative p-8 flex flex-col overflow-clip border border-gray-100';
+
+const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
+  slide: CarouselSlide;
+  theme: CarouselTheme;
+  index: number;
+  total: number;
+  logoUrl: string | null;
+  onUpdate: (updatedSlide: CarouselSlide) => void;
 }) => {
   const { bgColor, textColor, accentColor } = theme;
+  const update = (patch: Partial<CarouselSlide>) => onUpdate({ ...slide, ...patch });
 
   return (
     <div className={`${CANVAS_FRAME} justify-between`} style={{ backgroundColor: bgColor, color: textColor }}>
@@ -211,35 +290,76 @@ const SlideCanvas = ({ slide, theme, index, total }: {
       <div className="absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-10 -mt-10 blur-xl" style={{ backgroundColor: `${accentColor}1A` }}></div>
       <div className="absolute bottom-0 left-0 w-40 h-40 rounded-tr-full -ml-10 -mb-10 blur-xl" style={{ backgroundColor: `${accentColor}14` }}></div>
 
-      <div className="z-10 relative mt-4 min-h-0">
+      <div className="z-10 relative mt-4 min-h-0 flex-1 flex flex-col">
         <span
-          className="inline-block px-3 py-1 font-bold text-xs rounded-full uppercase tracking-wider mb-4"
+          className="self-start inline-flex items-center gap-1 px-3 py-1 font-bold text-xs rounded-full uppercase tracking-wider mb-4 shrink-0"
           style={{ backgroundColor: `${accentColor}26`, color: accentColor }}
         >
-          {slide.type} · {padNumber(index + 1)}
+          <EditableText
+            value={slide.type}
+            field="type"
+            normalize={normalizeSlideType}
+            onCommit={type => update({ type: type as CarouselSlideType })}
+            className="inline-block min-w-[2ch]"
+          />
+          <span>· {padNumber(index + 1)}</span>
         </span>
 
         {slide.type === 'quote' ? (
           <>
-            <span className="block text-6xl font-serif leading-none -mb-2" style={{ color: accentColor }}>&ldquo;</span>
-            <p className="text-2xl font-bold italic leading-snug mb-4">{slide.content}</p>
-            <p className="text-sm font-semibold opacity-70">&mdash; {slide.title}</p>
+            <span className="block text-6xl font-serif leading-none -mb-2 shrink-0" style={{ color: accentColor }}>&ldquo;</span>
+            <EditableText
+              as="p"
+              value={slide.content}
+              field="quote"
+              multiline
+              onCommit={content => update({ content })}
+              className="block text-2xl font-bold italic leading-snug mb-4 whitespace-pre-line"
+            />
+            <div className="flex items-center gap-2 text-sm font-semibold opacity-70">
+              {slide.imageUrl && (
+                <img src={slide.imageUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+              )}
+              <span>&mdash;</span>
+              <EditableText value={slide.title} field="author" onCommit={title => update({ title })} className="inline-block min-w-[4ch]" />
+            </div>
           </>
         ) : (
           <>
-            <h1 className={`${slide.type === 'cover' ? 'text-4xl' : 'text-3xl'} font-extrabold leading-tight mb-4`}>
-              {slide.title}
-            </h1>
-            <p className="text-lg leading-relaxed font-medium opacity-80 whitespace-pre-line">{slide.content}</p>
+            <EditableText
+              as="h1"
+              value={slide.title}
+              field="title"
+              onCommit={title => update({ title })}
+              className={`block ${slide.type === 'cover' ? 'text-4xl' : 'text-3xl'} font-extrabold leading-tight shrink-0 ${slide.imageUrl ? 'mb-3' : 'mb-4'}`}
+            />
+            {slide.imageUrl && (
+              // Takes whatever height is left between title and text, so the 4:5 frame never overflows
+              <div className="relative flex-1 min-h-[72px] mb-3 rounded-xl overflow-hidden shadow-sm">
+                <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              </div>
+            )}
+            <EditableText
+              as="p"
+              value={slide.content}
+              field="content"
+              multiline
+              onCommit={content => update({ content })}
+              className={`block leading-relaxed font-medium opacity-80 whitespace-pre-line shrink-0 ${slide.imageUrl ? 'text-base line-clamp-4 focus:line-clamp-none' : 'text-lg'}`}
+            />
           </>
         )}
       </div>
 
-      <div className="z-10 relative flex items-center justify-between">
+      <div className="z-10 relative flex items-center justify-between mt-4 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}26` }}>
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: accentColor }}></div>
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover bg-white" />
+          ) : (
+            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}26` }}>
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: accentColor }}></div>
+            </div>
+          )}
           <span className="font-bold text-sm">@design.daily</span>
         </div>
         <span className="text-xs font-semibold opacity-60">{index + 1} / {total}</span>
@@ -270,7 +390,10 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
   const [isSending, setIsSending] = useState(false);
   const [carousel, setCarousel] = useState<CarouselData | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0); // 0-based index into carousel.slides
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const slideImageInputRef = useRef<HTMLInputElement>(null);
 
   // Keep the newest message in view
   useEffect(() => {
@@ -307,7 +430,11 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
       }
 
       const nextCarousel = parseCarousel((data as KaruResponse).responseText);
-      setCarousel(nextCarousel);
+      // The AI never returns images, so carry the user's uploads over by slide position
+      setCarousel(prev => ({
+        ...nextCarousel,
+        slides: nextCarousel.slides.map((slide, i) => ({ ...slide, imageUrl: prev?.slides[i]?.imageUrl })),
+      }));
       // Stay on the same slide across edits, as long as it still exists
       setCurrentSlide(prev => Math.min(prev, nextCarousel.slides.length - 1));
 
@@ -328,6 +455,37 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const updateSlide = (index: number, patch: Partial<CarouselSlide>) => {
+    setCarousel(prev => prev && {
+      ...prev,
+      slides: prev.slides.map((slide, i) => (i === index ? { ...slide, ...patch } : slide)),
+    });
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again later
+    if (!file) return;
+    try {
+      setLogoUrl(await readImageAsDataUrl(file));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not load the logo.');
+    }
+  };
+
+  const handleSlideImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const targetIndex = currentSlide; // the slide that was active when the dialog opened
+    try {
+      const imageUrl = await readImageAsDataUrl(file);
+      updateSlide(targetIndex, { imageUrl });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not load the image.');
     }
   };
 
@@ -352,10 +510,35 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
           
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">Logo</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
-              <Upload className="text-gray-400 mb-2" size={24} />
-              <span className="text-sm text-gray-500 font-medium">Upload Logo</span>
-            </div>
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              className={`w-full border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-indigo-400 transition-colors ${
+                logoUrl ? 'p-4' : 'p-8'
+              }`}
+            >
+              {logoUrl ? (
+                <>
+                  <img src={logoUrl} alt="Your logo" className="h-16 max-w-full object-contain mb-2" />
+                  <span className="text-xs text-gray-400 font-medium">Click to replace</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="text-gray-400 mb-2" size={24} />
+                  <span className="text-sm text-gray-500 font-medium">Upload Logo</span>
+                </>
+              )}
+            </button>
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={() => setLogoUrl(null)}
+                className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Remove logo
+              </button>
+            )}
           </div>
           
           <div>
@@ -450,10 +633,43 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
         </div>
 
         {/* Center: The Canvas */}
-        <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-100/50">
+        <div className="flex-1 overflow-auto flex flex-col items-center justify-center gap-4 p-8 bg-gray-100/50">
           {/* Main 4:5 Canvas */}
           {activeSlide ? (
-            <SlideCanvas slide={activeSlide} theme={theme} index={currentSlide} total={slides.length} />
+            <>
+              <SlideCanvas
+                slide={activeSlide}
+                theme={theme}
+                index={currentSlide}
+                total={slides.length}
+                logoUrl={logoUrl}
+                onUpdate={updatedSlide => updateSlide(currentSlide, updatedSlide)}
+              />
+
+              {/* Slide image controls */}
+              <input ref={slideImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleSlideImageChange} />
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => slideImageInputRef.current?.click()}
+                  className="flex items-center gap-2 bg-white border border-gray-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-full shadow-sm hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                >
+                  <ImagePlus size={16} />
+                  {activeSlide.imageUrl ? 'Replace Slide Image' : 'Upload Slide Image'}
+                </button>
+                {activeSlide.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => updateSlide(currentSlide, { imageUrl: undefined })}
+                    aria-label="Remove slide image"
+                    title="Remove slide image"
+                    className="w-9 h-9 flex items-center justify-center bg-white border border-gray-200 text-gray-500 rounded-full shadow-sm hover:border-red-300 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </>
           ) : (
             <EmptyCanvas />
           )}
@@ -471,8 +687,9 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
               } flex flex-col justify-between p-1.5 relative overflow-hidden`}
               style={{ backgroundColor: theme.bgColor, color: theme.textColor }}
             >
-              <div className="h-1 w-1/2 rounded-full" style={{ backgroundColor: theme.accentColor }}></div>
-              <p className="text-[6px] font-bold leading-tight line-clamp-3">{slide.title}</p>
+              <div className="h-1 w-1/2 rounded-full shrink-0" style={{ backgroundColor: theme.accentColor }}></div>
+              {slide.imageUrl && <img src={slide.imageUrl} alt="" className="w-full h-5 rounded-sm object-cover" />}
+              <p className={`text-[6px] font-bold leading-tight ${slide.imageUrl ? 'line-clamp-2' : 'line-clamp-3'}`}>{slide.title}</p>
               <span className="text-[8px] font-semibold opacity-60 self-end">{index + 1}</span>
             </div>
           ))}
