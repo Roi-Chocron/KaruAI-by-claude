@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, AtSign, Download, Edit2, ChevronLeft, ChevronRight, 
-  Plus, Bot, Send, Mail, Lock, User, Cookie, ImagePlus, Trash2
+  Plus, Bot, Send, Mail, Lock, User, Cookie, ImagePlus, Trash2, Undo2, Redo2
 } from 'lucide-react';
 import type {
-  KaruResponse, CarouselData, CarouselSlide, CarouselSlideType, CarouselTheme
+  KaruResponse, CarouselData, CarouselSlide, CarouselSlideType, CarouselTheme, SlideElementPosition, CustomSlideElement
 } from './karu_response_utility';
-
 // --- Reusable SVG Icons ---
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
@@ -67,6 +66,7 @@ const LoginScreen = ({ onNavigate }: NavProps) => (
         >
           Log In
         </button>
+
         
         <div className="flex items-center my-6">
           <div className="flex-1 border-t border-gray-300"></div>
@@ -147,13 +147,27 @@ type ChatMessage = {
   sender: 'user' | 'ai';
   text: string;
   status?: 'loading' | 'error';
+  imagePrompts?: ImagePromptApproval[];
+};
+
+type ImagePromptApproval = {
+  slideIndex: number;
+  prompt: string;
+  status: 'pending' | 'generating' | 'generated' | 'error';
+  error?: string;
 };
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 // --- Carousel helpers ---
 
-const DEFAULT_THEME: CarouselTheme = { bgColor: '#FFFFFF', textColor: '#0F172A', accentColor: '#EC4899' };
+const DEFAULT_THEME: CarouselTheme = {
+  bgColor: '#FFFFFF',
+  textColor: '#0F172A',
+  accentColor: '#EC4899',
+  fontFamily: 'Inter, sans-serif',
+};
+const POST_STORAGE_KEY = 'karuai:last-post';
 const SLIDE_TYPES: CarouselSlideType[] = ['cover', 'content', 'quote', 'cta'];
 
 // Accepts #RGB or #RRGGBB and returns #RRGGBB (so an alpha suffix can be appended), or null if invalid
@@ -185,6 +199,7 @@ const parseCarousel = (responseText: string): CarouselData => {
       bgColor: normalizeHex(raw.theme?.bgColor) ?? DEFAULT_THEME.bgColor,
       textColor: normalizeHex(raw.theme?.textColor) ?? DEFAULT_THEME.textColor,
       accentColor: normalizeHex(raw.theme?.accentColor) ?? DEFAULT_THEME.accentColor,
+      fontFamily: typeof raw.theme?.fontFamily === 'string' ? raw.theme.fontFamily : DEFAULT_THEME.fontFamily,
     },
     slides: raw.slides.map((slide: any, index: number): CarouselSlide => ({
       id: Number.isInteger(slide?.id) ? slide.id : index + 1,
@@ -269,6 +284,24 @@ const normalizeSlideType = (raw: string): CarouselSlideType | null => {
   return SLIDE_TYPES.includes(type) ? type : null;
 };
 
+const positionFor = (slide: CarouselSlide, element: keyof NonNullable<CarouselSlide['layout']>): SlideElementPosition =>
+  slide.layout?.[element] ?? { x: 0, y: 0 };
+
+const elementStyle = (position: SlideElementPosition): React.CSSProperties => ({
+  transform: `translate(${position.x}%, ${position.y}%)`,
+  width: position.width ? `${position.width}%` : undefined,
+  height: position.height ? `${position.height}%` : undefined,
+  borderRadius: position.borderRadius !== undefined ? `${position.borderRadius}px` : undefined,
+  border: position.borderWidth ? `${position.borderWidth}px solid ${position.borderColor ?? '#000000'}` : undefined,
+  boxShadow: position.shadow,
+});
+
+const sanitizeCustomHtml = (html: string): string =>
+  html
+    .replace(/<(?!\/?(?:strong|em|b|i|br)\b)[^>]*>/gi, '')
+    .replace(/\son\w+=(?:"[^"]*"|'[^']*')/gi, '')
+    .replace(/javascript:/gi, '');
+
 // overflow-clip (not hidden): the decorative blobs stick out of the frame, and a hidden-overflow
 // frame would scroll itself when an inline-edited element near the edge takes focus
 const CANVAS_FRAME = 'w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5] shadow-2xl rounded-sm relative p-8 flex flex-col overflow-clip border border-gray-100';
@@ -283,17 +316,45 @@ const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
 }) => {
   const { bgColor, textColor, accentColor } = theme;
   const update = (patch: Partial<CarouselSlide>) => onUpdate({ ...slide, ...patch });
+  const move = (element: keyof NonNullable<CarouselSlide['layout']>, event: React.PointerEvent<HTMLDivElement>) => {
+    const frame = event.currentTarget.closest<HTMLElement>('[data-slide-canvas]');
+    if (!frame) return;
+    const start = { x: event.clientX, y: event.clientY };
+    const initial = positionFor(slide, element);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const handleMove = (moveEvent: PointerEvent) => {
+      const next = {
+        x: Math.max(-45, Math.min(45, initial.x + ((moveEvent.clientX - start.x) / frame.clientWidth) * 100)),
+        y: Math.max(-45, Math.min(45, initial.y + ((moveEvent.clientY - start.y) / frame.clientHeight) * 100)),
+      };
+      update({ layout: { ...slide.layout, [element]: next } });
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', stop);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', stop, { once: true });
+  };
+  const dragged = (element: keyof NonNullable<CarouselSlide['layout']>) => ({
+    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => move(element, event),
+    className: 'cursor-move touch-none',
+  });
+
+  const customHtml = sanitizeCustomHtml(slide.customHtml?.trim() ?? '');
 
   return (
-    <div className={`${CANVAS_FRAME} justify-between`} style={{ backgroundColor: bgColor, color: textColor }}>
+    <div data-slide-canvas className={`${CANVAS_FRAME} justify-between`} style={{ backgroundColor: bgColor, color: textColor, fontFamily: theme.fontFamily }}>
+      {slide.customCss && <style>{`[data-slide-canvas] .slide-custom-html { ${slide.customCss} }`}</style>}
       {/* Decorative accent blobs (hex + alpha suffix) */}
       <div className="absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-10 -mt-10 blur-xl" style={{ backgroundColor: `${accentColor}1A` }}></div>
       <div className="absolute bottom-0 left-0 w-40 h-40 rounded-tr-full -ml-10 -mb-10 blur-xl" style={{ backgroundColor: `${accentColor}14` }}></div>
 
       <div className="z-10 relative mt-4 min-h-0 flex-1 flex flex-col">
         <span
-          className="self-start inline-flex items-center gap-1 px-3 py-1 font-bold text-xs rounded-full uppercase tracking-wider mb-4 shrink-0"
-          style={{ backgroundColor: `${accentColor}26`, color: accentColor }}
+          {...dragged('badge')}
+          style={{ ...elementStyle(positionFor(slide, 'badge')), backgroundColor: `${accentColor}26`, color: accentColor }}
+          className="self-start inline-flex items-center gap-1 px-3 py-1 font-bold text-xs rounded-full uppercase tracking-wider mb-4 shrink-0 cursor-move touch-none"
         >
           <EditableText
             value={slide.type}
@@ -308,6 +369,7 @@ const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
         {slide.type === 'quote' ? (
           <>
             <span className="block text-6xl font-serif leading-none -mb-2 shrink-0" style={{ color: accentColor }}>&ldquo;</span>
+            <div {...dragged('content')} style={elementStyle(positionFor(slide, 'content'))}>
             <EditableText
               as="p"
               value={slide.content}
@@ -323,9 +385,11 @@ const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
               <span>&mdash;</span>
               <EditableText value={slide.title} field="author" onCommit={title => update({ title })} className="inline-block min-w-[4ch]" />
             </div>
+            </div>
           </>
         ) : (
           <>
+            <div {...dragged('title')} style={elementStyle(positionFor(slide, 'title'))}>
             <EditableText
               as="h1"
               value={slide.title}
@@ -333,12 +397,14 @@ const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
               onCommit={title => update({ title })}
               className={`block ${slide.type === 'cover' ? 'text-4xl' : 'text-3xl'} font-extrabold leading-tight shrink-0 ${slide.imageUrl ? 'mb-3' : 'mb-4'}`}
             />
+            </div>
             {slide.imageUrl && (
               // Takes whatever height is left between title and text, so the 4:5 frame never overflows
-              <div className="relative flex-1 min-h-[72px] mb-3 rounded-xl overflow-hidden shadow-sm">
+              <div {...dragged('image')} style={elementStyle(positionFor(slide, 'image'))} className="relative flex-1 min-h-[72px] mb-3 rounded-xl overflow-hidden shadow-sm">
                 <img src={slide.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
               </div>
             )}
+            <div {...dragged('content')} style={elementStyle(positionFor(slide, 'content'))}>
             <EditableText
               as="p"
               value={slide.content}
@@ -347,9 +413,13 @@ const SlideCanvas = ({ slide, theme, index, total, logoUrl, onUpdate }: {
               onCommit={content => update({ content })}
               className={`block leading-relaxed font-medium opacity-80 whitespace-pre-line shrink-0 ${slide.imageUrl ? 'text-base line-clamp-4 focus:line-clamp-none' : 'text-lg'}`}
             />
+            </div>
           </>
         )}
       </div>
+      {customHtml && (
+        <div className="slide-custom-html absolute inset-8 z-20 pointer-events-none" dangerouslySetInnerHTML={{ __html: customHtml }} />
+      )}
 
       <div className="z-10 relative flex items-center justify-between mt-4 shrink-0">
         <div className="flex items-center gap-3">
@@ -388,12 +458,127 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [carousel, setCarousel] = useState<CarouselData | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0); // 0-based index into carousel.slides
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<'badge' | 'title' | 'content' | 'image'>('title');
+  const [selectedCustomElementId, setSelectedCustomElementId] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ past: CarouselData[]; future: CarouselData[] }>({ past: [], future: [] });
+  const clipboardRef = useRef<CustomSlideElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const slideImageInputRef = useRef<HTMLInputElement>(null);
+  const slides = carousel?.slides ?? [];
+  const theme = carousel?.theme ?? DEFAULT_THEME;
+  const activeSlide = slides[currentSlide];
+
+  const openAdvancedEditor = () => {
+    if (!activeSlide) return;
+    localStorage.setItem('karuai:advanced-editor-input', JSON.stringify({
+      currentSlide: currentSlide,
+      carousel,
+      theme,
+    }));
+    window.open('/advanced_figma_clone_carousel_editor.html', '_blank', 'noopener,noreferrer');
+  };
+
+  useEffect(() => {
+    const applyEditorResult = () => {
+      const raw = localStorage.getItem('karuai:advanced-editor-result');
+      if (!raw) return;
+      try {
+        const result = JSON.parse(raw) as {
+          slides: Array<{
+            slideId: number;
+            elements: Array<{
+            id: string;
+            type: 'text' | 'rect' | 'ellipse' | 'image';
+            content?: string;
+            x: number;
+            y: number;
+            w: number | 'auto';
+            h: number | 'auto';
+            rotation?: number;
+            radius?: number;
+            fillColor?: string;
+            src?: string;
+            fontSize?: number;
+            }>;
+          }>;
+        };
+        setCarousel(previous => previous ? {
+          ...previous,
+          slides: previous.slides.map(slide => {
+            const edited = result.slides.find(item => item.slideId === slide.id);
+            if (!edited) return slide;
+            const elements: CustomSlideElement[] = edited.elements
+          .filter(element => element.id !== 'slide-background' && element.type !== 'image')
+          .map(element => ({
+            id: element.id,
+            type: element.type === 'rect' ? 'rectangle' : element.type === 'ellipse' ? 'circle' : 'text',
+            content: element.content,
+            position: {
+              x: element.x,
+              y: element.y,
+              width: typeof element.w === 'number' ? element.w : undefined,
+              height: typeof element.h === 'number' ? element.h : undefined,
+              rotation: element.rotation,
+              borderRadius: element.radius,
+            },
+            backgroundColor: element.type === 'text' ? undefined : element.fillColor,
+            color: element.type === 'text' ? element.fillColor : undefined,
+            fontSize: element.fontSize,
+          }));
+            const image = edited.elements.find(element => element.id === 'slide-image' && element.type === 'image');
+            return { ...slide, elements, imageUrl: image?.src || slide.imageUrl };
+          }),
+        } : previous);
+        localStorage.removeItem('karuai:advanced-editor-result');
+      } catch (error) {
+        console.warn('[Karu Dashboard] Failed to apply advanced editor changes.', error);
+      }
+    };
+    window.addEventListener('focus', applyEditorResult);
+    return () => window.removeEventListener('focus', applyEditorResult);
+  }, [slides]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(POST_STORAGE_KEY);
+      if (saved) {
+        const state = JSON.parse(saved) as {
+          carousel?: CarouselData | null;
+          chatMessages?: ChatMessage[];
+          currentSlide?: number;
+          logoUrl?: string | null;
+        };
+        setCarousel(state.carousel ?? null);
+        setChatMessages(state.chatMessages ?? []);
+        setCurrentSlide(Math.max(0, state.currentSlide ?? 0));
+        setLogoUrl(state.logoUrl ?? null);
+      }
+    } catch (error) {
+      console.warn('[Karu Dashboard] Failed to restore the previous post.', error);
+    } finally {
+      setIsHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    try {
+      localStorage.setItem(POST_STORAGE_KEY, JSON.stringify({
+        carousel,
+        chatMessages,
+        currentSlide,
+        logoUrl,
+      }));
+    } catch (error) {
+      console.warn('[Karu Dashboard] Failed to save the current post locally.', error);
+    }
+  }, [carousel, chatMessages, currentSlide, logoUrl, isHydrated]);
 
   // Keep the newest message in view
   useEffect(() => {
@@ -433,12 +618,28 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
       // The AI never returns images, so carry the user's uploads over by slide position
       setCarousel(prev => ({
         ...nextCarousel,
-        slides: nextCarousel.slides.map((slide, i) => ({ ...slide, imageUrl: prev?.slides[i]?.imageUrl })),
+        theme: { ...nextCarousel.theme, fontFamily: prev?.theme.fontFamily ?? nextCarousel.theme.fontFamily },
+        slides: nextCarousel.slides.map((slide, i) => ({
+          ...slide,
+          imageUrl: prev?.slides[i]?.imageUrl,
+          layout: prev?.slides[i]?.layout,
+          customHtml: prev?.slides[i]?.customHtml,
+          customCss: prev?.slides[i]?.customCss,
+          elements: prev?.slides[i]?.elements,
+        })),
       }));
       // Stay on the same slide across edits, as long as it still exists
       setCurrentSlide(prev => Math.min(prev, nextCarousel.slides.length - 1));
 
-      reply = { id: createId(), sender: 'ai', text: 'Carousel updated!' };
+      reply = {
+        id: createId(),
+        sender: 'ai',
+        text: 'Carousel updated. Review and approve an image prompt to add an image to a slide.',
+        imagePrompts: nextCarousel.slides
+          .map((slide, slideIndex) => ({ slideIndex, prompt: slide.imagePrompt.trim() }))
+          .filter(({ prompt }) => prompt.length > 0)
+          .map(({ slideIndex, prompt }) => ({ slideIndex, prompt, status: 'pending' })),
+      };
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error';
       reply = { id: createId(), sender: 'ai', text: `Sorry, something went wrong: ${reason}`, status: 'error' };
@@ -450,6 +651,69 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
     setChatMessages(prev => [...prev.filter(msg => msg.id !== loadingId), reply]);
   };
 
+  const generateImageForPrompt = async (messageId: string, promptIndex: number, prompt: string, slideIndex: number) => {
+    if (isGeneratingImage) return;
+    setIsGeneratingImage(true);
+    setChatMessages(prev => prev.map(message => {
+      if (message.id !== messageId || !message.imagePrompts) return message;
+      return {
+        ...message,
+        imagePrompts: message.imagePrompts.map((item, index) =>
+          index === promptIndex ? { ...item, status: 'generating', error: undefined } : item
+        ),
+      };
+
+    }));
+
+    try {
+      const response = await fetch('/api/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || typeof data?.imageUrl !== 'string') {
+        throw new Error(data?.error || `Image request failed with status ${response.status}`);
+      }
+
+      updateSlide(slideIndex, { imageUrl: data.imageUrl });
+      setCurrentSlide(slideIndex);
+      setChatMessages(prev => prev.map(message => {
+        if (message.id !== messageId || !message.imagePrompts) return message;
+        return {
+          ...message,
+          imagePrompts: message.imagePrompts.map((item, index) =>
+            index === promptIndex ? { ...item, status: 'generated' } : item
+          ),
+        };
+      }));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Image generation failed.';
+      setChatMessages(prev => prev.map(message => {
+        if (message.id !== messageId || !message.imagePrompts) return message;
+        return {
+          ...message,
+          imagePrompts: message.imagePrompts.map((item, index) =>
+            index === promptIndex ? { ...item, status: 'error', error: reason } : item
+          ),
+        };
+      }));
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const approveAllImages = async (messageId: string) => {
+    const message = chatMessages.find(item => item.id === messageId);
+    const pending = message?.imagePrompts?.filter(item => item.status !== 'generated') ?? [];
+    for (const item of pending) {
+      const promptIndex = message?.imagePrompts?.indexOf(item) ?? -1;
+      if (promptIndex >= 0) {
+        await generateImageForPrompt(messageId, promptIndex, item.prompt, item.slideIndex);
+      }
+    }
+  };
+
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter sends, Shift+Enter inserts a newline; ignore Enter while an IME is composing
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -459,10 +723,116 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
   };
 
   const updateSlide = (index: number, patch: Partial<CarouselSlide>) => {
-    setCarousel(prev => prev && {
-      ...prev,
-      slides: prev.slides.map((slide, i) => (i === index ? { ...slide, ...patch } : slide)),
+    setCarousel(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, slides: prev.slides.map((slide, i) => (i === index ? { ...slide, ...patch } : slide)) };
+      setHistory(current => ({ past: [...current.past.slice(-49), prev], future: [] }));
+      return next;
     });
+  };
+
+  const updateTheme = (patch: Partial<CarouselTheme>) => {
+    setCarousel(prev => prev && { ...prev, theme: { ...prev.theme, ...patch } });
+  };
+
+  const updateSelectedElement = (patch: Partial<SlideElementPosition>) => {
+    if (!activeSlide) return;
+    updateSlide(currentSlide, {
+      layout: {
+        ...activeSlide.layout,
+        [selectedElement]: { ...positionFor(activeSlide, selectedElement), ...patch },
+      },
+    });
+  };
+
+  const addElement = (type: CustomSlideElement['type']) => {
+    if (!activeSlide) return;
+    const element: CustomSlideElement = {
+      id: createId(),
+      type,
+      content: type === 'text' ? 'New text' : '',
+      position: { x: 0, y: 0, width: type === 'circle' ? 18 : 32, height: type === 'circle' ? 18 : 12, borderRadius: type === 'circle' ? 999 : 8 },
+      backgroundColor: type === 'rectangle' || type === 'circle' ? theme.accentColor : undefined,
+      color: type === 'text' ? theme.textColor : undefined,
+      fontSize: type === 'text' ? 18 : undefined,
+    };
+    updateSlide(currentSlide, { elements: [...(activeSlide.elements ?? []), element] });
+    setSelectedCustomElementId(element.id);
+  };
+
+  const undo = () => {
+    setHistory(current => {
+      const previous = current.past.at(-1);
+      if (!previous) return current;
+      setCarousel(previous);
+      return { past: current.past.slice(0, -1), future: carousel ? [carousel, ...current.future] : current.future };
+    });
+  };
+
+  const redo = () => {
+    setHistory(current => {
+      const next = current.future[0];
+      if (!next) return current;
+      setCarousel(next);
+      return { past: carousel ? [...current.past, carousel] : current.past, future: current.future.slice(1) };
+    });
+  };
+
+  const duplicateSelectedElement = () => {
+    const element = activeSlide?.elements?.find(item => item.id === selectedCustomElementId);
+    if (!element) return;
+    const duplicate = { ...element, id: createId(), position: { ...element.position, x: element.position.x + 5, y: element.position.y + 5 } };
+    updateSlide(currentSlide, { elements: [...(activeSlide.elements ?? []), duplicate] });
+    setSelectedCustomElementId(duplicate.id);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        event.shiftKey ? redo() : undo();
+      } else if (modifier && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        redo();
+      } else if (modifier && event.key.toLowerCase() === 'c') {
+        const element = activeSlide?.elements?.find(item => item.id === selectedCustomElementId);
+        if (element) clipboardRef.current = structuredClone(element);
+      } else if (modifier && event.key.toLowerCase() === 'v' && clipboardRef.current && activeSlide) {
+        event.preventDefault();
+        const pasted = { ...structuredClone(clipboardRef.current), id: createId(), position: { ...clipboardRef.current.position, x: clipboardRef.current.position.x + 5, y: clipboardRef.current.position.y + 5 } };
+        updateSlide(currentSlide, { elements: [...(activeSlide.elements ?? []), pasted] });
+        setSelectedCustomElementId(pasted.id);
+      } else if (modifier && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        duplicateSelectedElement();
+      } else if (selectedCustomElementId && activeSlide && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
+        const element = activeSlide.elements?.find(item => item.id === selectedCustomElementId);
+        if (!element) return;
+        const delta = event.shiftKey ? 5 : 1;
+        const x = element.position.x + (event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0);
+        const y = element.position.y + (event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0);
+        updateSlide(currentSlide, { elements: activeSlide.elements?.map(item => item.id === selectedCustomElementId ? { ...item, position: { ...item.position, x, y } } : item) });
+      } else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedCustomElementId && activeSlide) {
+        updateSlide(currentSlide, { elements: activeSlide.elements?.filter(item => item.id !== selectedCustomElementId) });
+        setSelectedCustomElementId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeSlide, selectedCustomElementId, currentSlide, carousel]);
+
+  const createNewPost = () => {
+    if (!window.confirm('Start a new post? The current post will be cleared from this browser.')) return;
+    setCarousel(null);
+    setChatMessages([]);
+    setChatInput('');
+    setCurrentSlide(0);
+    setLogoUrl(null);
+    localStorage.removeItem(POST_STORAGE_KEY);
   };
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -489,9 +859,6 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
     }
   };
 
-  const slides = carousel?.slides ?? [];
-  const theme = carousel?.theme ?? DEFAULT_THEME;
-  const activeSlide = slides[currentSlide];
   const colorSwatches = [
     { label: 'Text', color: theme.textColor },
     { label: 'BG', color: theme.bgColor },
@@ -502,11 +869,31 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
     <div className="h-screen w-screen overflow-hidden flex flex-row bg-white text-slate-800 font-sans">
       
       {/* 1. Left Column: Brand & Export Settings (25%) */}
-      <div className="w-[25%] h-full flex flex-col border-r border-gray-200 p-6 bg-white shrink-0">
+      <div className="w-[25%] h-full flex flex-col border-r border-gray-200 p-6 bg-white shrink-0 overflow-y-auto">
         
         {/* Brand Settings Section */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-6 text-slate-900">Brand & Design Settings</h2>
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <h2 className="text-xl font-bold text-slate-900">Brand & Design Settings</h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openAdvancedEditor}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                <Edit2 size={14} />
+                Advanced editor
+              </button>
+              <button
+                type="button"
+                onClick={createNewPost}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-indigo-200 px-2.5 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+              >
+                <Plus size={14} />
+                New post
+              </button>
+            </div>
+          </div>
           
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">Logo</label>
@@ -555,6 +942,99 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
           </div>
         </div>
 
+        {activeSlide && (
+          <div className="mb-8 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+            <label className="block text-sm font-semibold text-slate-800 mb-3">Advanced slide editor</label>
+            <p className="text-xs text-slate-500 mb-3">Drag elements on the canvas. Blue guides mark the center; selected elements show resize and rotate handles.</p>
+            <div className="flex items-center gap-2 mb-3">
+              <button type="button" onClick={undo} disabled={history.past.length === 0} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">
+                <Undo2 size={13} /> Undo
+              </button>
+              <button type="button" onClick={redo} disabled={history.future.length === 0} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">
+                <Redo2 size={13} /> Redo
+              </button>
+              <span className="text-[10px] text-slate-400">C/V/D/Z · arrows move · Shift+arrows = 5px</span>
+            </div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Selected element</label>
+            <select
+              value={selectedElement}
+              onChange={event => setSelectedElement(event.target.value as typeof selectedElement)}
+              className="w-full mb-3 rounded-lg border border-gray-200 bg-white p-2 text-xs"
+            >
+              <option value="badge">Badge</option>
+              <option value="title">Title</option>
+              <option value="content">Content</option>
+              <option value="image">Image</option>
+            </select>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {([
+                ['Width %', 'width', 40],
+                ['Height %', 'height', 20],
+                ['Radius px', 'borderRadius', 12],
+                ['Border px', 'borderWidth', 0],
+              ] as const).map(([label, key, fallback]) => (
+                <label key={key} className="text-[10px] text-slate-600">
+                  {label}
+                  <input
+                    type="number"
+                    min={0}
+                    value={positionFor(activeSlide, selectedElement)[key] ?? fallback}
+                    onChange={event => updateSelectedElement({ [key]: Number(event.target.value) })}
+                    className="mt-1 w-full rounded border border-gray-200 p-1.5 text-xs"
+                  />
+                </label>
+              ))}
+            </div>
+            <label className="block text-[10px] text-slate-600 mb-3">
+              Border color
+              <input
+                type="color"
+                value={positionFor(activeSlide, selectedElement).borderColor ?? '#000000'}
+                onChange={event => updateSelectedElement({ borderColor: event.target.value })}
+                className="mt-1 h-7 w-full rounded border border-gray-200"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button type="button" onClick={() => addElement('text')} className="rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200">+ Text</button>
+              <button type="button" onClick={() => addElement('rectangle')} className="rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200">+ Rectangle</button>
+              <button type="button" onClick={() => addElement('circle')} className="rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200">+ Circle</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {([
+                ['Background', 'bgColor'],
+                ['Text', 'textColor'],
+                ['Accent', 'accentColor'],
+              ] as const).map(([label, key]) => (
+                <label key={key} className="text-[10px] text-slate-600">
+                  {label}
+                  <input
+                    type="color"
+                    value={theme[key]}
+                    onChange={event => updateTheme({ [key]: event.target.value })}
+                    className="mt-1 h-8 w-full cursor-pointer rounded border border-gray-200 bg-white"
+                  />
+                </label>
+              ))}
+            </div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Custom HTML</label>
+            <textarea
+              value={activeSlide.customHtml ?? ''}
+              onChange={event => updateSlide(currentSlide, { customHtml: event.target.value })}
+              placeholder="<strong>Optional overlay</strong>"
+              className="w-full h-16 resize-y rounded-lg border border-gray-200 bg-white p-2 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              spellCheck={false}
+            />
+            <label className="block text-xs font-semibold text-slate-700 mt-3 mb-1">Custom CSS</label>
+            <textarea
+              value={activeSlide.customCss ?? ''}
+              onChange={event => updateSlide(currentSlide, { customCss: event.target.value })}
+              placeholder="color: #4f46e5; font-size: 24px;"
+              className="w-full h-20 resize-y rounded-lg border border-gray-200 bg-white p-2 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              spellCheck={false}
+            />
+          </div>
+        )}
+
         {/* Style Section */}
         <div className="mb-8">
           <label className="block text-sm font-semibold text-gray-700 mb-3">Colors</label>
@@ -575,11 +1055,15 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
           </div>
 
           <label className="block text-sm font-semibold text-gray-700 mb-2">Typography</label>
-          <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-            <option>Inter</option>
-            <option>Roboto</option>
-            <option>Poppins</option>
-            <option>Playfair Display</option>
+          <select
+            value={theme.fontFamily ?? DEFAULT_THEME.fontFamily}
+            onChange={event => updateTheme({ fontFamily: event.target.value })}
+            className="w-full border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+          >
+            <option value="Inter, sans-serif">Inter</option>
+            <option value="Roboto, sans-serif">Roboto</option>
+            <option value="Poppins, sans-serif">Poppins</option>
+            <option value="Georgia, serif">Playfair Display</option>
           </select>
         </div>
 
@@ -637,14 +1121,16 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
           {/* Main 4:5 Canvas */}
           {activeSlide ? (
             <>
-              <SlideCanvas
-                slide={activeSlide}
-                theme={theme}
-                index={currentSlide}
-                total={slides.length}
-                logoUrl={logoUrl}
-                onUpdate={updatedSlide => updateSlide(currentSlide, updatedSlide)}
-              />
+              <div className="relative w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5]">
+                <SlideCanvas
+                  slide={activeSlide}
+                  theme={theme}
+                  index={currentSlide}
+                  total={slides.length}
+                  logoUrl={logoUrl}
+                  onUpdate={updatedSlide => updateSlide(currentSlide, updatedSlide)}
+                />
+              </div>
 
               {/* Slide image controls */}
               <input ref={slideImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleSlideImageChange} />
@@ -728,7 +1214,47 @@ const DashboardScreen = ({ onNavigate }: NavProps) => {
                       : 'bg-white border border-gray-200 text-slate-800 rounded-bl-sm'
                 }`}
               >
-                {msg.status === 'loading' ? <TypingIndicator /> : msg.text}
+                {msg.status === 'loading' ? <TypingIndicator /> : (
+                  <>
+                    <p>{msg.text}</p>
+                    {msg.imagePrompts && msg.imagePrompts.length > 0 && (
+                      <div className="mt-3 space-y-3">
+                        {msg.imagePrompts.some(item => item.status !== 'generated') && (
+                          <button
+                            type="button"
+                            disabled={isGeneratingImage}
+                            onClick={() => approveAllImages(msg.id)}
+                            className="w-full rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isGeneratingImage ? 'Generating approved images...' : 'Approve all & generate'}
+                          </button>
+                        )}
+                        {msg.imagePrompts.map((imagePrompt, promptIndex) => (
+                          <div key={`${msg.id}-${promptIndex}`} className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                            <p className="text-xs font-semibold text-indigo-900 mb-2">
+                              Slide {imagePrompt.slideIndex + 1} image prompt
+                            </p>
+                            <p className="text-xs text-slate-700 mb-3">{imagePrompt.prompt}</p>
+                            {imagePrompt.status === 'generated' ? (
+                              <p className="text-xs font-semibold text-green-700">Image added to slide.</p>
+                            ) : imagePrompt.status === 'error' ? (
+                              <p className="text-xs text-red-600">{imagePrompt.error}</p>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isGeneratingImage || imagePrompt.status === 'generating'}
+                                onClick={() => generateImageForPrompt(msg.id, promptIndex, imagePrompt.prompt, imagePrompt.slideIndex)}
+                                className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {imagePrompt.status === 'generating' ? 'Generating image...' : 'Approve & generate image'}
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}
