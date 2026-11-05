@@ -26,7 +26,6 @@ export interface CarouselTheme {
     bgColor: string;
     textColor: string;
     accentColor: string;
-    fontFamily?: string;
 }
 
 export interface CarouselSlide {
@@ -38,42 +37,6 @@ export interface CarouselSlide {
     // Set only by the user's local uploads in the UI (a base64 data URL). Deliberately not part of
     // CAROUSEL_RESPONSE_SCHEMA: the model never generates images.
     imageUrl?: string;
-    layout?: SlideLayout;
-    customHtml?: string;
-    customCss?: string;
-    elements?: CustomSlideElement[];
-}
-
-export interface SlideLayout {
-    badge?: SlideElementPosition;
-    title?: SlideElementPosition;
-    content?: SlideElementPosition;
-    image?: SlideElementPosition;
-}
-
-export interface SlideElementPosition {
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    borderRadius?: number;
-    borderWidth?: number;
-    borderColor?: string;
-    shadow?: string;
-    rotation?: number;
-}
-
-export type CustomSlideElementType = 'text' | 'rectangle' | 'circle' | 'image';
-
-export interface CustomSlideElement {
-    id: string;
-    type: CustomSlideElementType;
-    content?: string;
-    position: SlideElementPosition;
-    backgroundColor?: string;
-    color?: string;
-    fontSize?: number;
-    src?: string;
 }
 
 export interface CarouselData {

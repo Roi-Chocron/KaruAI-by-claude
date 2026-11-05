@@ -8,13 +8,8 @@ node_modules/
 .env
 .env.local
 
-# Local KaruAI state and metrics
+# Local KaruAI chat history
 .karu/
-
-# WhatsApp MCP runtime data
-whatsapp-sessions/
-logs/mcp-whatsapp.log
-.chrome-pids.json
 
 # Next.js generated files
 next-env.d.ts
