@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+
+# Environment / secrets
+.env
+.env.local
+
+# Local KaruAI chat history
+.karu/
