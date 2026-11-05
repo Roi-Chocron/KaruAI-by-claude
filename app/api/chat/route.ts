@@ -6,7 +6,7 @@ import { generateKaruResponse, KaruResponse } from '../../../karu_response_utili
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MODEL_NAME = 'gemini-1.5-flash';
+const MODEL_NAME = 'gemini-3.8-flash';
 const HISTORY_FILE = path.join(process.cwd(), '.karu', 'chat_history.json');
 
 // generateKaruResponse does read -> call Gemini -> write on the history file, so two

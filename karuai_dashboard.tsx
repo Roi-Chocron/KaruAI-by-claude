@@ -5,6 +5,9 @@ import {
   Upload, AtSign, Download, Edit2, ChevronLeft, ChevronRight, 
   Plus, Bot, Send, Mail, Lock, User, Cookie
 } from 'lucide-react';
+import type {
+  KaruResponse, CarouselData, CarouselSlide, CarouselSlideType, CarouselTheme
+} from './karu_response_utility';
 
 // --- Reusable SVG Icons ---
 const GoogleIcon = () => (
@@ -27,7 +30,10 @@ const KaruLogo = () => (
 
 // --- Sub-components (Screens) ---
 
-const LoginScreen = ({ onNavigate }) => (
+type View = 'login' | 'register' | 'dashboard';
+type NavProps = { onNavigate: (view: View) => void };
+
+const LoginScreen = ({ onNavigate }: NavProps) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
     <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
       <KaruLogo />
@@ -81,7 +87,7 @@ const LoginScreen = ({ onNavigate }) => (
   </div>
 );
 
-const RegisterScreen = ({ onNavigate }) => (
+const RegisterScreen = ({ onNavigate }: NavProps) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
     <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
       <KaruLogo />
@@ -143,13 +149,112 @@ type ChatMessage = {
   status?: 'loading' | 'error';
 };
 
-type KaruResponse = {
-  responseText: string;
-  currentRequestTokens: number;
-  totalConversationTokens: number;
+const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+// --- Carousel helpers ---
+
+const DEFAULT_THEME: CarouselTheme = { bgColor: '#FFFFFF', textColor: '#0F172A', accentColor: '#EC4899' };
+const SLIDE_TYPES: CarouselSlideType[] = ['cover', 'content', 'quote', 'cta'];
+
+// Accepts #RGB or #RRGGBB and returns #RRGGBB (so an alpha suffix can be appended), or null if invalid
+const normalizeHex = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return null;
+  const hex = match[1].length === 3 ? match[1].split('').map(c => c + c).join('') : match[1];
+  return `#${hex.toUpperCase()}`;
 };
 
-const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+// Parses the model's responseText and checks it really has the carousel shape
+const parseCarousel = (responseText: string): CarouselData => {
+  // The response schema should rule out markdown fences, but strip them defensively
+  const cleaned = responseText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+
+  let raw: any;
+  try {
+    raw = JSON.parse(cleaned);
+  } catch {
+    throw new Error('The AI returned invalid JSON. Please try again.');
+  }
+  if (!Array.isArray(raw?.slides) || raw.slides.length === 0) {
+    throw new Error('The AI response did not contain any slides.');
+  }
+
+  return {
+    theme: {
+      bgColor: normalizeHex(raw.theme?.bgColor) ?? DEFAULT_THEME.bgColor,
+      textColor: normalizeHex(raw.theme?.textColor) ?? DEFAULT_THEME.textColor,
+      accentColor: normalizeHex(raw.theme?.accentColor) ?? DEFAULT_THEME.accentColor,
+    },
+    slides: raw.slides.map((slide: any, index: number): CarouselSlide => ({
+      id: Number.isInteger(slide?.id) ? slide.id : index + 1,
+      type: SLIDE_TYPES.includes(slide?.type) ? slide.type : 'content',
+      title: String(slide?.title ?? ''),
+      content: String(slide?.content ?? ''),
+      imagePrompt: String(slide?.imagePrompt ?? ''),
+    })),
+  };
+};
+
+const padNumber = (n: number) => String(n).padStart(2, '0');
+
+const CANVAS_FRAME = 'w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5] shadow-2xl rounded-sm relative p-8 flex flex-col overflow-hidden border border-gray-100';
+
+const SlideCanvas = ({ slide, theme, index, total }: {
+  slide: CarouselSlide; theme: CarouselTheme; index: number; total: number;
+}) => {
+  const { bgColor, textColor, accentColor } = theme;
+
+  return (
+    <div className={`${CANVAS_FRAME} justify-between`} style={{ backgroundColor: bgColor, color: textColor }}>
+      {/* Decorative accent blobs (hex + alpha suffix) */}
+      <div className="absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-10 -mt-10 blur-xl" style={{ backgroundColor: `${accentColor}1A` }}></div>
+      <div className="absolute bottom-0 left-0 w-40 h-40 rounded-tr-full -ml-10 -mb-10 blur-xl" style={{ backgroundColor: `${accentColor}14` }}></div>
+
+      <div className="z-10 relative mt-4 min-h-0">
+        <span
+          className="inline-block px-3 py-1 font-bold text-xs rounded-full uppercase tracking-wider mb-4"
+          style={{ backgroundColor: `${accentColor}26`, color: accentColor }}
+        >
+          {slide.type} · {padNumber(index + 1)}
+        </span>
+
+        {slide.type === 'quote' ? (
+          <>
+            <span className="block text-6xl font-serif leading-none -mb-2" style={{ color: accentColor }}>&ldquo;</span>
+            <p className="text-2xl font-bold italic leading-snug mb-4">{slide.content}</p>
+            <p className="text-sm font-semibold opacity-70">&mdash; {slide.title}</p>
+          </>
+        ) : (
+          <>
+            <h1 className={`${slide.type === 'cover' ? 'text-4xl' : 'text-3xl'} font-extrabold leading-tight mb-4`}>
+              {slide.title}
+            </h1>
+            <p className="text-lg leading-relaxed font-medium opacity-80 whitespace-pre-line">{slide.content}</p>
+          </>
+        )}
+      </div>
+
+      <div className="z-10 relative flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}26` }}>
+            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: accentColor }}></div>
+          </div>
+          <span className="font-bold text-sm">@design.daily</span>
+        </div>
+        <span className="text-xs font-semibold opacity-60">{index + 1} / {total}</span>
+      </div>
+    </div>
+  );
+};
+
+const EmptyCanvas = () => (
+  <div className={`${CANVAS_FRAME} bg-white items-center justify-center text-center border-dashed border-2 border-gray-300`}>
+    <Bot size={40} className="text-indigo-300 mb-4" />
+    <p className="text-slate-700 font-semibold mb-1">No carousel yet</p>
+    <p className="text-sm text-gray-500">Describe your carousel in the chat and KaruAI will build it here.</p>
+  </div>
+);
 
 const TypingIndicator = () => (
   <div className="flex items-center gap-1 py-1" aria-label="KaruAI is typing">
@@ -159,10 +264,12 @@ const TypingIndicator = () => (
   </div>
 );
 
-const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void }) => {
+const DashboardScreen = ({ onNavigate }: NavProps) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [carousel, setCarousel] = useState<CarouselData | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0); // 0-based index into carousel.slides
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Keep the newest message in view
@@ -199,7 +306,12 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
         throw new Error(data?.error || `Request failed with status ${res.status}`);
       }
 
-      reply = { id: createId(), sender: 'ai', text: (data as KaruResponse).responseText };
+      const nextCarousel = parseCarousel((data as KaruResponse).responseText);
+      setCarousel(nextCarousel);
+      // Stay on the same slide across edits, as long as it still exists
+      setCurrentSlide(prev => Math.min(prev, nextCarousel.slides.length - 1));
+
+      reply = { id: createId(), sender: 'ai', text: 'Carousel updated!' };
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error';
       reply = { id: createId(), sender: 'ai', text: `Sorry, something went wrong: ${reason}`, status: 'error' };
@@ -219,8 +331,14 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
     }
   };
 
-  const slides = [1, 2, 3, 4, 5];
-  const [currentSlide, setCurrentSlide] = useState(2);
+  const slides = carousel?.slides ?? [];
+  const theme = carousel?.theme ?? DEFAULT_THEME;
+  const activeSlide = slides[currentSlide];
+  const colorSwatches = [
+    { label: 'Text', color: theme.textColor },
+    { label: 'BG', color: theme.bgColor },
+    { label: 'Accent', color: theme.accentColor },
+  ];
 
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-row bg-white text-slate-800 font-sans">
@@ -258,18 +376,19 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
         <div className="mb-8">
           <label className="block text-sm font-semibold text-gray-700 mb-3">Colors</label>
           <div className="flex gap-4 mb-6">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-10 h-10 rounded-full bg-slate-900 border-2 border-gray-200 cursor-pointer shadow-sm"></div>
-              <span className="text-xs text-gray-500 font-medium">Text</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-10 h-10 rounded-full bg-white border-2 border-gray-200 cursor-pointer shadow-sm"></div>
-              <span className="text-xs text-gray-500 font-medium">BG</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-10 h-10 rounded-full bg-pink-500 border-2 border-gray-200 cursor-pointer shadow-sm ring-2 ring-indigo-500 ring-offset-2"></div>
-              <span className="text-xs text-gray-500 font-medium">Accent</span>
-            </div>
+            {colorSwatches.map(({ label, color }) => (
+              <div key={label} className="flex flex-col items-center gap-1">
+                <div
+                  title={color}
+                  className={`w-10 h-10 rounded-full border-2 border-gray-200 cursor-pointer shadow-sm transition-colors ${
+                    label === 'Accent' ? 'ring-2 ring-indigo-500 ring-offset-2' : ''
+                  }`}
+                  style={{ backgroundColor: color }}
+                ></div>
+                <span className="text-xs text-gray-500 font-medium">{label}</span>
+                <span className="text-[10px] text-gray-400 font-mono">{color}</span>
+              </div>
+            ))}
           </div>
 
           <label className="block text-sm font-semibold text-gray-700 mb-2">Typography</label>
@@ -302,24 +421,28 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
         
         {/* Top Bar */}
         <div className="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <h3 className="font-bold text-lg text-slate-800 group-hover:text-indigo-600 transition-colors">UI/UX Trends 2027</h3>
+          <div className="flex items-center gap-2 group cursor-pointer min-w-0">
+            <h3 className="font-bold text-lg text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
+              {slides[0]?.title || 'Untitled carousel'}
+            </h3>
             <Edit2 size={16} className="text-gray-400 group-hover:text-indigo-600" />
           </div>
           
           <div className="flex items-center gap-4 bg-gray-100 rounded-full px-3 py-1.5 border border-gray-200 shadow-sm">
             <button 
-              onClick={() => setCurrentSlide(Math.max(1, currentSlide - 1))}
-              className="p-1 rounded-full hover:bg-white transition-colors"
+              onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+              disabled={currentSlide <= 0}
+              className="p-1 rounded-full hover:bg-white transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <ChevronLeft size={20} className="text-gray-600" />
             </button>
-            <span className="font-semibold text-sm w-12 text-center text-slate-700">
-              {currentSlide} of {slides.length}
+            <span className="font-semibold text-sm w-16 text-center text-slate-700">
+              {slides.length ? currentSlide + 1 : 0} of {slides.length}
             </span>
             <button 
-              onClick={() => setCurrentSlide(Math.min(slides.length, currentSlide + 1))}
-              className="p-1 rounded-full hover:bg-white transition-colors"
+              onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+              disabled={currentSlide >= slides.length - 1}
+              className="p-1 rounded-full hover:bg-white transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <ChevronRight size={20} className="text-gray-600" />
             </button>
@@ -328,45 +451,29 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
 
         {/* Center: The Canvas */}
         <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-100/50">
-          {/* Main 4:5 Canvas Wrapper */}
-          <div className="w-full max-w-[360px] xl:max-w-[420px] aspect-[4/5] bg-white shadow-2xl rounded-sm relative p-8 flex flex-col justify-between overflow-hidden border border-gray-100">
-            {/* Slide Placeholder Content */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-bl-full -mr-10 -mt-10 blur-xl"></div>
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-500/10 rounded-tr-full -ml-10 -mb-10 blur-xl"></div>
-            
-            <div className="z-10 relative mt-4">
-              <span className="inline-block px-3 py-1 bg-pink-100 text-pink-600 font-bold text-xs rounded-full uppercase tracking-wider mb-4">
-                Trend 0{currentSlide}
-              </span>
-              <h1 className="text-4xl font-extrabold text-slate-900 leading-tight mb-4">
-                The Rise of <br/><span className="text-pink-500">AI Interfaces</span>
-              </h1>
-              <p className="text-gray-600 text-lg leading-relaxed font-medium">
-                By 2027, graphical user interfaces will transition entirely to conversational, predictive, and hyper-personalized AI systems that adapt in real-time.
-              </p>
-            </div>
-
-            <div className="z-10 relative flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                <div className="w-6 h-6 rounded-full bg-indigo-500"></div>
-              </div>
-              <span className="font-bold text-slate-800 text-sm">@design.daily</span>
-            </div>
-          </div>
+          {/* Main 4:5 Canvas */}
+          {activeSlide ? (
+            <SlideCanvas slide={activeSlide} theme={theme} index={currentSlide} total={slides.length} />
+          ) : (
+            <EmptyCanvas />
+          )}
         </div>
 
         {/* Bottom Section: Thumbnails */}
         <div className="h-32 border-t border-gray-200 bg-white flex items-center px-6 overflow-x-auto gap-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-          {slides.map(slide => (
+          {slides.map((slide, index) => (
             <div 
-              key={slide} 
-              onClick={() => setCurrentSlide(slide)}
+              key={`${slide.id}-${index}`} 
+              onClick={() => setCurrentSlide(index)}
+              title={slide.title}
               className={`h-20 w-16 shrink-0 aspect-[4/5] rounded-md border-2 cursor-pointer transition-all ${
-                currentSlide === slide ? 'border-indigo-600 shadow-md scale-105' : 'border-gray-200 hover:border-indigo-300 opacity-60 hover:opacity-100'
-              } flex items-center justify-center bg-gray-50 relative overflow-hidden`}
+                currentSlide === index ? 'border-indigo-600 shadow-md scale-105' : 'border-gray-200 hover:border-indigo-300 opacity-60 hover:opacity-100'
+              } flex flex-col justify-between p-1.5 relative overflow-hidden`}
+              style={{ backgroundColor: theme.bgColor, color: theme.textColor }}
             >
-              <div className="absolute inset-x-2 top-2 h-1/2 bg-gray-200 rounded-sm"></div>
-              <div className="absolute left-2 bottom-2 w-1/2 h-1 bg-gray-300 rounded-full"></div>
+              <div className="h-1 w-1/2 rounded-full" style={{ backgroundColor: theme.accentColor }}></div>
+              <p className="text-[6px] font-bold leading-tight line-clamp-3">{slide.title}</p>
+              <span className="text-[8px] font-semibold opacity-60 self-end">{index + 1}</span>
             </div>
           ))}
           <button className="h-20 w-16 shrink-0 aspect-[4/5] rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer bg-gray-50">
@@ -437,7 +544,7 @@ const DashboardScreen = ({ onNavigate }: { onNavigate: (view: string) => void })
   );
 };
 
-const CookieBanner = ({ onAccept }) => (
+const CookieBanner = ({ onAccept }: { onAccept: () => void }) => (
   <div className="fixed bottom-6 left-6 max-w-sm bg-slate-900 text-white p-5 rounded-2xl shadow-2xl z-50 flex flex-col gap-4 border border-slate-700">
     <div className="flex items-start gap-3">
       <Cookie className="text-yellow-400 shrink-0 mt-0.5" size={24} />
@@ -462,7 +569,7 @@ const CookieBanner = ({ onAccept }) => (
 // --- Main App Component ---
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('login'); // 'login' | 'register' | 'dashboard'
+  const [currentView, setCurrentView] = useState<View>('login');
   const [showCookie, setShowCookie] = useState(true);
 
   return (

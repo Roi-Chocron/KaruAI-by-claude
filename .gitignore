@@ -10,3 +10,7 @@ node_modules/
 
 # Local KaruAI chat history
 .karu/
+
+# Next.js generated files
+next-env.d.ts
+*.tsbuildinfo

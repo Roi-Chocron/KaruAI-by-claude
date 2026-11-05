@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, Content } from '@google/generative-ai';
+import { GoogleGenerativeAI, Content, ModelParams, ResponseSchema, SchemaType } from '@google/generative-ai';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -19,6 +19,74 @@ export interface ConversationState {
     lastMetrics: ConversationMetrics | null;
 }
 
+// Structured carousel output returned (as a JSON string) in KaruResponse.responseText
+export type CarouselSlideType = 'cover' | 'content' | 'quote' | 'cta';
+
+export interface CarouselTheme {
+    bgColor: string;
+    textColor: string;
+    accentColor: string;
+}
+
+export interface CarouselSlide {
+    id: number;
+    type: CarouselSlideType;
+    title: string;
+    content: string;
+    imagePrompt: string;
+}
+
+export interface CarouselData {
+    theme: CarouselTheme;
+    slides: CarouselSlide[];
+}
+
+export const KARU_SYSTEM_PROMPT =
+    "You are KaruAI, an expert Instagram carousel generator. Based on the user's request, generate a highly engaging carousel. " +
+    'You must return ONLY a valid JSON object matching the schema. No markdown wrapping, no conversational filler. ' +
+    'When the user asks to change an existing carousel, return the complete updated carousel, not just the changed parts.';
+
+const hexColor = (description: string) => ({
+    type: SchemaType.STRING as const,
+    description: `${description} as a 6-digit hex code, e.g. #1E293B`,
+});
+
+export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
+    type: SchemaType.OBJECT,
+    properties: {
+        theme: {
+            type: SchemaType.OBJECT,
+            properties: {
+                bgColor: hexColor('Slide background color'),
+                textColor: hexColor('Main text color, readable on bgColor'),
+                accentColor: hexColor('Accent color for highlights and badges'),
+            },
+            required: ['bgColor', 'textColor', 'accentColor'],
+        },
+        slides: {
+            type: SchemaType.ARRAY,
+            description: 'The carousel slides in display order',
+            items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                    id: { type: SchemaType.INTEGER, description: '1-based position of the slide' },
+                    type: {
+                        type: SchemaType.STRING,
+                        format: 'enum',
+                        enum: ['cover', 'content', 'quote', 'cta'],
+                        description: 'cover = opening hook, content = main points, quote = a quotation, cta = closing call to action',
+                    },
+                    title: { type: SchemaType.STRING },
+                    content: { type: SchemaType.STRING },
+                    imagePrompt: { type: SchemaType.STRING, description: 'Prompt for generating an image for this slide later' },
+                },
+                required: ['id', 'type', 'title', 'content', 'imagePrompt'],
+            },
+        },
+    },
+    required: ['theme', 'slides'],
+};
+
 export interface KaruResponse {
     responseText: string;
     currentRequestTokens: number;
@@ -32,14 +100,14 @@ export interface KaruResponse {
  * @param userInput - The text message from the user.
  * @param modelName - The specific Gemini model to use (e.g., 'gemini-1.5-flash').
  * @param jsonFilename - The path to the JSON file where the conversation state is saved.
- * @param systemPrompt - Optional system instructions to guide the model's behavior.
- * @returns An object containing the response text and token metrics.
+ * @param systemPrompt - System instructions to guide the model's behavior (defaults to the KaruAI carousel prompt).
+ * @returns An object containing the response text (a CarouselData JSON string) and token metrics.
  */
 export async function generateKaruResponse(
     userInput: string,
     modelName: string,
     jsonFilename: string,
-    systemPrompt?: string
+    systemPrompt: string = KARU_SYSTEM_PROMPT
 ): Promise<KaruResponse> {
     // 1. Ensure the API key is present
     const apiKey = process.env.GEMINI_API_KEY;
@@ -67,7 +135,14 @@ export async function generateKaruResponse(
     // 3. Initialize the SDK Model
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    const modelConfig: any = { model: modelName };
+    // Force structured JSON output matching the carousel schema
+    const modelConfig: ModelParams = {
+        model: modelName,
+        generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: CAROUSEL_RESPONSE_SCHEMA,
+        },
+    };
     // Configure system prompt if provided
     if (systemPrompt && systemPrompt.trim() !== '') {
         modelConfig.systemInstruction = systemPrompt;
