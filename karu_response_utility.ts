@@ -209,6 +209,7 @@ export interface KaruResponse {
  * @param systemPrompt - System instructions to guide the model's behavior (defaults to the KaruAI carousel prompt).
  * @param turnContext - Extra text sent with this message only (e.g. the current carousel). It is not stored in the
  *                      history, so the history keeps just what the user wrote.
+ * @param geminiApiKey - API key to use instead of the GEMINI_API_KEY environment variable.
  * @returns An object containing the response text (a CarouselData JSON string) and token metrics.
  */
 export async function generateKaruResponse(
@@ -216,10 +217,11 @@ export async function generateKaruResponse(
     modelName: string,
     jsonFilename: string,
     systemPrompt: string = KARU_SYSTEM_PROMPT,
-    turnContext?: string
+    turnContext?: string,
+    geminiApiKey?: string
 ): Promise<KaruResponse> {
-    // 1. Ensure the API key is present
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 1. Ensure the API key is present (the caller's, else the environment's)
+    const apiKey = geminiApiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error('GEMINI_API_KEY environment variable is not set.');
     }

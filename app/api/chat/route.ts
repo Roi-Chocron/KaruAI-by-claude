@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { generateKaruResponse, KaruResponse, KARU_SYSTEM_PROMPT } from '../../../karu_response_utility';
-import { assertExists, CarouselNotFoundError, chatHistoryFile, isCarouselId } from '../../../carousel_store';
+import { CarouselNotFoundError, chatHistoryFile, getOwnedCarousel } from '../../../carousel_store';
+import { getCurrentUser, unauthorized } from '../../../karu_auth';
+import { DEFAULT_GEMINI_MODEL, getSetting } from '../../../karu_db';
 
 // The utility reads/writes the history file with `fs`, so this must run on the Node.js runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MODEL_NAME = 'gemini-3-flash-preview';
 const MAX_CAROUSEL_CHARS = 400_000;
 
 // generateKaruResponse does read -> call Gemini -> write on the history file, so two
@@ -43,6 +44,9 @@ function formatWait(seconds: number | undefined) {
 }
 
 export async function POST(request: Request) {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
+
     // 1. Validate the request body
     let body: unknown;
     try {
@@ -56,13 +60,10 @@ export async function POST(request: Request) {
         return errorResponse('`message` must be a non-empty string.', 400);
     }
 
-    // Every carousel has its own Gemini conversation
-    const carouselId = (body as { carouselId?: unknown } | null)?.carouselId;
-    if (!isCarouselId(carouselId)) {
-        return errorResponse('`carouselId` is missing or invalid.', 400);
-    }
+    // Every carousel has its own Gemini conversation, and only its owner may talk to it
+    let carouselId: string;
     try {
-        await assertExists(carouselId);
+        carouselId = getOwnedCarousel((body as { carouselId?: unknown } | null)?.carouselId, user).id;
     } catch (error) {
         if (error instanceof CarouselNotFoundError) return errorResponse(error.message, 404);
         throw error;
@@ -86,14 +87,21 @@ export async function POST(request: Request) {
     // 2. Call the utility and map failures to HTTP status codes
     try {
         const result: KaruResponse = await enqueue(() =>
-            generateKaruResponse(message.trim(), MODEL_NAME, chatHistoryFile(carouselId), KARU_SYSTEM_PROMPT, turnContext)
+            generateKaruResponse(
+                message.trim(),
+                getSetting('gemini_model') || DEFAULT_GEMINI_MODEL,
+                chatHistoryFile(carouselId),
+                KARU_SYSTEM_PROMPT,
+                turnContext,
+                getSetting('gemini_api_key')
+            )
         );
         return NextResponse.json(result, { status: 200 });
     } catch (error: any) {
         console.error('[api/chat] generateKaruResponse failed:', error);
 
         if (error?.message?.includes('GEMINI_API_KEY')) {
-            return errorResponse('Server is missing its Gemini API key configuration.', 500);
+            return errorResponse('No Gemini API key is set. An admin can add one on the Admin page.', 500);
         }
 
         // Errors from the Gemini SDK carry the upstream HTTP status

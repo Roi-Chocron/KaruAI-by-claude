@@ -11,6 +11,7 @@ export interface PollinationsImageOptions {
     safe?: boolean;
     metricsFilename?: string;
     timeoutMs?: number;
+    apiKey?: string; // defaults to the POLLINATIONS_API_KEY environment variable
 }
 
 export interface PollinationsImageMetrics {
@@ -67,7 +68,7 @@ export async function generatePollinationsImage(
     const startTime = new Date();
     let response: Response;
     try {
-        const apiKey = process.env.POLLINATIONS_API_KEY;
+        const apiKey = options.apiKey || process.env.POLLINATIONS_API_KEY;
         response = await fetch(endpoint, {
             headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
             signal: AbortSignal.timeout(options.timeoutMs ?? 120_000),

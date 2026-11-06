@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
-    CarouselNotFoundError, decodeImageDataUrl, deleteCarousel, readCarousel, saveCarousel,
+    CarouselNotFoundError, decodeImageDataUrl, deleteCarousel, getOwnedCarousel, readCarouselDocument, saveCarousel,
 } from '../../../../carousel_store';
+import { getCurrentUser, unauthorized } from '../../../../karu_auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,9 +18,12 @@ function errorResponse(error: unknown, action: string) {
 }
 
 export async function GET(_request: Request, { params }: Context) {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
     const { id } = await params;
     try {
-        return NextResponse.json(await readCarousel(id));
+        const meta = getOwnedCarousel(id, user);
+        return NextResponse.json({ meta, document: await readCarouselDocument(meta.id) });
     } catch (error) {
         return errorResponse(error, 'load');
     }
@@ -27,6 +31,8 @@ export async function GET(_request: Request, { params }: Context) {
 
 // Autosave from the editor: the whole document, plus an optional JPEG thumbnail of the first slide
 export async function PUT(request: Request, { params }: Context) {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
     const { id } = await params;
     let body: any;
     try {
@@ -42,22 +48,24 @@ export async function PUT(request: Request, { params }: Context) {
         return NextResponse.json({ error: '`thumbnail` must be a JPEG data URL.' }, { status: 400 });
     }
     try {
-        const meta = await saveCarousel(id, {
-            title: typeof body.title === 'string' ? body.title.slice(0, 200) : '',
+        const meta = getOwnedCarousel(id, user);
+        return NextResponse.json(await saveCarousel(meta.id, {
+            title: typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '',
             slideCount: Number.isInteger(body.slideCount) ? body.slideCount : 0,
             document: body.document,
             thumbnail: thumbnail?.data,
-        });
-        return NextResponse.json(meta);
+        }));
     } catch (error) {
         return errorResponse(error, 'save');
     }
 }
 
 export async function DELETE(_request: Request, { params }: Context) {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
     const { id } = await params;
     try {
-        await deleteCarousel(id);
+        await deleteCarousel(getOwnedCarousel(id, user).id);
         return new NextResponse(null, { status: 204 });
     } catch (error) {
         return errorResponse(error, 'delete');

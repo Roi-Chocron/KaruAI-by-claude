@@ -118,7 +118,13 @@
 
     <!-- LEFT COLUMN -->
     <aside class="w-[25%] h-full flex flex-col border-r border-gray-200 bg-white shrink-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-        <div class="flex h-14 border-b border-gray-200 shrink-0 bg-gray-50/50">
+        <div class="flex items-center gap-1 h-14 px-2 border-b border-gray-200 shrink-0">
+            <button onclick="goToGallery()" class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-md transition-all shrink-0" title="All carousels"><i data-lucide="layout-grid" class="w-4 h-4"></i></button>
+            <input id="carousel-title" type="text" dir="auto" maxlength="200" placeholder="Untitled carousel" title="Rename the carousel"
+                class="flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm font-bold text-slate-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:bg-white outline-none transition-colors"
+                onchange="renameCarousel(this.value)" onkeydown="if (event.key === 'Enter') this.blur()">
+        </div>
+        <div class="flex h-12 border-b border-gray-200 shrink-0 bg-gray-50/50">
             <button onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
                 <i data-lucide="palette" class="w-4 h-4"></i> Brand
             </button>
@@ -151,7 +157,6 @@
     <!-- MIDDLE COLUMN -->
     <main class="w-[50%] h-full flex flex-col relative shrink-0">
         <header class="h-14 border-b border-gray-200 px-4 flex items-center justify-between gap-2 bg-white shrink-0 shadow-sm z-10 whitespace-nowrap">
-            <button onclick="goToGallery()" class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-md transition-all shrink-0" title="All carousels"><i data-lucide="layout-grid" class="w-4 h-4"></i></button>
             <div class="flex gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                 <button onclick="setTool('V')" id="tool-V" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
                 <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
@@ -211,8 +216,14 @@
             </div>
         </div>
 
-        <footer id="slide-thumbnails" class="h-28 border-t border-gray-200 bg-white flex items-center px-6 overflow-x-auto gap-4 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
-            <div class="text-xs text-gray-400">No carousel generated yet.</div>
+        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 pl-5 pr-3 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
+            <div id="slide-thumbnails" class="flex-1 min-w-0 h-full flex items-center gap-4 overflow-x-auto px-1"></div>
+            <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 pl-3 border-l border-gray-100">
+                <button id="slide-move-earlier" onclick="moveSlide(-1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide earlier"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                <button id="slide-move-later" onclick="moveSlide(1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide later"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                <button onclick="duplicateSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800" title="Duplicate slide"><i data-lucide="copy" class="w-4 h-4"></i></button>
+                <button id="slide-delete" onclick="deleteSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent" title="Delete slide"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            </div>
         </footer>
     </main>
 
@@ -454,8 +465,10 @@
 
         // One undo history for the whole carousel: every entry is a snapshot of all slides in both versions, so
         // undo also reverts Brand changes, image approvals and AI edits, not only the slide on screen. Each entry
-        // remembers which slide the change was made on, and undo/redo jump back to it.
+        // remembers which slide the change was made on, and undo/redo jump back to it. The history is saved
+        // with the carousel; every entry has its own number so a save only uploads the entries that are new.
         const HISTORY_LIMIT = 100;
+        let historySeq = 0;
 
         function documentSnapshot() {
             rememberCurrentSlide();
@@ -471,13 +484,13 @@
             const snapshot = documentSnapshot();
             if (history[historyIndex]?.snapshot === snapshot) return; // nothing actually changed (e.g. a click)
             history = history.slice(0, historyIndex + 1);
-            history.push({ snapshot, slide: state.currentSlide });
+            history.push({ seq: ++historySeq, snapshot, slide: state.currentSlide });
             if (history.length > HISTORY_LIMIT) history.shift();
             historyIndex = history.length - 1;
         }
 
         function resetHistory() {
-            history = [{ snapshot: documentSnapshot(), slide: state.currentSlide }];
+            history = [{ seq: ++historySeq, snapshot: documentSnapshot(), slide: state.currentSlide }];
             historyIndex = 0;
         }
 
@@ -765,7 +778,10 @@
             state.slides = slides;
             state.slideData = slideData;
             state.carouselVersion = ++lastCarouselVersion;
-            if (typeof carousel.title === 'string' && carousel.title.trim()) carouselTitle = carousel.title.trim().slice(0, 200);
+            if (!titleLocked && typeof carousel.title === 'string' && carousel.title.trim()) {
+                carouselTitle = carousel.title.trim().slice(0, 200);
+                showTitle();
+            }
             loadSlide(Math.min(state.currentSlide, slides.length - 1));
             saveHistory();
         }
@@ -1072,10 +1088,6 @@
         function renderThumbnails() {
             const footer = document.getElementById('slide-thumbnails');
             footer.innerHTML = '';
-            if (!state.slideData.length) {
-                footer.innerHTML = '<div class="text-xs text-gray-400">No carousel generated yet.</div>';
-                return;
-            }
             state.slideData.forEach((data, index) => {
                 const button = document.createElement('button');
                 button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 shadow-sm overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
@@ -1091,6 +1103,12 @@
                 button.onclick = () => selectSlide(index);
                 footer.appendChild(button);
             });
+            const add = document.createElement('button');
+            add.className = 'h-20 w-16 shrink-0 rounded-md border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all';
+            add.title = 'Add a blank slide after this one';
+            add.innerHTML = '<span class="text-2xl leading-none">+</span><span class="text-[9px] font-semibold">Slide</span>';
+            add.onclick = addSlide;
+            footer.appendChild(add);
         }
 
         function renderVariantToggle() {
@@ -1117,6 +1135,7 @@
             updatePropertiesPanel();
             refreshPromptCards();
             renderBrandPanel();
+            renderSlideActions();
             scheduleSave();
         }
 
@@ -1267,33 +1286,17 @@
 
         // Workspace Interactions
         function handleWorkspaceDown(e) {
-            if (e.target.closest('.element')) return; 
             if (e.target.closest('.resize-handle')) return;
-            
             const rect = canvasContainer.getBoundingClientRect();
             const x = (e.clientX - rect.left) / state.zoom;
             const y = (e.clientY - rect.top) / state.zoom;
-
             if (state.tool !== 'V') {
-                let type = state.tool === 'R' ? 'rect' : state.tool === 'O' ? 'ellipse' : 'text';
-                const newEl = {
-                    id: generateId(), type: type, name: type === 'rect' ? 'Rectangle' : type === 'ellipse' ? 'Ellipse' : 'Text',
-                    x: x, y: y, w: type === 'text' ? 400 : 200, h: type === 'text' ? 'auto' : 200,
-                    rotation: 0, radius: type === 'ellipse' ? 9999 : 0,
-                    fillColor: type === 'text' ? '#0f172a' : '#cbd5e1', fillOpacity: 100,
-                    strokeColor: '#000000', strokeWidth: 0, strokeStyle: 'solid',
-                    shadowType: 'none', shadowX: 0, shadowY: 4, shadowBlur: 4, shadowSpread: 0, shadowColor: '#000000',
-                    content: type === 'text' ? 'New Text' : '', fontSize: 64, fontWeight: '700', textAlign: 'right',
-                    fontFamily: DEFAULT_FONT, lineHeight: 1.2, letterSpacing: 0
-                };
-                state.elements.push(newEl);
-                state.selectedIds = [newEl.id];
-                setTool('V');
-                switchLeftTab('layers');
-                switchRightTab('design');
-                saveHistory();
-                renderAll();
-            } else {
+                startDrawing(x, y);
+                return;
+            }
+            if (e.target.closest('.element')) return;
+
+            {
                 state.dragState = { type: 'select', startX: x, startY: y };
                 if (!e.shiftKey) {
                     state.selectedIds = [];
@@ -1303,8 +1306,8 @@
         }
 
         function handleElementDown(e, id) {
+            if (state.tool !== 'V') return; // drawing: let the workspace start the new shape here
             e.stopPropagation();
-            if (state.tool !== 'V') return;
 
             if (e.shiftKey) {
                 if (state.selectedIds.includes(id)) state.selectedIds = state.selectedIds.filter(x => x !== id);
@@ -1346,7 +1349,27 @@
             
             const rect = canvasContainer.getBoundingClientRect();
             
-            if (state.dragState.type === 'select') {
+            if (state.dragState.type === 'create') {
+                const { startX, startY, element } = state.dragState;
+                const currX = (e.clientX - rect.left) / state.zoom;
+                const currY = (e.clientY - rect.top) / state.zoom;
+                let w = Math.abs(currX - startX);
+                let h = Math.abs(currY - startY);
+                if (e.shiftKey && element.type !== 'text') w = h = Math.max(w, h);
+                element.x = Math.round(currX < startX ? startX - w : startX);
+                element.y = Math.round(currY < startY ? startY - h : startY);
+                element.w = Math.max(1, Math.round(w));
+                if (element.type !== 'text') element.h = Math.max(1, Math.round(h));
+                const domEl = document.querySelector(`.element[data-id="${element.id}"]`);
+                if (domEl) {
+                    domEl.style.left = `${element.x}px`;
+                    domEl.style.top = `${element.y}px`;
+                    domEl.style.width = `${element.w}px`;
+                    if (element.type !== 'text') domEl.style.height = `${element.h}px`;
+                }
+                updateSelectionOverlay();
+            }
+            else if (state.dragState.type === 'select') {
                 const currX = (e.clientX - rect.left) / state.zoom;
                 const currY = (e.clientY - rect.top) / state.zoom;
                 const x = Math.min(state.dragState.startX, currX);
@@ -1473,6 +1496,7 @@
 
         window.onmouseup = () => {
             if(state.dragState) {
+                if (state.dragState.type === 'create') finishDrawing();
                 if(['move', 'resize', 'select'].includes(state.dragState.type)) saveHistory();
                 state.dragState = null;
                 document.getElementById('dragBox').style.display = 'none';
@@ -1563,6 +1587,132 @@
             else if (e.code === 'KeyT') setTool('T');
             else if (e.code === 'KeyI') pickImageFile();
         });
+
+        // --- Slides added and arranged by hand ---
+
+        function nextSlideId() { return Math.max(0, ...state.slides.map(slide => slide.id)) + 1; }
+
+        function newSlideData(elements) {
+            return {
+                mode: 'without',
+                variants: { with: cloneElements(elements), without: elements },
+                aiIds: { with: [], without: [] },
+                deleted: { with: [], without: [] }
+            };
+        }
+
+        // A blank slide after the current one, on the current slide's background
+        function addSlide() {
+            rememberCurrentSlide();
+            const at = state.slides.length ? state.currentSlide + 1 : 0;
+            const current = state.slideData[state.currentSlide];
+            const bottom = current?.variants[current.mode][0];
+            const isBackground = bottom && bottom.type === 'rect' && bottom.x <= 0 && bottom.y <= 0 && bottom.w >= CANVAS_W && bottom.h >= CANVAS_H;
+            const background = isBackground
+                ? { ...cloneElements([bottom])[0], id: 'bg', name: 'Background' }
+                : baseElement({ id: 'bg', type: 'rect', name: 'Background', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: '#FFFFFF' });
+            state.slides.splice(at, 0, { id: nextSlideId(), title: `Slide ${at + 1}`, imagePrompt: '' });
+            state.slideData.splice(at, 0, newSlideData([background]));
+            loadSlide(at);
+            saveHistory();
+        }
+
+        function duplicateSlide() {
+            if (!state.slides.length) return;
+            rememberCurrentSlide();
+            const at = state.currentSlide + 1;
+            state.slides.splice(at, 0, { ...state.slides[state.currentSlide], id: nextSlideId() });
+            state.slideData.splice(at, 0, JSON.parse(JSON.stringify(state.slideData[state.currentSlide])));
+            loadSlide(at);
+            saveHistory();
+        }
+
+        function deleteSlide() {
+            if (state.slides.length <= 1) return; // a carousel keeps at least one slide
+            rememberCurrentSlide();
+            state.slides.splice(state.currentSlide, 1);
+            state.slideData.splice(state.currentSlide, 1);
+            loadSlide(Math.min(state.currentSlide, state.slides.length - 1));
+            saveHistory();
+        }
+
+        function moveSlide(direction) {
+            const from = state.currentSlide;
+            const to = from + direction;
+            if (to < 0 || to >= state.slides.length) return;
+            rememberCurrentSlide();
+            [state.slides[from], state.slides[to]] = [state.slides[to], state.slides[from]];
+            [state.slideData[from], state.slideData[to]] = [state.slideData[to], state.slideData[from]];
+            loadSlide(to);
+            saveHistory();
+        }
+
+        function renderSlideActions() {
+            const hasSlides = state.slides.length > 0;
+            const actions = document.getElementById('slide-actions');
+            actions.classList.toggle('hidden', !hasSlides);
+            actions.classList.toggle('grid', hasSlides);
+            if (!hasSlides) return;
+            document.getElementById('slide-move-earlier').disabled = state.currentSlide === 0;
+            document.getElementById('slide-move-later').disabled = state.currentSlide === state.slides.length - 1;
+            document.getElementById('slide-delete').disabled = state.slides.length <= 1;
+        }
+
+        // --- Carousel name ---
+
+        let titleLocked = false; // once the user names the carousel, the AI no longer renames it
+
+        function showTitle() {
+            const input = document.getElementById('carousel-title');
+            if (document.activeElement !== input) input.value = carouselTitle;
+        }
+
+        function renameCarousel(value) {
+            carouselTitle = value.trim().slice(0, 200);
+            titleLocked = carouselTitle !== '';
+            showTitle();
+            scheduleSave();
+        }
+
+        // --- Drawing shapes ---
+        // With the rectangle, ellipse or text tool, press anywhere (on the slide too) and drag to draw;
+        // a plain click places a default-size shape centered on that point. Shift keeps shapes square.
+
+        function startDrawing(x, y) {
+            const type = state.tool === 'R' ? 'rect' : state.tool === 'O' ? 'ellipse' : 'text';
+            const element = baseElement({
+                id: generateId(), type,
+                name: type === 'rect' ? 'Rectangle' : type === 'ellipse' ? 'Ellipse' : 'Text',
+                x: Math.round(x), y: Math.round(y), w: 1, h: type === 'text' ? 'auto' : 1,
+                radius: type === 'ellipse' ? 9999 : 0,
+                fillColor: type === 'text' ? '#0F172A' : '#CBD5E1',
+                ...(type === 'text' ? { content: 'New Text', fontFamily: DEFAULT_FONT, fontSize: 64, fontWeight: '700', textAlign: 'right', lineHeight: 1.2, letterSpacing: 0 } : {})
+            });
+            state.elements.push(element);
+            state.selectedIds = [element.id];
+            state.dragState = { type: 'create', startX: x, startY: y, element };
+            renderAll();
+        }
+
+        function finishDrawing() {
+            const { element, startX, startY } = state.dragState;
+            if (element.w < 8 && (element.type === 'text' || element.h < 8)) {
+                const w = element.type === 'text' ? 400 : 200;
+                const h = 200;
+                element.w = w;
+                element.x = Math.round(startX - w / 2);
+                if (element.type === 'text') {
+                    element.y = Math.round(startY - element.fontSize * 0.6);
+                } else {
+                    element.h = h;
+                    element.y = Math.round(startY - h / 2);
+                }
+            }
+            setTool('V');
+            switchLeftTab('layers');
+            switchRightTab('design');
+            saveHistory();
+        }
 
         function addChatBubble(text, tone = 'ai') {
             chatLog.push({ tone, text });
@@ -1685,8 +1835,12 @@
         function renderImagePrompts() {
             const version = state.carouselVersion;
             const isStale = () => version !== state.carouselVersion;
+            // Rows follow their slide by id, so they stay right when slides are added, moved or deleted
             const rows = state.slides
-                .map((slide, index) => ({ index, prompt: slide.imagePrompt, busy: false, note: '', error: '' }))
+                .map(slide => ({
+                    slideId: slide.id, prompt: slide.imagePrompt, busy: false, note: '', error: '',
+                    get index() { return state.slides.findIndex(item => item.id === this.slideId); }
+                }))
                 .filter(row => row.prompt && imageSlot(state.slideData[row.index]));
             if (!rows.length) return;
 
@@ -1706,7 +1860,7 @@
             card.append(heading, subheading, approveAllButton);
 
             const generate = async (row) => {
-                if (row.busy || isStale()) return;
+                if (row.busy || isStale() || row.index === -1) return;
                 row.busy = true;
                 row.note = '';
                 row.error = '';
@@ -1724,7 +1878,7 @@
                     const data = await response.json().catch(() => null);
                     if (!response.ok && data?.retryable) throw new Error('The image service is under heavy load. Please try again in a minute.');
                     if (!response.ok || typeof data?.imageUrl !== 'string') throw new Error(data?.error || `Image request failed with status ${response.status}`);
-                    if (!isStale()) applySlideImage(row.index, data.imageUrl);
+                    if (!isStale() && row.index !== -1) applySlideImage(row.index, data.imageUrl);
                 } catch (error) {
                     row.error = error instanceof Error ? error.message : 'Image generation failed.';
                 } finally {
@@ -1734,6 +1888,7 @@
             };
 
             const skip = (row) => {
+                if (row.index === -1) return;
                 row.error = '';
                 state.slideData[row.index].skipped = true;
                 setSlideModeAt(row.index, 'without');
@@ -1746,7 +1901,7 @@
                 for (const row of rows) {
                     if (isStale()) return;
                     const data = state.slideData[row.index];
-                    if (row.busy || data.mode === 'with') continue;
+                    if (!data || row.busy || data.mode === 'with') continue;
                     if (hasSlotImage(data)) setSlideModeAt(row.index, 'with');
                     else await generate(row);
                 }
@@ -1758,10 +1913,7 @@
                 const title = document.createElement('button');
                 title.type = 'button';
                 title.className = 'block text-xs font-semibold text-slate-800 hover:text-indigo-600 mb-1.5';
-                const size = imageRequestSize(row.index);
-                const slideTitle = state.slides[row.index].title;
-                title.textContent = `Slide ${row.index + 1}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
-                title.onclick = () => { if (!isStale()) selectSlide(row.index); };
+                title.onclick = () => { if (!isStale() && row.index !== -1) selectSlide(row.index); };
                 const textarea = document.createElement('textarea');
                 textarea.className = 'w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs text-slate-700 focus:border-indigo-500 outline-none resize-y h-20 mb-2';
                 textarea.value = row.prompt;
@@ -1770,17 +1922,23 @@
                 actions.className = 'flex flex-wrap items-center gap-2';
                 item.append(title, textarea, actions);
                 card.appendChild(item);
-                row.ui = { textarea, actions };
+                row.ui = { title, textarea, actions };
             });
 
             function render() {
                 const stale = isStale();
-                approveAllButton.disabled = stale || rows.every(row => row.busy || state.slideData[row.index]?.mode === 'with');
+                approveAllButton.disabled = stale || rows.every(row => row.busy || (state.slideData[row.index]?.mode ?? 'with') === 'with');
                 rows.forEach(row => {
-                    const { textarea, actions } = row.ui;
-                    const data = state.slideData[row.index];
+                    const { title, textarea, actions } = row.ui;
+                    const index = row.index;
+                    const data = state.slideData[index];
                     const hasPrompt = row.prompt.trim() !== '';
-                    textarea.disabled = stale || row.busy;
+                    textarea.disabled = stale || row.busy || !data;
+                    if (data) {
+                        const size = imageRequestSize(index);
+                        const slideTitle = state.slides[index].title;
+                        title.textContent = `Slide ${index + 1}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
+                    }
                     actions.innerHTML = '';
                     const status = (text, color = 'text-gray-500') => {
                         const span = document.createElement('span');
@@ -1790,6 +1948,8 @@
                     };
                     if (stale) {
                         status('Replaced by a newer carousel.', 'text-gray-400');
+                    } else if (!data) {
+                        status('This slide was deleted.', 'text-gray-400');
                     } else if (row.busy) {
                         status(row.note || 'Generating image…', 'text-indigo-600');
                     } else if (row.error) {
@@ -1800,7 +1960,7 @@
                         actions.append(createChipButton('Regenerate', () => generate(row)), createChipButton('Use without image', () => skip(row)));
                     } else if (hasSlotImage(data)) {
                         status('Using the version without image');
-                        actions.append(createChipButton('Use image', () => { data.skipped = false; setSlideModeAt(row.index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
+                        actions.append(createChipButton('Use image', () => { data.skipped = false; setSlideModeAt(index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
                     } else if (data.skipped) {
                         status('Skipped: the slide stays without an image');
                         actions.append(createChipButton('Approve & generate', () => generate(row), true));
@@ -2011,7 +2171,9 @@
                 slideData: state.slideData,
                 carouselVersion: state.carouselVersion,
                 currentSlide: state.currentSlide,
-                chat: chatLog
+                chat: chatLog,
+                title: carouselTitle,
+                titleLocked
             };
         }
 
@@ -2040,7 +2202,7 @@
         let lastThumbnailSignature = '';
 
         function hasUnsavedChanges() {
-            return state.loaded && (isSaving || JSON.stringify(documentForSave()) !== lastSavedJson);
+            return state.loaded && (isSaving || JSON.stringify(documentForSave()) !== lastSavedJson || historySignature() !== persistedHistory.signature);
         }
 
         function scheduleSave() {
@@ -2058,7 +2220,7 @@
             }
             const document_ = documentForSave();
             const json = JSON.stringify(document_);
-            if (json === lastSavedJson) return;
+            if (json === lastSavedJson && historySignature() === persistedHistory.signature) return;
             isSaving = true;
             setSaveStatus('saving');
             try {
@@ -2066,17 +2228,21 @@
                 const first = state.slideData[0];
                 const thumbnailElements = first ? first.variants[first.mode] : null;
                 const signature = thumbnailElements ? JSON.stringify(thumbnailElements) : '';
-                if (thumbnailElements && signature !== lastThumbnailSignature) {
+                if (json !== lastSavedJson && thumbnailElements && signature !== lastThumbnailSignature) {
                     body.thumbnail = await renderThumbnail(thumbnailElements).catch(() => undefined);
                 }
-                const response = await fetch(`/api/carousels/${carouselId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!response.ok) throw new Error(`status ${response.status}`);
-                lastSavedJson = json;
-                if (body.thumbnail) lastThumbnailSignature = signature;
+                if (json !== lastSavedJson) {
+                    const response = await fetch(`/api/carousels/${carouselId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (response.status === 401) redirectToLogin();
+                    if (!response.ok) throw new Error(`status ${response.status}`);
+                    lastSavedJson = json;
+                    if (body.thumbnail) lastThumbnailSignature = signature;
+                }
+                await saveHistoryToServer();
                 setSaveStatus('saved');
             } catch (error) {
                 console.error('Could not save the carousel:', error);
@@ -2088,6 +2254,31 @@
                     saveNow();
                 }
             }
+        }
+
+        function redirectToLogin() {
+            window.top.location.href = `/login?next=${encodeURIComponent(window.top.location.pathname)}`;
+        }
+
+        // --- Saving the undo history ---
+        let persistedHistory = { seqs: new Set(), signature: '' };
+        const historySignature = () => `${history.map(entry => entry.seq).join(',')}|${historyIndex}`;
+
+        async function saveHistoryToServer() {
+            const signature = historySignature();
+            if (signature === persistedHistory.signature) return;
+            const seqs = history.map(entry => entry.seq);
+            const index = historyIndex;
+            const send = (entries) => fetch(`/api/carousels/${carouselId}/history`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ seqs, index, entries })
+            });
+            let response = await send(history.filter(entry => !persistedHistory.seqs.has(entry.seq)));
+            if (response.status === 409) response = await send(history); // the server lost track: send it all
+            if (response.status === 401) redirectToLogin();
+            if (!response.ok) throw new Error(`history status ${response.status}`);
+            persistedHistory = { seqs: new Set(seqs), signature };
         }
 
         async function goToGallery() {
@@ -2119,15 +2310,29 @@
                 window.top.location.replace(`/carousel/${meta.id}`);
                 return;
             }
-            const response = await fetch(`/api/carousels/${carouselId}`);
+            const [response, historyResponse] = await Promise.all([
+                fetch(`/api/carousels/${carouselId}`),
+                fetch(`/api/carousels/${carouselId}/history`)
+            ]);
+            if (response.status === 401) {
+                redirectToLogin();
+                return;
+            }
             if (response.status === 404) throw new Error('This carousel does not exist anymore.');
             if (!response.ok) throw new Error(`Could not load the carousel (status ${response.status}).`);
             const { meta, document: saved } = await response.json();
+            const savedHistory = historyResponse.ok ? await historyResponse.json() : null;
             carouselTitle = meta.title || '';
+            titleLocked = saved?.titleLocked === true;
+            showTitle();
 
             if (saved?.slides?.length) {
+                // Images of the current slides and of every undo step, so undo can bring any of them back
                 const imageIds = new Set(saved.slideData.flatMap(data => [...data.variants.with, ...data.variants.without])
                     .map(el => el.imageId).filter(Boolean));
+                (savedHistory?.entries ?? []).forEach(entry => {
+                    for (const match of entry.snapshot.matchAll(/"imageId":"([A-Za-z0-9_-]+)"/g)) imageIds.add(match[1]);
+                });
                 await Promise.all([...imageIds].map(async imageId => {
                     const imageResponse = await fetch(`/api/carousels/${carouselId}/images/${encodeURIComponent(imageId)}`);
                     if (imageResponse.ok) imageStore.set(imageId, await blobToDataUrl(await imageResponse.blob()));
@@ -2145,7 +2350,20 @@
             } else {
                 renderAll();
             }
-            resetHistory();
+            if (savedHistory?.entries?.length) {
+                history = savedHistory.entries;
+                historyIndex = Math.min(Math.max(0, savedHistory.index), history.length - 1);
+                historySeq = Math.max(...history.map(entry => entry.seq));
+                persistedHistory = { seqs: new Set(history.map(entry => entry.seq)), signature: historySignature() };
+                // Never hand out a carousel version number that an undo step already uses
+                history.forEach(entry => {
+                    const version = Number(entry.snapshot.match(/"carouselVersion":(\d+)/)?.[1] ?? 0);
+                    lastCarouselVersion = Math.max(lastCarouselVersion, version);
+                });
+                saveHistory(); // adds the current state if the last save got the document but not the history
+            } else {
+                resetHistory();
+            }
             lastSavedJson = JSON.stringify(documentForSave());
             setSaveStatus(saved ? 'saved' : '');
         }

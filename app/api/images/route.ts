@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generatePollinationsImage } from '../../../pollinations_image_utility';
+import { getCurrentUser, unauthorized } from '../../../karu_auth';
+import { getSetting } from '../../../karu_db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,6 +11,9 @@ function errorResponse(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
+
     let body: unknown;
     try {
         body = await request.json();
@@ -36,6 +41,7 @@ export async function POST(request: Request) {
             width,
             height,
             safe: true,
+            apiKey: getSetting('pollinations_api_key'),
         });
 
         return NextResponse.json({

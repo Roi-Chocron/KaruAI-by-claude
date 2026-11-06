@@ -1,10 +1,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import {
+    CarouselRow, deleteCarouselRow, getCarouselRow, insertCarousel, listCarouselRows, updateCarouselRow, User,
+} from './karu_db';
 
-// Every carousel lives in its own folder:
-//   .karu/carousels/<id>/meta.json          what the gallery lists (title, dates, slide count)
+// Gallery metadata and ownership live in the database (karu_db.ts). The contents are files:
 //   .karu/carousels/<id>/carousel.json      the editor document (slides, both versions, chat log)
+//   .karu/carousels/<id>/history.json       the undo history
 //   .karu/carousels/<id>/chat_history.json  this carousel's Gemini conversation
 //   .karu/carousels/<id>/thumbnail.jpg      the first slide, for the gallery
 //   .karu/carousels/<id>/images/<imageId>.<ext>  generated and uploaded images
@@ -19,14 +22,9 @@ const IMAGE_TYPES: Record<string, string> = {
     'image/gif': 'gif',
 };
 
-export interface CarouselMeta {
-    id: string;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-    slideCount: number;
-}
+export type CarouselMeta = CarouselRow;
 
+// Also used when the carousel belongs to someone else, so other people's ids are indistinguishable
 export class CarouselNotFoundError extends Error {
     constructor() {
         super('Carousel not found.');
@@ -44,88 +42,59 @@ function carouselDir(id: string): string {
 
 export const chatHistoryFile = (id: string) => path.join(carouselDir(id), 'chat_history.json');
 
-export async function assertExists(id: string) {
-    try {
-        await fs.access(path.join(carouselDir(id), 'meta.json'));
-    } catch {
-        throw new CarouselNotFoundError();
-    }
+// The carousel if `user` owns it; throws CarouselNotFoundError otherwise
+export function getOwnedCarousel(id: unknown, user: User): CarouselMeta {
+    const row = isCarouselId(id) ? getCarouselRow(id) : null;
+    if (!row || row.ownerId !== user.id) throw new CarouselNotFoundError();
+    return row;
 }
 
-// Write to a temp file and rename it over the target, so a crash mid-write never leaves half a JSON file
+// Write to a temp file and rename it over the target, so a crash mid-write never leaves half a file
 async function writeAtomic(file: string, data: string | Buffer) {
     const temp = `${file}.${randomUUID()}.tmp`;
     await fs.writeFile(temp, data);
     await fs.rename(temp, file);
 }
 
-async function readJson<T>(file: string): Promise<T> {
-    return JSON.parse(await fs.readFile(file, 'utf-8')) as T;
-}
-
-export async function listCarousels(): Promise<CarouselMeta[]> {
-    let ids: string[];
+async function readJsonIfExists<T>(file: string): Promise<T | null> {
     try {
-        ids = await fs.readdir(CAROUSELS_DIR);
+        return JSON.parse(await fs.readFile(file, 'utf-8')) as T;
     } catch (error: any) {
-        if (error.code === 'ENOENT') return [];
+        if (error.code === 'ENOENT') return null;
         throw error;
     }
-    const metas = await Promise.all(ids.filter(isCarouselId).map(async id => {
-        try {
-            return await readJson<CarouselMeta>(path.join(carouselDir(id), 'meta.json'));
-        } catch {
-            return null; // a half-created or foreign folder: skip it
-        }
-    }));
-    return metas
-        .filter((meta): meta is CarouselMeta => meta !== null)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export async function createCarousel(): Promise<CarouselMeta> {
+export const listCarousels = (owner: User): CarouselMeta[] => listCarouselRows(owner.id);
+
+export async function createCarousel(owner: User): Promise<CarouselMeta> {
     const id = randomUUID();
-    const now = new Date().toISOString();
-    const meta: CarouselMeta = { id, title: '', createdAt: now, updatedAt: now, slideCount: 0 };
     await fs.mkdir(path.join(carouselDir(id), 'images'), { recursive: true });
-    await writeAtomic(path.join(carouselDir(id), 'meta.json'), JSON.stringify(meta, null, 2));
-    return meta;
+    return insertCarousel(id, owner.id);
 }
 
-export async function readCarousel(id: string): Promise<{ meta: CarouselMeta; document: unknown }> {
-    await assertExists(id);
-    const meta = await readJson<CarouselMeta>(path.join(carouselDir(id), 'meta.json'));
-    let document: unknown = null;
-    try {
-        document = await readJson(path.join(carouselDir(id), 'carousel.json'));
-    } catch (error: any) {
-        if (error.code !== 'ENOENT') throw error; // a new carousel has no document yet
-    }
-    return { meta, document };
+export async function readCarouselDocument(id: string): Promise<unknown> {
+    return readJsonIfExists(path.join(carouselDir(id), 'carousel.json')); // null for a new carousel
 }
 
 export async function saveCarousel(
     id: string,
     update: { title: string; slideCount: number; document: unknown; thumbnail?: Buffer }
 ): Promise<CarouselMeta> {
-    await assertExists(id);
     const dir = carouselDir(id);
-    const previous = await readJson<CarouselMeta>(path.join(dir, 'meta.json'));
-    const meta: CarouselMeta = {
-        ...previous,
-        title: update.title,
-        slideCount: update.slideCount,
-        updatedAt: new Date().toISOString(),
-    };
+    await fs.mkdir(dir, { recursive: true });
     await writeAtomic(path.join(dir, 'carousel.json'), JSON.stringify(update.document));
     if (update.thumbnail) await writeAtomic(path.join(dir, 'thumbnail.jpg'), update.thumbnail);
-    await writeAtomic(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2));
-    return meta;
+    return updateCarouselRow(id, { title: update.title, slideCount: update.slideCount });
+}
+
+export async function deleteCarouselFiles(id: string) {
+    await fs.rm(carouselDir(id), { recursive: true, force: true });
 }
 
 export async function deleteCarousel(id: string) {
-    await assertExists(id);
-    await fs.rm(carouselDir(id), { recursive: true, force: true });
+    deleteCarouselRow(id);
+    await deleteCarouselFiles(id);
 }
 
 export async function readThumbnail(id: string): Promise<Buffer | null> {
@@ -136,6 +105,40 @@ export async function readThumbnail(id: string): Promise<Buffer | null> {
     }
 }
 
+// --- Undo history ---
+// Entries are full snapshots with a sequence number. The editor uploads only the entries the server does not
+// have yet plus the list of sequence numbers in order, so a save stays small even with a long history.
+
+export interface HistoryEntry {
+    seq: number;
+    snapshot: string;
+    slide: number;
+}
+
+export interface UndoHistory {
+    entries: HistoryEntry[];
+    index: number;
+}
+
+export class HistoryOutOfSyncError extends Error {}
+
+export async function readHistory(id: string): Promise<UndoHistory | null> {
+    return readJsonIfExists<UndoHistory>(path.join(carouselDir(id), 'history.json'));
+}
+
+export async function saveHistory(id: string, update: { seqs: number[]; index: number; entries: HistoryEntry[] }) {
+    const file = path.join(carouselDir(id), 'history.json');
+    const known = new Map<number, HistoryEntry>();
+    (await readHistory(id))?.entries.forEach(entry => known.set(entry.seq, entry));
+    update.entries.forEach(entry => known.set(entry.seq, entry));
+    const entries = update.seqs.map(seq => known.get(seq)).filter((entry): entry is HistoryEntry => entry !== undefined);
+    if (entries.length !== update.seqs.length) throw new HistoryOutOfSyncError('Some history entries are missing.');
+    const index = Math.min(Math.max(0, update.index), entries.length - 1);
+    await writeAtomic(file, JSON.stringify({ entries, index } satisfies UndoHistory));
+}
+
+// --- Images ---
+
 // Decodes a base64 data URL of one of the supported image types
 export function decodeImageDataUrl(dataUrl: unknown): { contentType: string; data: Buffer } | null {
     if (typeof dataUrl !== 'string') return null;
@@ -145,7 +148,6 @@ export function decodeImageDataUrl(dataUrl: unknown): { contentType: string; dat
 }
 
 export async function saveImage(id: string, imageId: string, image: { contentType: string; data: Buffer }) {
-    await assertExists(id);
     if (!isImageId(imageId)) throw new Error('Invalid image id.');
     const dir = path.join(carouselDir(id), 'images');
     await fs.mkdir(dir, { recursive: true });

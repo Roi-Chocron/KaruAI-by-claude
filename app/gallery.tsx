@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, ImageOff, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Bot, ImageOff, Loader2, LogOut, Plus, Shield, Trash2 } from 'lucide-react';
 import type { CarouselMeta } from '../carousel_store';
 
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -39,7 +39,9 @@ const Thumbnail = ({ carousel }: { carousel: CarouselMeta }) => {
   );
 };
 
-export default function Gallery() {
+type SignedInUser = { id: string; email: string; name: string; role: 'user' | 'admin' };
+
+export default function Gallery({ user }: { user: SignedInUser }) {
   const router = useRouter();
   const [carousels, setCarousels] = useState<CarouselMeta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,11 @@ export default function Gallery() {
     }
   };
 
+  const logOut = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  };
+
   const deleteCarousel = async (carousel: CarouselMeta) => {
     if (!confirm(`Delete "${carousel.title || 'Untitled carousel'}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/carousels/${carousel.id}`, { method: 'DELETE' });
@@ -88,14 +95,28 @@ export default function Gallery() {
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-900">KaruAI</span>
         </div>
-        <button
-          onClick={createCarousel}
-          disabled={isCreating}
-          className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-60"
-        >
-          {isCreating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          New carousel
-        </button>
+        <div className="flex items-center gap-3">
+          {user.role === 'admin' && (
+            <a href="/admin" className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-gray-100">
+              <Shield size={16} /> Admin
+            </a>
+          )}
+          <div className="text-right leading-tight">
+            <p className="text-sm font-semibold text-slate-800" dir="auto">{user.name || user.email}</p>
+            {user.name && <p className="text-xs text-gray-400">{user.email}</p>}
+          </div>
+          <button onClick={logOut} title="Log out" className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+            <LogOut size={18} />
+          </button>
+          <button
+            onClick={createCarousel}
+            disabled={isCreating}
+            className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-60"
+          >
+            {isCreating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            New carousel
+          </button>
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-8 py-10">
