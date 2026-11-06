@@ -22,6 +22,10 @@ export interface ConversationState {
 // Structured carousel output returned (as a JSON string) in KaruResponse.responseText
 export type CarouselSlideType = 'cover' | 'content' | 'quote' | 'cta';
 
+// Where the slide's image goes in its "with image" version. Each layout has a fixed frame on the
+// 1080x1350 canvas, so the image is generated at exactly that aspect ratio (see the dashboard editor).
+export type CarouselImageLayout = 'top' | 'bottom' | 'background' | 'side' | 'circle';
+
 export interface CarouselTheme {
     bgColor: string;
     textColor: string;
@@ -34,6 +38,7 @@ export interface CarouselSlide {
     title: string;
     content: string;
     imagePrompt: string;
+    imageLayout: CarouselImageLayout;
     // Set only by the user's local uploads in the UI (a base64 data URL). Deliberately not part of
     // CAROUSEL_RESPONSE_SCHEMA: the model never generates images.
     imageUrl?: string;
@@ -47,7 +52,13 @@ export interface CarouselData {
 export const KARU_SYSTEM_PROMPT =
     "You are KaruAI, an expert Instagram carousel generator. Based on the user's request, generate a highly engaging carousel. " +
     'You must return ONLY a valid JSON object matching the schema. No markdown wrapping, no conversational filler. ' +
-    'When the user asks to change an existing carousel, return the complete updated carousel, not just the changed parts.';
+    'When the user asks to change an existing carousel, return the complete updated carousel, not just the changed parts. ' +
+    'Every slide is built in two versions: one without an image and one with an image. The user reviews each imagePrompt and ' +
+    'only the slides whose image they approve use the image version, so the title and content must work on their own too. ' +
+    'For every slide choose the imageLayout that best fits its content, and write the imagePrompt for exactly that layout\'s ' +
+    'shape and role: describe the composition for its aspect ratio, keep the main subject inside the frame, and never ask for ' +
+    'text, letters, logos or watermarks in the image. For the background layout the text is printed over the image, so ask for ' +
+    'a calm, darker area with little detail where the text will sit.';
 
 const hexColor = (description: string) => ({
     type: SchemaType.STRING as const,
@@ -81,9 +92,24 @@ export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
                     },
                     title: { type: SchemaType.STRING },
                     content: { type: SchemaType.STRING },
-                    imagePrompt: { type: SchemaType.STRING, description: 'Prompt for generating an image for this slide later' },
+                    imageLayout: {
+                        type: SchemaType.STRING,
+                        format: 'enum',
+                        enum: ['top', 'bottom', 'background', 'side', 'circle'],
+                        description:
+                            'Placement of the image in the slide\'s image version: ' +
+                            'top = wide landscape banner above the text (aspect 45:28); ' +
+                            'bottom = wide landscape banner below the text (aspect 45:28); ' +
+                            'background = full-bleed portrait image behind the text, darkened (aspect 4:5); ' +
+                            'side = tall portrait strip on the left with the text beside it (aspect 16:45); ' +
+                            'circle = square image cropped to a circle above centered text (aspect 1:1)',
+                    },
+                    imagePrompt: {
+                        type: SchemaType.STRING,
+                        description: 'English prompt for the image of this slide, composed for the aspect ratio of its imageLayout',
+                    },
                 },
-                required: ['id', 'type', 'title', 'content', 'imagePrompt'],
+                required: ['id', 'type', 'title', 'content', 'imageLayout', 'imagePrompt'],
             },
         },
     },

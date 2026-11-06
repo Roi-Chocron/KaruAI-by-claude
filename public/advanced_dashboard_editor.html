@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaruAI - Advanced Editor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --accent-color: #4f46e5; /* Indigo 600 */
+            --handle-size: 10px;
+            --guide-color: #ec4899; /* Pink 500 */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+        
+        .tab-btn.active { border-bottom: 2px solid var(--accent-color); color: var(--accent-color); background: white; }
+        .tab-btn:not(.active) { border-bottom: 2px solid transparent; color: #64748b; }
+        
+        .tool-btn.active { background: white; color: var(--accent-color); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        .tool-btn:not(.active) { color: #64748b; }
+
+        /* Workspace & Canvas */
+        .workspace-wrapper {
+            flex: 1;
+            background: #e5e5e5;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none; /* Prevent text selection while dragging */
+        }
+
+        .canvas-container {
+            position: relative;
+            transform-origin: center center;
+            box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);
+            background: #ffffff;
+            transition: transform 0.1s ease-out;
+        }
+
+        .canvas-artboard {
+            width: 1080px;
+            height: 1350px;
+            position: absolute;
+            top: 0; left: 0;
+            overflow: hidden;
+        }
+
+        .element {
+            position: absolute;
+            transform-origin: center;
+            cursor: move;
+        }
+        .element.text-element { white-space: pre-wrap; word-break: break-word; line-height: 1.2; }
+
+        /* Selection Overlay & Handles */
+        #selectionOverlay {
+            position: absolute;
+            border: 2px solid var(--accent-color);
+            pointer-events: none;
+            display: none;
+            z-index: 999;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: var(--handle-size);
+            height: var(--handle-size);
+            background: white;
+            border: 2px solid var(--accent-color);
+            pointer-events: auto;
+            z-index: 1000;
+            border-radius: 2px;
+        }
+
+        .h-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+        .h-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+        .h-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+        .h-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+        .layer-item.active { background-color: #eef2ff; border-left: 4px solid var(--accent-color); color: var(--accent-color); font-weight: 500;}
+        .layer-item:not(.active) { border-left: 4px solid transparent; }
+
+        /* Drag Selection Box */
+        #dragBox {
+            position: absolute;
+            border: 1px solid var(--accent-color);
+            background: rgba(79, 70, 229, 0.1);
+            display: none;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Smart Guides */
+        .snap-guide-v { position: absolute; width: 1px; background: var(--guide-color); top: 0; bottom: 0; display: none; z-index: 9998; pointer-events: none; }
+        .snap-guide-h { position: absolute; height: 1px; background: var(--guide-color); left: 0; right: 0; display: none; z-index: 9998; pointer-events: none; }
+
+        .thinking-dots { display: inline-flex; gap: 3px; align-items: center; }
+        .thinking-dots span { width: 5px; height: 5px; border-radius: 9999px; background: currentColor; animation: thinking 1s infinite ease-in-out; }
+        .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+        .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes thinking { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden bg-white text-slate-800 font-sans">
+
+    <!-- LEFT COLUMN -->
+    <aside class="w-[25%] h-full flex flex-col border-r border-gray-200 bg-white shrink-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+        <div class="flex h-14 border-b border-gray-200 shrink-0 bg-gray-50/50">
+            <button onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+                <i data-lucide="palette" class="w-4 h-4"></i> Brand
+            </button>
+            <button onclick="switchLeftTab('layers')" id="tab-layers" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+                <i data-lucide="layers" class="w-4 h-4"></i> Layers
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto relative">
+            <div id="panel-brand" class="hidden p-6">
+                <h2 class="text-sm font-bold mb-4 text-slate-800 uppercase tracking-wider">Brand Settings</h2>
+                <div class="mb-6">
+                    <label class="block text-xs font-semibold text-gray-500 mb-2">Logo</label>
+                    <button class="w-full border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer">
+                        <i data-lucide="upload" class="text-gray-400 mb-2 w-6 h-6"></i>
+                        <span class="text-xs text-gray-500 font-medium">Upload Logo</span>
+                    </button>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-xs font-semibold text-gray-500 mb-2">Colors</label>
+                    <div class="flex gap-4">
+                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #FFFFFF"></div>
+                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #0F172A"></div>
+                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #4F46E5"></div>
+                    </div>
+                </div>
+                <button onclick="downloadFullCarousel()" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md transition-all mt-10">
+                    <i data-lucide="download" class="w-4 h-4"></i> Download all (ZIP)
+                </button>
+                <button onclick="downloadCurrentSlide()" class="w-full mt-3 border border-gray-200 text-slate-700 font-semibold py-2 px-2 rounded-lg text-xs hover:bg-gray-50">Download this slide (PNG)</button>
+            </div>
+            <div id="panel-layers" class="flex flex-col pb-4"></div>
+        </div>
+    </aside>
+
+    <!-- MIDDLE COLUMN -->
+    <main class="w-[50%] h-full flex flex-col relative shrink-0">
+        <header class="h-14 border-b border-gray-200 px-4 flex items-center justify-between gap-2 bg-white shrink-0 shadow-sm z-10 whitespace-nowrap">
+            <div class="flex gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
+                <button onclick="setTool('V')" id="tool-V" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
+                <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
+                <button onclick="setTool('O')" id="tool-O" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Ellipse (O)"><i data-lucide="circle" class="w-4 h-4"></i></button>
+                <button onclick="setTool('T')" id="tool-T" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Text (T)"><i data-lucide="type" class="w-4 h-4"></i></button>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <span id="slide-label" class="text-xs font-bold text-gray-500 tracking-widest uppercase">Slide 1 of 1</span>
+                <div id="variant-toggle" class="hidden gap-0.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-[11px] font-semibold">
+                    <button id="variant-with" onclick="setSlideMode('with')">Image</button>
+                    <button id="variant-without" onclick="setSlideMode('without')">No image</button>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="undo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
+                <button onclick="redo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
+                
+                <div class="ml-2 flex items-center gap-2 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500">
+                     <button onclick="changeZoom(-0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">-</button>
+                     <span id="zoom-label" class="w-10 text-center">45%</span>
+                     <button onclick="changeZoom(0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">+</button>
+                </div>
+
+                <div id="download-wrap" class="relative">
+                    <button onclick="toggleDownloadMenu()" class="p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all" title="Download"><i data-lucide="download" class="w-4 h-4"></i></button>
+                    <div id="download-menu" class="hidden absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
+                        <button onclick="downloadCurrentSlide()" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">This slide (PNG)</button>
+                        <button onclick="downloadFullCarousel()" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">All slides (ZIP)</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="workspace-wrapper" id="workspace" onmousedown="handleWorkspaceDown(event)">
+            <div class="canvas-container" id="canvas-container" style="width: 1080px; height: 1350px; transform: scale(0.45);">
+                <div class="canvas-artboard" id="artboard">
+                    <!-- Elements injected via JS -->
+                    
+                    <div id="selectionOverlay">
+                        <div class="resize-handle h-nw" data-handle="nw"></div>
+                        <div class="resize-handle h-ne" data-handle="ne"></div>
+                        <div class="resize-handle h-se" data-handle="se"></div>
+                        <div class="resize-handle h-sw" data-handle="sw"></div>
+                    </div>
+                    
+                    <div id="dragBox"></div>
+                    <div id="guide-v" class="snap-guide-v"></div>
+                    <div id="guide-h" class="snap-guide-h"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer id="slide-thumbnails" class="h-28 border-t border-gray-200 bg-white flex items-center px-6 overflow-x-auto gap-4 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
+            <div class="text-xs text-gray-400">No carousel generated yet.</div>
+        </footer>
+    </main>
+
+    <!-- RIGHT COLUMN -->
+    <aside class="w-[25%] h-full flex flex-col border-l border-gray-200 bg-white shrink-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.02)]">
+        <div class="flex h-14 border-b border-gray-200 shrink-0 bg-gray-50/50">
+            <button onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+                <i data-lucide="message-square" class="w-4 h-4"></i> KaruAI
+            </button>
+            <button onclick="switchRightTab('design')" id="tab-design" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+                <i data-lucide="edit-2" class="w-4 h-4"></i> Design
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto relative bg-white">
+            
+            <div id="panel-chat" class="hidden h-full flex flex-col bg-slate-50/50">
+                <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6" id="chat-messages">
+                    <p id="chat-empty" class="m-auto text-center text-sm text-gray-400 max-w-[80%]">
+                        Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.
+                    </p>
+                </div>
+                <div class="p-4 border-t border-gray-200 bg-white shrink-0">
+                    <div class="relative flex items-center bg-gray-100 rounded-xl border border-gray-200 focus-within:border-indigo-500 focus-within:ring-1 transition-all">
+                        <input type="text" id="chat-input" placeholder="Prompt the AI..." class="w-full bg-transparent pl-4 pr-12 py-3 rounded-xl focus:outline-none text-sm text-slate-700" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
+                        <button id="chat-send" onclick="sendChat()" class="absolute right-2 w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors shadow-md">
+                            <i data-lucide="send" class="w-3 h-3 -ml-0.5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-design" class="pb-10">
+                <div id="empty-state" class="flex flex-col items-center justify-center h-40 text-gray-400 text-sm gap-4 mt-10">
+                    <i data-lucide="mouse-pointer-2" class="w-8 h-8 opacity-50"></i>
+                    <p>Select an element to edit properties.</p>
+                </div>
+                
+                <div id="multi-state" class="hidden flex-col items-center justify-center h-40 text-gray-400 text-sm gap-4 mt-10">
+                    <i data-lucide="layers" class="w-8 h-8 opacity-50"></i>
+                    <p>Multiple elements selected.</p>
+                </div>
+
+                <div id="props-content" class="hidden">
+                    <div class="p-4 border-b border-gray-200 flex gap-2">
+                        <button onclick="reorderLayer(1)" class="flex-1 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200" title="Ctrl + ]">Forward</button>
+                        <button onclick="reorderLayer(-1)" class="flex-1 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200" title="Ctrl + [">Backward</button>
+                        <button onclick="deleteSelected()" class="flex-1 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 flex items-center justify-center" title="Delete">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-5 border-b border-gray-200">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Transform</h4>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">X</span>
+                                <input type="number" id="propX" data-prop="x" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">Y</span>
+                                <input type="number" id="propY" data-prop="y" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">W</span>
+                                <input type="number" id="propW" data-prop="w" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">H</span>
+                                <input type="number" id="propH" data-prop="h" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">°</span>
+                                <input type="number" id="propRot" data-prop="rotation" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400 w-3">R</span>
+                                <input type="number" id="propRad" data-prop="radius" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="section-text" class="p-5 border-b border-gray-200">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Text</h4>
+                        <textarea id="propContent" data-prop="content" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-500 outline-none resize-none h-24 text-slate-800"></textarea>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                <span class="text-[10px] font-bold text-gray-400">Size</span>
+                                <input type="number" id="propFontSize" data-prop="fontSize" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <select id="propFontWeight" data-prop="fontWeight" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                                <option value="400">Regular</option>
+                                <option value="500">Medium</option>
+                                <option value="700">Bold</option>
+                                <option value="900">Black</option>
+                            </select>
+                        </div>
+                        <select id="propTextAlign" data-prop="textAlign" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                            <option value="left">Align Left</option>
+                            <option value="center">Align Center</option>
+                            <option value="right">Align Right</option>
+                        </select>
+                    </div>
+
+                    <div class="p-5 border-b border-gray-200">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Fill</h4>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="propFillColor" data-prop="fillColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
+                            <input type="text" id="propFillColorHex" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
+                            <div class="flex items-center gap-1 w-20">
+                                <input type="number" id="propFillOpacity" data-prop="fillOpacity" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
+                                <span class="text-gray-400 text-xs font-bold">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="section-stroke" class="p-5 border-b border-gray-200">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Stroke</h4>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="propStrokeColor" data-prop="strokeColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
+                            <input type="number" id="propStrokeWidth" data-prop="strokeWidth" class="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" placeholder="W">
+                            <select id="propStrokeStyle" data-prop="strokeStyle" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                                <option value="solid">Solid</option>
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-5">
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Effects</h4>
+                        <select id="propShadowType" data-prop="shadowType" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                            <option value="none">No Shadow</option>
+                            <option value="drop-shadow">Drop Shadow</option>
+                            <option id="opt-inner-shadow" value="inner-shadow">Inner Shadow</option>
+                        </select>
+
+                        <div id="shadow-controls" class="space-y-3 hidden">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                    <span class="text-[10px] font-bold text-gray-400 w-3">X</span>
+                                    <input type="number" id="propShadowX" data-prop="shadowX" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                </div>
+                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                    <span class="text-[10px] font-bold text-gray-400 w-3">Y</span>
+                                    <input type="number" id="propShadowY" data-prop="shadowY" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                    <span class="text-[10px] font-bold text-gray-400 w-3">B</span>
+                                    <input type="number" id="propShadowBlur" data-prop="shadowBlur" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Blur">
+                                </div>
+                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
+                                    <span class="text-[10px] font-bold text-gray-400 w-3">S</span>
+                                    <input type="number" id="propShadowSpread" data-prop="shadowSpread" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Spread">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="color" id="propShadowColor" data-prop="shadowColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
+                                <span class="text-xs text-gray-500 font-medium">Shadow Color</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        lucide.createIcons();
+
+        // State & History
+        function baseElement(props) {
+            return {
+                rotation: 0, radius: 0, fillOpacity: 100, strokeColor: '#000000', strokeWidth: 0, strokeStyle: 'solid',
+                shadowType: 'none', shadowX: 0, shadowY: 0, shadowBlur: 0, shadowSpread: 0, shadowColor: '#000000',
+                ...props
+            };
+        }
+
+        // Every generated slide is kept in two versions ("variants"): without an image, and with the image
+        // in the layout the AI picked. state.elements is the editable copy of the variant on screen.
+        let state = {
+            tool: 'V', 
+            zoom: 0.45,
+            selectedIds: [],
+            dragState: null,
+            slides: [],
+            currentSlide: 0,
+            theme: { bgColor: '#F8FAFC', textColor: '#0F172A', accentColor: '#4F46E5' },
+            slideData: [], // per slide: { mode: 'with' | 'without', imageUrl, variants: { with: [...], without: [...] } }
+            carouselVersion: 0, // bumped on every AI carousel, so late image results for an old one are dropped
+            elements: [
+                baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: 1080, h: 1350, fillColor: '#F8FAFC' }),
+                baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: 'Describe your carousel in the KaruAI chat\nand it will appear here.', fontSize: 44, fontWeight: '700', textAlign: 'center' })
+            ]
+        };
+
+        let history = [];
+        let historyIndex = -1;
+        let clipboard = [];
+
+        function saveHistory() {
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+
+            history.push(JSON.stringify(state.elements));
+            historyIndex++;
+        }
+
+        // Undo history belongs to the variant being edited, so it restarts whenever another one is loaded
+        function resetHistory() {
+            history = [JSON.stringify(state.elements)];
+            historyIndex = 0;
+        }
+
+        function cloneElements(elements) { return JSON.parse(JSON.stringify(elements)); }
+
+        // Writes the editor's working copy back into the variant it was loaded from
+        function rememberCurrentSlide() {
+            const data = state.slideData[state.currentSlide];
+            if (data) data.variants[data.mode] = cloneElements(state.elements);
+        }
+
+        function loadHistory() {
+            state.elements = JSON.parse(history[historyIndex]);
+            state.selectedIds = state.selectedIds.filter(id => state.elements.find(e => e.id === id));
+            renderAll();
+        }
+
+        function undo() { if (historyIndex > 0) { historyIndex--; loadHistory(); } }
+        function redo() { if (historyIndex < history.length - 1) { historyIndex++; loadHistory(); } }
+
+        // Core Functions
+        const artboard = document.getElementById('artboard');
+        const overlay = document.getElementById('selectionOverlay');
+        const layersPanel = document.getElementById('panel-layers');
+        const canvasContainer = document.getElementById('canvas-container');
+        const inputs = document.querySelectorAll('input[data-prop], select[data-prop], textarea[data-prop]');
+
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+        function normalizeHex(value, fallback) {
+            return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+        }
+
+        // --- Slide layouts ---
+        const CANVAS_W = 1080;
+        const CANVAS_H = 1350;
+        const FOOTER_Y = 1250;
+        // The image frame and text area of each imageLayout the AI can pick (see karu_response_utility.ts).
+        // Images are generated at the frame's exact aspect ratio.
+        const IMAGE_LAYOUTS = {
+            top: {
+                label: 'Top banner', hint: 'Wide banner shown above the slide text.',
+                frame: { x: 90, y: 90, w: 900, h: 560, radius: 32 },
+                text: { x: 90, w: 900, top: 700, bottom: 1190, valign: 'top' }
+            },
+            bottom: {
+                label: 'Bottom banner', hint: 'Wide banner shown below the slide text.',
+                frame: { x: 90, y: 640, w: 900, h: 560, radius: 32 },
+                text: { x: 90, w: 900, top: 120, bottom: 590, valign: 'bottom' }
+            },
+            background: {
+                label: 'Full background', hint: 'Full-bleed background behind white text; keep the lower half calm, dark and low in detail.',
+                frame: { x: 0, y: 0, w: 1080, h: 1350, radius: 0 },
+                text: { x: 90, w: 900, top: 560, bottom: 1180, valign: 'bottom' }, overlay: true
+            },
+            side: {
+                label: 'Side strip', hint: 'Tall strip beside the slide text.',
+                frame: { x: 0, y: 0, w: 480, h: 1350, radius: 0 },
+                text: { x: 540, w: 450, top: 140, bottom: 1180, valign: 'center' }, compact: true
+            },
+            circle: {
+                label: 'Circle', hint: 'Cropped to a circle; keep the subject centered with space around it.',
+                frame: { x: 320, y: 110, w: 440, h: 440, radius: 9999 },
+                text: { x: 90, w: 900, top: 610, bottom: 1190, valign: 'top' }, centered: true
+            }
+        };
+        const NO_IMAGE_TEXT_AREA = { x: 90, w: 900, top: 140, bottom: 1180, valign: 'center' };
+        const RTL_PATTERN = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+
+        // Off-screen twin of a text element, used to measure how tall wrapped text will be
+        const textMeasurer = document.createElement('div');
+        textMeasurer.className = 'element text-element';
+        textMeasurer.dir = 'auto';
+        textMeasurer.style.cssText = 'left:-100000px;top:0;visibility:hidden;pointer-events:none;';
+        document.body.appendChild(textMeasurer);
+
+        function measureTextHeight(content, fontSize, fontWeight, width) {
+            textMeasurer.style.width = `${width}px`;
+            textMeasurer.style.fontSize = `${fontSize}px`;
+            textMeasurer.style.fontWeight = fontWeight;
+            textMeasurer.textContent = content || ' ';
+            return textMeasurer.offsetHeight;
+        }
+
+        function buildSlideElements(slide, index, total, withImage) {
+            const layout = withImage ? IMAGE_LAYOUTS[slide.imageLayout] : null;
+            const area = layout ? layout.text : NO_IMAGE_TEXT_AREA;
+            const onImage = Boolean(layout?.overlay);
+            const textColor = onImage ? '#FFFFFF' : state.theme.textColor;
+            const align = layout?.centered ? 'center' : RTL_PATTERN.test(`${slide.title}${slide.content}`) ? 'right' : 'left';
+            const elements = [
+                baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: state.theme.bgColor })
+            ];
+
+            if (layout) {
+                const { x, y, w, h, radius } = layout.frame;
+                elements.push(baseElement({ id: 'image-1', type: 'image', name: 'Slide Image', x, y, w, h, radius, fillColor: '#E2E8F0', imageUrl: '' }));
+                if (layout.overlay) {
+                    elements.push(baseElement({ id: 'overlay-1', type: 'rect', name: 'Image Shade', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: '#000000', fillOpacity: 45 }));
+                }
+            }
+
+            // Shrink the type until the accent bar, title and content fit inside the text area
+            const accentW = 100, accentH = 14, accentGap = 36, textGap = 32;
+            let titleSize = Math.round((slide.type === 'cover' ? 96 : 72) * (layout?.compact ? 0.8 : 1));
+            let contentSize = layout?.compact ? 34 : 40;
+            let titleH = 0, contentH = 0, blockH = 0;
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+                titleH = measureTextHeight(slide.title, titleSize, '900', area.w);
+                contentH = slide.content ? measureTextHeight(slide.content, contentSize, '500', area.w) : 0;
+                blockH = accentH + accentGap + titleH + (contentH ? textGap + contentH : 0);
+                if (blockH <= area.bottom - area.top) break;
+                titleSize = Math.max(28, Math.round(titleSize * 0.9));
+                contentSize = Math.max(20, Math.round(contentSize * 0.92));
+            }
+            const free = Math.max(0, area.bottom - area.top - blockH);
+            let y = Math.round(area.top + (area.valign === 'center' ? free / 2 : area.valign === 'bottom' ? free : 0));
+
+            const accentX = align === 'right' ? area.x + area.w - accentW : align === 'center' ? area.x + (area.w - accentW) / 2 : area.x;
+            elements.push(baseElement({ id: 'accent-1', type: 'rect', name: 'Accent', x: accentX, y, w: accentW, h: accentH, radius: 7, fillColor: state.theme.accentColor }));
+            y += accentH + accentGap;
+            elements.push(baseElement({ id: 'text-1', type: 'text', name: 'Title', x: area.x, y, w: area.w, h: 'auto', fillColor: textColor, content: slide.title, fontSize: titleSize, fontWeight: '900', textAlign: align }));
+            y += titleH + textGap;
+            if (slide.content) {
+                elements.push(baseElement({ id: 'text-2', type: 'text', name: 'Content', x: area.x, y, w: area.w, h: 'auto', fillColor: textColor, fillOpacity: onImage ? 90 : 75, content: slide.content, fontSize: contentSize, fontWeight: '500', textAlign: align }));
+            }
+            elements.push(baseElement({ id: 'footer-1', type: 'text', name: 'Slide Number', x: area.x, y: FOOTER_Y, w: area.w, h: 'auto', fillColor: onImage ? '#FFFFFF' : state.theme.accentColor, content: `KaruAI  •  ${index + 1} / ${total}`, fontSize: 24, fontWeight: '700', textAlign: align }));
+            return elements;
+        }
+
+        function setVariantImage(elements, imageUrl) {
+            elements.forEach(el => { if (el.id === 'image-1') el.imageUrl = imageUrl; });
+        }
+
+        // Keeps what the user changed by hand when the AI sends an updated carousel: moved/restyled
+        // elements keep their geometry and style, hand-edited text keeps its text, added elements stay.
+        function mergeManualEdits(fresh, previous) {
+            if (!previous) return fresh;
+            const freshIds = new Set(fresh.map(el => el.id));
+            const merged = fresh.map(el => {
+                const old = previous.find(item => item.id === el.id);
+                if (!old) return el;
+                const next = old.manual ? { ...old, content: el.content, imageUrl: el.imageUrl } : el;
+                return old.manualContent ? { ...next, content: old.content, manualContent: true } : next;
+            });
+            return [...merged, ...previous.filter(el => !freshIds.has(el.id))];
+        }
+
+        function applyCarousel(carousel) {
+            rememberCurrentSlide();
+            const previousSlides = state.slides;
+            const previousData = state.slideData;
+            state.theme = {
+                bgColor: normalizeHex(carousel.theme?.bgColor, '#F8FAFC'),
+                textColor: normalizeHex(carousel.theme?.textColor, '#0F172A'),
+                accentColor: normalizeHex(carousel.theme?.accentColor, '#4F46E5')
+            };
+            const slides = carousel.slides.map((slide, index) => ({
+                id: Number.isInteger(slide.id) ? slide.id : index + 1,
+                type: typeof slide.type === 'string' ? slide.type : 'content',
+                title: typeof slide.title === 'string' ? slide.title : '',
+                content: typeof slide.content === 'string' ? slide.content : '',
+                imagePrompt: typeof slide.imagePrompt === 'string' ? slide.imagePrompt.trim() : '',
+                imageLayout: IMAGE_LAYOUTS[slide.imageLayout] ? slide.imageLayout : 'top'
+            }));
+            state.slides = slides;
+            state.slideData = slides.map((slide, index) => {
+                const previous = previousData[index];
+                const sameLayout = previousSlides[index]?.imageLayout === slide.imageLayout;
+                const variants = {
+                    without: mergeManualEdits(buildSlideElements(slide, index, slides.length, false), previous?.variants.without),
+                    with: mergeManualEdits(buildSlideElements(slide, index, slides.length, true), sameLayout ? previous?.variants.with : null)
+                };
+                // An image the user already approved survives an edit, as long as its frame keeps its shape
+                const imageUrl = sameLayout && previous?.imageUrl ? previous.imageUrl : null;
+                if (imageUrl) setVariantImage(variants.with, imageUrl);
+                return { mode: imageUrl && previous.mode === 'with' ? 'with' : 'without', imageUrl, variants };
+            });
+            state.carouselVersion += 1;
+            loadSlide(Math.min(state.currentSlide, slides.length - 1));
+        }
+
+        function loadSlide(index) {
+            const data = state.slideData[index];
+            if (!data) return;
+            state.currentSlide = index;
+            state.elements = cloneElements(data.variants[data.mode]);
+            state.selectedIds = [];
+            resetHistory();
+            renderAll();
+        }
+
+        function selectSlide(index) {
+            if (!state.slideData[index]) return;
+            rememberCurrentSlide();
+            loadSlide(index);
+        }
+
+        function setSlideModeAt(index, mode) {
+            const data = state.slideData[index];
+            if (!data || data.mode === mode || (mode === 'with' && !data.imageUrl)) return;
+            if (index === state.currentSlide) rememberCurrentSlide();
+            data.mode = mode;
+            refreshSlide(index);
+        }
+
+        function setSlideMode(mode) { setSlideModeAt(state.currentSlide, mode); }
+
+        // Puts a generated image into the slide's image version and switches the slide to that version
+        function applySlideImage(index, imageUrl) {
+            const data = state.slideData[index];
+            if (!data) return;
+            if (index === state.currentSlide) rememberCurrentSlide();
+            data.imageUrl = imageUrl;
+            setVariantImage(data.variants.with, imageUrl);
+            data.mode = 'with';
+            refreshSlide(index);
+        }
+
+        function refreshSlide(index) {
+            if (index === state.currentSlide) {
+                loadSlide(index);
+            } else {
+                renderThumbnails();
+                refreshPromptCards();
+            }
+        }
+
+        // Builds the DOM for one element; shared by the editor canvas, the thumbnails and the PNG export
+        function createElementNode(el, index) {
+            const div = document.createElement('div');
+            div.className = `element ${el.type === 'text' ? 'text-element' : ''}`;
+
+            div.style.left = `${el.x}px`;
+            div.style.top = `${el.y}px`;
+            div.style.width = el.w === 'auto' ? 'auto' : `${el.w}px`;
+            div.style.height = el.h === 'auto' ? 'auto' : `${el.h}px`;
+            div.style.transform = `rotate(${el.rotation}deg)`;
+            div.style.borderRadius = `${el.radius}px`;
+            div.style.opacity = el.fillOpacity / 100;
+            div.style.zIndex = index;
+
+            if (el.type === 'text') {
+                div.dir = 'auto';
+                div.textContent = el.content;
+                div.style.color = el.fillColor;
+                div.style.fontSize = `${el.fontSize}px`;
+                div.style.fontWeight = el.fontWeight;
+                div.style.textAlign = el.textAlign;
+                div.style.textShadow = el.shadowType === 'drop-shadow' ? `${el.shadowX}px ${el.shadowY}px ${el.shadowBlur}px ${el.shadowColor}40` : 'none';
+            } else if (el.type === 'image') {
+                if (el.imageUrl) {
+                    div.style.backgroundImage = `url("${el.imageUrl}")`;
+                    div.style.backgroundSize = 'cover';
+                    div.style.backgroundPosition = 'center';
+                } else {
+                    div.style.backgroundColor = el.fillColor; // placeholder until the image is generated
+                }
+            } else {
+                div.style.backgroundColor = el.fillColor;
+                if (el.strokeWidth > 0) div.style.border = `${el.strokeWidth}px ${el.strokeStyle} ${el.strokeColor}`;
+                if (el.shadowType !== 'none') {
+                    const inset = el.shadowType === 'inner-shadow' ? 'inset ' : '';
+                    div.style.boxShadow = `${inset}${el.shadowX}px ${el.shadowY}px ${el.shadowBlur}px ${el.shadowSpread}px ${el.shadowColor}40`;
+                }
+            }
+            return div;
+        }
+
+        function createArtboardNode(elements) {
+            const node = document.createElement('div');
+            node.style.cssText = `position:relative;width:${CANVAS_W}px;height:${CANVAS_H}px;overflow:hidden;background:#FFFFFF;`;
+            elements.forEach((el, index) => node.appendChild(createElementNode(el, index)));
+            return node;
+        }
+
+        const THUMB_INNER_W = 60; // w-16 button minus its 2px borders
+        function renderThumbnails() {
+            const footer = document.getElementById('slide-thumbnails');
+            footer.innerHTML = '';
+            if (!state.slideData.length) {
+                footer.innerHTML = '<div class="text-xs text-gray-400">No carousel generated yet.</div>';
+                return;
+            }
+            state.slideData.forEach((data, index) => {
+                const button = document.createElement('button');
+                button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 shadow-sm overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
+                button.title = `${state.slides[index].title || `Slide ${index + 1}`}${data.mode === 'with' ? ' (with image)' : ''}`;
+                const preview = createArtboardNode(index === state.currentSlide ? state.elements : data.variants[data.mode]);
+                preview.style.position = 'absolute';
+                preview.style.left = '0';
+                preview.style.top = '0';
+                preview.style.pointerEvents = 'none';
+                preview.style.transformOrigin = 'top left';
+                preview.style.transform = `scale(${THUMB_INNER_W / CANVAS_W})`;
+                button.appendChild(preview);
+                button.onclick = () => selectSlide(index);
+                footer.appendChild(button);
+            });
+        }
+
+        function renderVariantToggle() {
+            const data = state.slideData[state.currentSlide];
+            const toggle = document.getElementById('variant-toggle');
+            toggle.classList.toggle('hidden', !data);
+            toggle.classList.toggle('flex', Boolean(data));
+            if (!data) return;
+            const withButton = document.getElementById('variant-with');
+            withButton.disabled = !data.imageUrl;
+            withButton.title = data.imageUrl ? 'Show the version with the image' : 'Approve this slide\'s image prompt in the chat to get the image version';
+            [[withButton, 'with'], [document.getElementById('variant-without'), 'without']].forEach(([button, mode]) => {
+                button.className = `px-2 py-1 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${data.mode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-slate-800'}`;
+            });
+        }
+
+        function renderAll() {
+            renderElements();
+            renderLayers();
+            renderThumbnails();
+            renderVariantToggle();
+            document.getElementById('slide-label').textContent = `Slide ${state.slides.length ? state.currentSlide + 1 : 1} of ${state.slides.length || 1}`;
+            updateSelectionOverlay();
+            updatePropertiesPanel();
+            refreshPromptCards();
+        }
+
+        function renderElements() {
+            Array.from(artboard.children).forEach(child => {
+                if (!['selectionOverlay', 'dragBox', 'guide-v', 'guide-h'].includes(child.id)) child.remove();
+            });
+
+            state.elements.forEach((el, index) => {
+                const div = createElementNode(el, index);
+                div.dataset.id = el.id;
+                div.onmousedown = (e) => handleElementDown(e, el.id);
+                artboard.appendChild(div);
+            });
+        }
+
+        function renderLayers() {
+            layersPanel.innerHTML = '';
+            [...state.elements].reverse().forEach(el => {
+                const div = document.createElement('div');
+                div.className = `px-5 py-3 text-sm flex items-center gap-3 cursor-pointer border-b border-gray-100 transition-colors layer-item ${state.selectedIds.includes(el.id) ? 'active' : 'hover:bg-gray-50 text-slate-600'}`;
+                
+                let iconStr = el.type === 'text' ? 'type' : el.type === 'ellipse' ? 'circle' : el.type === 'image' ? 'image' : 'square';
+                div.innerHTML = `<span class="${state.selectedIds.includes(el.id) ? 'text-indigo-600' : 'text-gray-400'}"><i data-lucide="${iconStr}" class="w-4 h-4"></i></span><span class="truncate">${el.name}</span>`;
+                
+                div.onclick = (e) => {
+                    if (e.shiftKey) {
+                        if (state.selectedIds.includes(el.id)) state.selectedIds = state.selectedIds.filter(id => id !== el.id);
+                        else state.selectedIds.push(el.id);
+                    } else {
+                        state.selectedIds = [el.id];
+                    }
+                    renderAll();
+                };
+                layersPanel.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        function updateSelectionOverlay() {
+            if (state.selectedIds.length === 0) {
+                overlay.style.display = 'none';
+                return;
+            }
+            
+            overlay.style.display = 'block';
+            const handles = overlay.querySelectorAll('.resize-handle');
+            
+            if (state.selectedIds.length === 1) {
+                const el = state.elements.find(e => e.id === state.selectedIds[0]);
+                const domEl = document.querySelector(`.element[data-id="${el.id}"]`);
+                if (domEl && el) {
+                    overlay.style.left = `${el.x}px`;
+                    overlay.style.top = `${el.y}px`;
+                    overlay.style.width = `${domEl.offsetWidth}px`;
+                    overlay.style.height = `${domEl.offsetHeight}px`;
+                    overlay.style.transform = `rotate(${el.rotation}deg)`;
+                    handles.forEach(h => h.style.display = 'block'); // Enable handles for all single selections including text
+                }
+            } else {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                state.selectedIds.forEach(id => {
+                    const el = state.elements.find(e => e.id === id);
+                    const domEl = document.querySelector(`.element[data-id="${id}"]`);
+                    const w = domEl ? domEl.offsetWidth : (el.w==='auto'?200:el.w);
+                    const h = domEl ? domEl.offsetHeight : (el.h==='auto'?50:el.h);
+                    if(el.x < minX) minX = el.x;
+                    if(el.y < minY) minY = el.y;
+                    if(el.x + w > maxX) maxX = el.x + w;
+                    if(el.y + h > maxY) maxY = el.y + h;
+                });
+                overlay.style.left = `${minX}px`;
+                overlay.style.top = `${minY}px`;
+                overlay.style.width = `${maxX - minX}px`;
+                overlay.style.height = `${maxY - minY}px`;
+                overlay.style.transform = `rotate(0deg)`;
+                handles.forEach(h => h.style.display = 'none'); // Disable resize for multi-select
+            }
+        }
+
+        function updatePropertiesPanel() {
+            const emptyState = document.getElementById('empty-state');
+            const multiState = document.getElementById('multi-state');
+            const propsContent = document.getElementById('props-content');
+
+            if (state.selectedIds.length === 0) {
+                emptyState.style.display = 'flex';
+                if(multiState) multiState.style.display = 'none';
+                propsContent.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            if(multiState) multiState.style.display = 'none';
+            propsContent.style.display = 'block';
+
+            const el = state.elements.find(e => e.id === state.selectedIds[0]);
+            
+            inputs.forEach(inp => {
+                const prop = inp.dataset.prop;
+                if (el[prop] !== undefined) inp.value = el[prop];
+            });
+
+            if (el.fillColor) document.getElementById('propFillColorHex').value = el.fillColor.toUpperCase();
+            
+            const hasText = state.selectedIds.some(id => state.elements.find(e => e.id === id).type === 'text');
+            const hasShape = state.selectedIds.some(id => state.elements.find(e => e.id === id).type !== 'text');
+
+            document.getElementById('section-text').style.display = hasText ? 'block' : 'none';
+            document.getElementById('section-stroke').style.display = hasShape ? 'block' : 'none';
+            document.getElementById('opt-inner-shadow').style.display = hasShape ? 'block' : 'none';
+            document.getElementById('shadow-controls').style.display = el.shadowType !== 'none' ? 'block' : 'none';
+            
+            document.getElementById('propRad').disabled = !hasShape;
+            document.getElementById('propShadowSpread').disabled = !hasShape;
+        }
+
+        // Tool Selection
+        function switchLeftTab(tab) {
+            document.getElementById('tab-brand').classList.toggle('active', tab === 'brand');
+            document.getElementById('tab-layers').classList.toggle('active', tab === 'layers');
+            document.getElementById('panel-brand').style.display = tab === 'brand' ? 'block' : 'none';
+            document.getElementById('panel-layers').style.display = tab === 'layers' ? 'block' : 'none';
+        }
+
+        function switchRightTab(tab) {
+            document.getElementById('tab-chat').classList.toggle('active', tab === 'chat');
+            document.getElementById('tab-design').classList.toggle('active', tab === 'design');
+            document.getElementById('panel-chat').style.display = tab === 'chat' ? 'flex' : 'none';
+            document.getElementById('panel-design').style.display = tab === 'design' ? 'block' : 'none';
+        }
+
+        function setTool(t) {
+            state.tool = t;
+            ['V','R','O','T'].forEach(id => document.getElementById('tool-'+id).classList.toggle('active', id === t));
+            document.getElementById('workspace').style.cursor = t === 'V' ? 'default' : 'crosshair';
+        }
+
+        function changeZoom(amount) {
+            state.zoom = Math.max(0.1, Math.min(2, state.zoom + amount));
+            document.getElementById('zoom-label').innerText = Math.round(state.zoom * 100) + '%';
+            canvasContainer.style.transform = `scale(${state.zoom})`;
+        }
+
+        // Workspace Interactions
+        function handleWorkspaceDown(e) {
+            if (e.target.closest('.element')) return; 
+            if (e.target.closest('.resize-handle')) return;
+            
+            const rect = canvasContainer.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / state.zoom;
+            const y = (e.clientY - rect.top) / state.zoom;
+
+            if (state.tool !== 'V') {
+                let type = state.tool === 'R' ? 'rect' : state.tool === 'O' ? 'ellipse' : 'text';
+                const newEl = {
+                    id: generateId(), type: type, name: type === 'rect' ? 'Rectangle' : type === 'ellipse' ? 'Ellipse' : 'Text',
+                    x: x, y: y, w: type === 'text' ? 400 : 200, h: type === 'text' ? 'auto' : 200,
+                    rotation: 0, radius: type === 'ellipse' ? 9999 : 0,
+                    fillColor: type === 'text' ? '#0f172a' : '#cbd5e1', fillOpacity: 100,
+                    strokeColor: '#000000', strokeWidth: 0, strokeStyle: 'solid',
+                    shadowType: 'none', shadowX: 0, shadowY: 4, shadowBlur: 4, shadowSpread: 0, shadowColor: '#000000',
+                    content: type === 'text' ? 'New Text' : '', fontSize: 64, fontWeight: '700', textAlign: 'right'
+                };
+                state.elements.push(newEl);
+                state.selectedIds = [newEl.id];
+                setTool('V');
+                switchLeftTab('layers');
+                switchRightTab('design');
+                saveHistory();
+                renderAll();
+            } else {
+                state.dragState = { type: 'select', startX: x, startY: y };
+                if (!e.shiftKey) {
+                    state.selectedIds = [];
+                    renderAll();
+                }
+            }
+        }
+
+        function handleElementDown(e, id) {
+            e.stopPropagation();
+            if (state.tool !== 'V') return;
+
+            if (e.shiftKey) {
+                if (state.selectedIds.includes(id)) state.selectedIds = state.selectedIds.filter(x => x !== id);
+                else state.selectedIds.push(id);
+            } else {
+                if (!state.selectedIds.includes(id)) state.selectedIds = [id];
+            }
+            
+            switchLeftTab('layers');
+            switchRightTab('design');
+            renderAll();
+
+            state.dragState = {
+                type: 'move',
+                startX: e.clientX, startY: e.clientY,
+                origPositions: state.selectedIds.map(sid => {
+                    const el = state.elements.find(x => x.id === sid);
+                    return { id: sid, x: el.x, y: el.y };
+                })
+            };
+        }
+
+        overlay.onmousedown = (e) => {
+            if(e.target.classList.contains('resize-handle') && state.selectedIds.length === 1) {
+                e.stopPropagation();
+                const el = state.elements.find(x => x.id === state.selectedIds[0]);
+                const domEl = document.querySelector(`.element[data-id="${el.id}"]`);
+                state.dragState = {
+                    type: 'resize', handle: e.target.dataset.handle,
+                    startX: e.clientX, startY: e.clientY,
+                    origX: el.x, origY: el.y, origW: domEl.offsetWidth, origH: domEl.offsetHeight, origFontSize: el.fontSize,
+                    element: el
+                };
+            }
+        };
+
+        window.onmousemove = (e) => {
+            if (!state.dragState) return;
+            
+            const rect = canvasContainer.getBoundingClientRect();
+            
+            if (state.dragState.type === 'select') {
+                const currX = (e.clientX - rect.left) / state.zoom;
+                const currY = (e.clientY - rect.top) / state.zoom;
+                const x = Math.min(state.dragState.startX, currX);
+                const y = Math.min(state.dragState.startY, currY);
+                const w = Math.abs(currX - state.dragState.startX);
+                const h = Math.abs(currY - state.dragState.startY);
+                
+                const dragBox = document.getElementById('dragBox');
+                dragBox.style.display = 'block';
+                dragBox.style.left = `${x}px`; dragBox.style.top = `${y}px`;
+                dragBox.style.width = `${w}px`; dragBox.style.height = `${h}px`;
+                
+                state.selectedIds = state.elements.filter(el => {
+                    const domEl = document.querySelector(`.element[data-id="${el.id}"]`);
+                    const elW = domEl ? domEl.offsetWidth : (el.w==='auto'?200:el.w);
+                    const elH = domEl ? domEl.offsetHeight : (el.h==='auto'?50:el.h);
+                    return el.x < x + w && el.x + elW > x && el.y < y + h && el.y + elH > y;
+                }).map(el => el.id);
+                
+                updateSelectionOverlay();
+                renderLayers(); // Update active states in panel
+            } 
+            else if (state.dragState.type === 'move') {
+                const dx = (e.clientX - state.dragState.startX) / state.zoom;
+                const dy = (e.clientY - state.dragState.startY) / state.zoom;
+                let snapDx = dx, snapDy = dy;
+
+                // Smart Guides Logic
+                const SNAP_TOL = 6 / state.zoom;
+                let guideX = null, guideY = null;
+                
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                state.dragState.origPositions.forEach(pos => {
+                    const domEl = document.querySelector(`.element[data-id="${pos.id}"]`);
+                    const w = domEl ? domEl.offsetWidth : 100;
+                    const h = domEl ? domEl.offsetHeight : 100;
+                    if(pos.x + dx < minX) minX = pos.x + dx;
+                    if(pos.y + dy < minY) minY = pos.y + dy;
+                    if(pos.x + dx + w > maxX) maxX = pos.x + dx + w;
+                    if(pos.y + dy + h > maxY) maxY = pos.y + dy + h;
+                });
+                const mB = { left: minX, right: maxX, centerX: (minX + maxX)/2, top: minY, bottom: maxY, centerY: (minY + maxY)/2 };
+                const otherElements = state.elements.filter(e => !state.selectedIds.includes(e.id));
+                let minDiffX = SNAP_TOL, minDiffY = SNAP_TOL;
+
+                otherElements.forEach(other => {
+                    const domEl = document.querySelector(`.element[data-id="${other.id}"]`);
+                    const w = domEl ? domEl.offsetWidth : (other.w==='auto'?100:other.w);
+                    const h = domEl ? domEl.offsetHeight : (other.h==='auto'?50:other.h);
+                    const oB = { left: other.x, right: other.x + w, centerX: other.x + w/2, top: other.y, bottom: other.y + h, centerY: other.y + h/2 };
+
+                    [mB.left, mB.centerX, mB.right].forEach((mX) => {
+                        [oB.left, oB.centerX, oB.right].forEach((oX) => {
+                            if (Math.abs(mX - oX) < minDiffX) {
+                                minDiffX = Math.abs(mX - oX);
+                                snapDx = oX - (mX - dx);
+                                guideX = oX;
+                            }
+                        });
+                    });
+                    [mB.top, mB.centerY, mB.bottom].forEach((mY) => {
+                        [oB.top, oB.centerY, oB.bottom].forEach((oY) => {
+                            if (Math.abs(mY - oY) < minDiffY) {
+                                minDiffY = Math.abs(mY - oY);
+                                snapDy = oY - (mY - dy);
+                                guideY = oY;
+                            }
+                        });
+                    });
+                });
+
+                document.getElementById('guide-v').style.display = guideX !== null ? 'block' : 'none';
+                if(guideX !== null) document.getElementById('guide-v').style.left = `${guideX}px`;
+                document.getElementById('guide-h').style.display = guideY !== null ? 'block' : 'none';
+                if(guideY !== null) document.getElementById('guide-h').style.top = `${guideY}px`;
+
+                // Apply Move
+                state.dragState.origPositions.forEach(pos => {
+                    const el = state.elements.find(x => x.id === pos.id);
+                    el.x = Math.round(pos.x + snapDx);
+                    el.y = Math.round(pos.y + snapDy);
+                    const domEl = document.querySelector(`.element[data-id="${el.id}"]`);
+                    if(domEl) { domEl.style.left = `${el.x}px`; domEl.style.top = `${el.y}px`; }
+                });
+                updateSelectionOverlay();
+                updatePropertiesPanel();
+            } 
+            else if (state.dragState.type === 'resize') {
+                const dx = (e.clientX - state.dragState.startX) / state.zoom;
+                const dy = (e.clientY - state.dragState.startY) / state.zoom;
+                const el = state.dragState.element;
+                const h = state.dragState.handle;
+                let newX = state.dragState.origX, newY = state.dragState.origY, newW = state.dragState.origW, newH = state.dragState.origH;
+
+                if (h.includes('e')) newW += dx;
+                if (h.includes('s')) newH += dy;
+                if (h.includes('w')) { newW -= dx; newX += dx; }
+                if (h.includes('n')) { newH -= dy; newY += dy; }
+
+                if (e.shiftKey) {
+                    const ratio = Math.max(newW / state.dragState.origW, newH / state.dragState.origH);
+                    newW = state.dragState.origW * ratio;
+                    newH = state.dragState.origH * ratio;
+                    if (h.includes('w')) newX = state.dragState.origX + (state.dragState.origW - newW);
+                    if (h.includes('n')) newY = state.dragState.origY + (state.dragState.origH - newH);
+                }
+
+                if (newW < 20) { newW = 20; newX = state.dragState.origX + (h.includes('w') ? state.dragState.origW - 20 : 0); }
+                if (newH < 20) { newH = 20; newY = state.dragState.origY + (h.includes('n') ? state.dragState.origH - 20 : 0); }
+
+                el.w = newW; el.h = newH; el.x = newX; el.y = newY;
+                
+                const domEl = document.querySelector(`.element[data-id="${el.id}"]`);
+                if(domEl) {
+                    domEl.style.width = `${el.w}px`;
+                    domEl.style.height = `${el.h}px`;
+                    domEl.style.left = `${el.x}px`; domEl.style.top = `${el.y}px`;
+                }
+                
+                updateSelectionOverlay();
+                updatePropertiesPanel();
+            }
+        };
+
+        window.onmouseup = () => {
+            if(state.dragState) {
+                if (['move', 'resize'].includes(state.dragState.type)) {
+                    state.selectedIds.forEach(id => {
+                        const element = state.elements.find(item => item.id === id);
+                        if (element) element.manual = true;
+                    });
+                }
+                if(['move', 'resize', 'select'].includes(state.dragState.type)) saveHistory();
+                state.dragState = null;
+                document.getElementById('dragBox').style.display = 'none';
+                document.getElementById('guide-v').style.display = 'none';
+                document.getElementById('guide-h').style.display = 'none';
+                renderAll();
+            }
+        };
+
+        // Properties & Actions
+        inputs.forEach(inp => {
+            inp.addEventListener('change', (e) => {
+                if (state.selectedIds.length === 0) return;
+                const prop = e.target.dataset.prop;
+                let val = e.target.value;
+                if (['x', 'y', 'w', 'h', 'radius', 'rotation', 'fillOpacity', 'strokeWidth', 'shadowX', 'shadowY', 'shadowBlur', 'shadowSpread', 'fontSize'].includes(prop)) val = parseFloat(val) || 0;
+
+                state.selectedIds.forEach(id => {
+                    const el = state.elements.find(ex => ex.id === id);
+                    if (el) {
+                        el[prop] = val;
+                        // Hand-edited text and hand-edited geometry/style are kept separately when the AI updates the carousel
+                        if (prop === 'content') el.manualContent = true;
+                        else el.manual = true;
+                    }
+                });
+                
+                if (prop === 'fillColor') document.getElementById('propFillColorHex').value = val.toUpperCase();
+                if (prop === 'shadowType') updatePropertiesPanel(); 
+
+                saveHistory();
+                renderAll();
+            });
+        });
+
+        function copy() { clipboard = state.elements.filter(e => state.selectedIds.includes(e.id)).map(e => JSON.parse(JSON.stringify(e))); }
+        function cut() { copy(); deleteSelected(); }
+        function paste() {
+            if (!clipboard.length) return;
+            const newIds = [];
+            clipboard.forEach(el => {
+                const newEl = JSON.parse(JSON.stringify(el));
+                newEl.id = generateId();
+                newEl.x += 20; newEl.y += 20;
+                state.elements.push(newEl);
+                newIds.push(newEl.id);
+            });
+            state.selectedIds = newIds;
+            saveHistory();
+            renderAll();
+        }
+        function duplicate() { copy(); paste(); }
+        
+        function deleteSelected() {
+            if (state.selectedIds.length === 0) return;
+            state.elements = state.elements.filter(e => !state.selectedIds.includes(e.id));
+            state.selectedIds = [];
+            saveHistory();
+            renderAll();
+        }
+
+        function reorderLayer(dir) {
+            if (state.selectedIds.length !== 1) return;
+            const idx = state.elements.findIndex(e => e.id === state.selectedIds[0]);
+            if ((dir === 1 && idx < state.elements.length - 1) || (dir === -1 && idx > 0)) {
+                const temp = state.elements[idx];
+                state.elements[idx] = state.elements[idx + dir];
+                state.elements[idx + dir] = temp;
+                saveHistory();
+                renderAll();
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+
+            if (e.code === 'Delete' || e.code === 'Backspace') { deleteSelected(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyC') { copy(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyX') { cut(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyV') { paste(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyD') { duplicate(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyZ') { if (e.shiftKey) redo(); else undo(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'KeyY') { redo(); e.preventDefault(); }
+            else if (cmdKey && e.code === 'BracketRight') { reorderLayer(1); e.preventDefault(); }
+            else if (cmdKey && e.code === 'BracketLeft') { reorderLayer(-1); e.preventDefault(); }
+            else if (e.code === 'KeyV') setTool('V');
+            else if (e.code === 'KeyR') setTool('R');
+            else if (e.code === 'KeyO') setTool('O');
+            else if (e.code === 'KeyT') setTool('T');
+        });
+
+        function addChatBubble(text, tone = 'ai') {
+            const container = document.getElementById('chat-messages');
+            const tones = {
+                user: 'bg-indigo-600 text-white rounded-br-sm',
+                ai: 'text-slate-600 bg-white rounded-bl-sm',
+                error: 'text-red-600 bg-red-50 rounded-bl-sm'
+            };
+            const wrap = document.createElement('div');
+            wrap.className = `flex w-full ${tone === 'user' ? 'justify-end' : 'justify-start'}`;
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap break-words ${tones[tone]}`;
+            bubble.textContent = text;
+            wrap.appendChild(bubble);
+            container.appendChild(wrap);
+            container.scrollTop = container.scrollHeight;
+            return wrap;
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const container = document.getElementById('chat-messages');
+            const sendButton = document.getElementById('chat-send');
+            const val = input.value.trim();
+            if (!val || sendButton.disabled) return;
+
+            switchRightTab('chat');
+            const emptyState = document.getElementById('chat-empty');
+            if (emptyState) emptyState.remove();
+
+            addChatBubble(val, 'user');
+            input.value = '';
+            sendButton.disabled = true;
+            sendButton.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const thinkingMessage = document.createElement('div');
+            thinkingMessage.className = 'flex w-full justify-start';
+            thinkingMessage.innerHTML = '<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span>KaruAI is thinking</span><span class="thinking-dots" aria-label="KaruAI is thinking"><span></span><span></span><span></span></span></div>';
+            container.appendChild(thinkingMessage);
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: val })
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok) throw new Error(data?.error || `Request failed with status ${response.status}`);
+                if (typeof data?.responseText !== 'string') throw new Error('The server returned no carousel data.');
+                let proposed;
+                try {
+                    proposed = JSON.parse(data.responseText);
+                } catch {
+                    throw new Error('KaruAI returned invalid carousel data.');
+                }
+                if (!proposed || !Array.isArray(proposed.slides) || !proposed.slides.length) throw new Error('KaruAI returned no slides.');
+
+                applyCarousel(proposed);
+                thinkingMessage.remove();
+                const count = state.slides.length;
+                addChatBubble(`Your carousel is ready with ${count} slide${count === 1 ? '' : 's'}. Every slide has a version with an image and one without. Approve the image prompts you like: those slides switch to their image version, the ones you skip stay without an image.`);
+                renderImagePrompts();
+            } catch (error) {
+                thinkingMessage.remove();
+                addChatBubble(`Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unable to reach KaruAI.'}`, 'error');
+            } finally {
+                sendButton.disabled = false;
+                sendButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // --- Image prompt approval ---
+
+        const promptCardRenderers = [];
+        function refreshPromptCards() { promptCardRenderers.forEach(render => render()); }
+
+        function aspectRatioLabel(width, height) {
+            const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+            const divisor = gcd(width, height);
+            return `${width / divisor}:${height / divisor}`;
+        }
+
+        // The size of the frame the image goes into (the AI's layout, or the frame as the user resized it)
+        function imageRequestSize(index) {
+            if (index === state.currentSlide) rememberCurrentSlide();
+            const frame = IMAGE_LAYOUTS[state.slides[index].imageLayout].frame;
+            const placed = state.slideData[index]?.variants.with.find(el => el.id === 'image-1');
+            const width = typeof placed?.w === 'number' ? placed.w : frame.w;
+            const height = typeof placed?.h === 'number' ? placed.h : frame.h;
+            const scale = Math.min(1, 2048 / Math.max(width, height)); // the image API accepts 64..2048 per side
+            return { width: Math.max(64, Math.round(width * scale)), height: Math.max(64, Math.round(height * scale)) };
+        }
+
+        function composeImagePrompt(prompt, layout, { width, height }) {
+            const shape = width > height ? 'landscape' : width < height ? 'portrait' : 'square';
+            return `${prompt}\n\nComposition: ${shape} image with a ${aspectRatioLabel(width, height)} aspect ratio (${width}x${height}px). ` +
+                `${IMAGE_LAYOUTS[layout].hint} Keep the main subject fully inside the frame. No text, letters, logos or watermarks.`;
+        }
+
+        function createChipButton(label, onClick, primary = false) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = primary
+                ? 'bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50'
+                : 'border border-gray-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50';
+            button.textContent = label;
+            button.onclick = onClick;
+            return button;
+        }
+
+        function renderImagePrompts() {
+            const version = state.carouselVersion;
+            const isStale = () => version !== state.carouselVersion;
+            const rows = state.slides
+                .map((slide, index) => ({ index, layout: slide.imageLayout, prompt: slide.imagePrompt, busy: false, skipped: false, error: '' }))
+                .filter(row => row.prompt);
+            if (!rows.length) return;
+
+            const container = document.getElementById('chat-messages');
+            const wrap = document.createElement('div');
+            wrap.className = 'flex w-full justify-start';
+            const card = document.createElement('div');
+            card.className = 'w-full max-w-[95%] p-4 rounded-2xl shadow-sm text-sm text-slate-600 bg-white rounded-bl-sm';
+            const heading = document.createElement('p');
+            heading.className = 'font-semibold text-slate-800 mb-1';
+            heading.textContent = 'Image prompts';
+            const subheading = document.createElement('p');
+            subheading.className = 'text-xs text-gray-500 mb-3';
+            subheading.textContent = 'Edit a prompt if you like, then approve it. Each image is generated in the shape of its spot on the slide.';
+            const approveAllButton = createChipButton('Approve all & generate', () => approveAll(), true);
+            approveAllButton.classList.add('w-full', 'mb-2');
+            card.append(heading, subheading, approveAllButton);
+
+            const generate = async (row) => {
+                if (row.busy || isStale()) return;
+                row.busy = true;
+                row.skipped = false;
+                row.error = '';
+                render();
+                try {
+                    const size = imageRequestSize(row.index);
+                    const response = await fetch('/api/images', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: composeImagePrompt(row.prompt, row.layout, size), width: size.width, height: size.height })
+                    });
+                    const data = await response.json().catch(() => null);
+                    if (!response.ok || typeof data?.imageUrl !== 'string') throw new Error(data?.error || `Image request failed with status ${response.status}`);
+                    if (!isStale()) applySlideImage(row.index, data.imageUrl);
+                } catch (error) {
+                    row.error = error instanceof Error ? error.message : 'Image generation failed.';
+                } finally {
+                    row.busy = false;
+                    render();
+                }
+            };
+
+            const skip = (row) => {
+                row.skipped = true;
+                row.error = '';
+                setSlideModeAt(row.index, 'without');
+                render();
+            };
+
+            const approveAll = async () => {
+                for (const row of rows) {
+                    if (isStale()) return;
+                    const data = state.slideData[row.index];
+                    if (row.busy || data.mode === 'with') continue;
+                    if (data.imageUrl) setSlideModeAt(row.index, 'with');
+                    else await generate(row);
+                }
+            };
+
+            rows.forEach(row => {
+                const item = document.createElement('div');
+                item.className = 'border-t border-gray-100 py-3';
+                const title = document.createElement('button');
+                title.type = 'button';
+                title.className = 'block text-xs font-semibold text-slate-800 hover:text-indigo-600 mb-1.5';
+                const size = IMAGE_LAYOUTS[row.layout].frame;
+                title.textContent = `Slide ${row.index + 1} · ${IMAGE_LAYOUTS[row.layout].label} · ${aspectRatioLabel(size.w, size.h)}`;
+                title.onclick = () => { if (!isStale()) selectSlide(row.index); };
+                const textarea = document.createElement('textarea');
+                textarea.className = 'w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs text-slate-700 focus:border-indigo-500 outline-none resize-y h-20 mb-2';
+                textarea.value = row.prompt;
+                textarea.oninput = () => { row.prompt = textarea.value; render(); };
+                const actions = document.createElement('div');
+                actions.className = 'flex flex-wrap items-center gap-2';
+                item.append(title, textarea, actions);
+                card.appendChild(item);
+                row.ui = { textarea, actions };
+            });
+
+            function render() {
+                const stale = isStale();
+                approveAllButton.disabled = stale || rows.every(row => row.busy || state.slideData[row.index]?.mode === 'with');
+                rows.forEach(row => {
+                    const { textarea, actions } = row.ui;
+                    const data = state.slideData[row.index];
+                    const hasPrompt = row.prompt.trim() !== '';
+                    textarea.disabled = stale || row.busy;
+                    actions.innerHTML = '';
+                    const status = (text, color = 'text-gray-500') => {
+                        const span = document.createElement('span');
+                        span.className = `text-xs font-medium ${color}`;
+                        span.textContent = text;
+                        actions.appendChild(span);
+                    };
+                    if (stale) {
+                        status('Replaced by a newer carousel.', 'text-gray-400');
+                    } else if (row.busy) {
+                        status('Generating image…', 'text-indigo-600');
+                    } else if (row.error) {
+                        status(row.error, 'text-red-600 w-full');
+                        actions.append(createChipButton('Retry', () => generate(row), true), createChipButton('Skip', () => skip(row)));
+                    } else if (data.mode === 'with') {
+                        status('✓ Using the image version', 'text-green-700');
+                        actions.append(createChipButton('Regenerate', () => generate(row)), createChipButton('Use without image', () => skip(row)));
+                    } else if (data.imageUrl) {
+                        status('Using the version without image');
+                        actions.append(createChipButton('Use image', () => { row.skipped = false; setSlideModeAt(row.index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
+                    } else if (row.skipped) {
+                        status('Skipped: the slide stays without an image');
+                        actions.append(createChipButton('Approve & generate', () => generate(row), true));
+                    } else {
+                        actions.append(createChipButton('Approve & generate', () => generate(row), true), createChipButton('Skip', () => skip(row)));
+                    }
+                    actions.querySelectorAll('button').forEach(button => {
+                        if (button.textContent !== 'Skip' && button.textContent !== 'Use without image' && !hasPrompt) button.disabled = true;
+                    });
+                });
+            }
+
+            promptCardRenderers.forEach(renderOld => renderOld()); // older cards now show as replaced
+            promptCardRenderers.push(render);
+            render();
+            wrap.appendChild(card);
+            container.appendChild(wrap);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Export ---
+
+        // The preview gets these rules from the page's stylesheets (Tailwind preflight + the .element
+        // classes above); the export renders outside the page, so it carries its own copy.
+        const EXPORT_STYLE = '*{box-sizing:border-box;margin:0;padding:0;border-width:0;border-style:solid;}' +
+            '.element{position:absolute;transform-origin:center;}' +
+            '.text-element{white-space:pre-wrap;word-break:break-word;line-height:1.2;}';
+
+        function loadImage(url) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error('Could not load an image for export.'));
+                image.src = url;
+            });
+        }
+
+        // Draws the slide with the browser's own layout engine (the same HTML as the preview, inside an
+        // SVG foreignObject), so the PNG matches the canvas: same fonts, line wrapping, cropping and effects.
+        async function renderSlideToCanvas(elements) {
+            const imageUrls = [...new Set(elements.filter(el => el.type === 'image' && el.imageUrl).map(el => el.imageUrl))];
+            await Promise.all(imageUrls.map(url => loadImage(url).then(image => image.decode?.())));
+
+            const root = createArtboardNode(elements);
+            root.style.fontFamily = getComputedStyle(document.body).fontFamily;
+            const style = document.createElement('style');
+            style.textContent = EXPORT_STYLE;
+            root.prepend(style);
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}">` +
+                `<foreignObject x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}">${new XMLSerializer().serializeToString(root)}</foreignObject></svg>`;
+            const snapshot = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+            await snapshot.decode?.().catch(() => {});
+
+            const canvas = document.createElement('canvas');
+            canvas.width = CANVAS_W;
+            canvas.height = CANVAS_H;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Canvas export is not supported in this browser.');
+            context.drawImage(snapshot, 0, 0, CANVAS_W, CANVAS_H);
+            return canvas;
+        }
+
+        function canvasToBlob(canvas) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Could not encode the PNG.'))), 'image/png');
+            });
+        }
+
+        function saveBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        // The elements of every slide, each in the version (with / without image) it currently shows
+        function slidesForExport() {
+            rememberCurrentSlide();
+            return state.slideData.length ? state.slideData.map(data => data.variants[data.mode]) : [state.elements];
+        }
+
+        const slideFileName = (index) => `karuai-slide-${String(index + 1).padStart(2, '0')}.png`;
+
+        let isExporting = false;
+        async function runExport(task) {
+            if (isExporting) return;
+            isExporting = true;
+            closeDownloadMenu();
+            document.body.style.cursor = 'progress';
+            try {
+                await task();
+            } catch (error) {
+                alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            } finally {
+                isExporting = false;
+                document.body.style.cursor = '';
+            }
+        }
+
+        function downloadCurrentSlide() {
+            return runExport(async () => {
+                const elements = slidesForExport()[state.currentSlide] ?? state.elements;
+                saveBlob(await canvasToBlob(await renderSlideToCanvas(elements)), slideFileName(state.currentSlide));
+            });
+        }
+
+        function downloadFullCarousel() {
+            return runExport(async () => {
+                if (typeof JSZip === 'undefined') throw new Error('The ZIP library did not load. Check your connection and reload.');
+                const zip = new JSZip();
+                const slides = slidesForExport();
+                for (const [index, elements] of slides.entries()) {
+                    zip.file(slideFileName(index), await canvasToBlob(await renderSlideToCanvas(elements)));
+                }
+                saveBlob(await zip.generateAsync({ type: 'blob' }), 'karuai-carousel.zip');
+            });
+        }
+
+        function toggleDownloadMenu() { document.getElementById('download-menu').classList.toggle('hidden'); }
+        function closeDownloadMenu() { document.getElementById('download-menu').classList.add('hidden'); }
+        document.addEventListener('mousedown', (e) => { if (!e.target.closest('#download-wrap')) closeDownloadMenu(); });
+
+        // Init
+        resetHistory();
+        switchRightTab('chat');
+        renderAll();
+    </script>
+</body>
+</html>

@@ -16,15 +16,25 @@ export async function POST(request: Request) {
         return errorResponse('Request body must be valid JSON.', 400);
     }
 
-    const prompt = (body as { prompt?: unknown } | null)?.prompt;
+    const requestBody = body as { prompt?: unknown; width?: unknown; height?: unknown } | null;
+    const prompt = requestBody?.prompt;
     if (typeof prompt !== 'string' || prompt.trim() === '') {
         return errorResponse('`prompt` must be a non-empty string.', 400);
     }
 
+    const width = requestBody?.width;
+    const height = requestBody?.height;
+    if (
+        typeof width !== 'number' || !Number.isInteger(width) || width < 64 || width > 2048 ||
+        typeof height !== 'number' || !Number.isInteger(height) || height < 64 || height > 2048
+    ) {
+        return errorResponse('`width` and `height` must be integers between 64 and 2048.', 400);
+    }
+
     try {
         const result = await generatePollinationsImage(prompt.trim(), {
-            width: 768,
-            height: 768,
+            width,
+            height,
             safe: true,
         });
 
