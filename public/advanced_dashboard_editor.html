@@ -129,23 +129,17 @@
 
         <div class="flex-1 overflow-y-auto relative">
             <div id="panel-brand" class="hidden p-6">
-                <h2 class="text-sm font-bold mb-4 text-slate-800 uppercase tracking-wider">Brand Settings</h2>
-                <div class="mb-6">
-                    <label class="block text-xs font-semibold text-gray-500 mb-2">Logo</label>
-                    <button class="w-full border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer">
-                        <i data-lucide="upload" class="text-gray-400 mb-2 w-6 h-6"></i>
-                        <span class="text-xs text-gray-500 font-medium">Upload Logo</span>
-                    </button>
-                </div>
+                <h2 class="text-sm font-bold mb-1 text-slate-800 uppercase tracking-wider">Brand</h2>
+                <p class="text-xs text-gray-400 mb-5">Everything the carousel uses. Change one to update it on every slide.</p>
                 <div class="mb-6">
                     <label class="block text-xs font-semibold text-gray-500 mb-2">Colors</label>
-                    <div class="flex gap-4">
-                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #FFFFFF"></div>
-                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #0F172A"></div>
-                        <div class="w-10 h-10 rounded-full border border-gray-200 shadow-sm" style="background-color: #4F46E5"></div>
-                    </div>
+                    <div id="brand-colors" class="grid grid-cols-4 gap-x-2 gap-y-3"></div>
                 </div>
-                <button onclick="downloadFullCarousel()" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md transition-all mt-10">
+                <div class="mb-6">
+                    <label class="block text-xs font-semibold text-gray-500 mb-2">Fonts</label>
+                    <div id="brand-fonts" class="space-y-2"></div>
+                </div>
+                <button onclick="downloadFullCarousel()" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md transition-all mt-4">
                     <i data-lucide="download" class="w-4 h-4"></i> Download all (ZIP)
                 </button>
                 <button onclick="downloadCurrentSlide()" class="w-full mt-3 border border-gray-200 text-slate-700 font-semibold py-2 px-2 rounded-lg text-xs hover:bg-gray-50">Download this slide (PNG)</button>
@@ -162,6 +156,8 @@
                 <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
                 <button onclick="setTool('O')" id="tool-O" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Ellipse (O)"><i data-lucide="circle" class="w-4 h-4"></i></button>
                 <button onclick="setTool('T')" id="tool-T" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Text (T)"><i data-lucide="type" class="w-4 h-4"></i></button>
+                <button onclick="pickImageFile()" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Add image (I) — or drop an image on the canvas"><i data-lucide="image-plus" class="w-4 h-4"></i></button>
+                <input id="image-file-input" type="file" accept="image/*" class="hidden" onchange="handleImageFile(event)">
             </div>
             
             <div class="flex items-center gap-3">
@@ -302,15 +298,19 @@
                     <div id="section-text" class="p-5 border-b border-gray-200">
                         <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Text</h4>
                         <textarea id="propContent" data-prop="content" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-500 outline-none resize-none h-24 text-slate-800"></textarea>
+                        <select id="propFontFamily" data-prop="fontFamily" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-500 text-xs text-slate-700"></select>
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
                                 <span class="text-[10px] font-bold text-gray-400">Size</span>
                                 <input type="number" id="propFontSize" data-prop="fontSize" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <select id="propFontWeight" data-prop="fontWeight" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                                <option value="300">Light</option>
                                 <option value="400">Regular</option>
                                 <option value="500">Medium</option>
+                                <option value="600">Semibold</option>
                                 <option value="700">Bold</option>
+                                <option value="800">Extra Bold</option>
                                 <option value="900">Black</option>
                             </select>
                         </div>
@@ -319,6 +319,16 @@
                             <option value="center">Align Center</option>
                             <option value="right">Align Right</option>
                         </select>
+                        <div class="grid grid-cols-2 gap-3 mt-3">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all" title="Line height">
+                                <span class="text-[10px] font-bold text-gray-400">LH</span>
+                                <input type="number" step="0.05" id="propLineHeight" data-prop="lineHeight" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all" title="Letter spacing">
+                                <span class="text-[10px] font-bold text-gray-400">LS</span>
+                                <input type="number" id="propLetterSpacing" data-prop="letterSpacing" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="p-5 border-b border-gray-200">
@@ -331,6 +341,15 @@
                                 <span class="text-gray-400 text-xs font-bold">%</span>
                             </div>
                         </div>
+                        <div id="gradient-controls" class="flex items-center gap-3 mt-3">
+                            <input type="color" id="propGradientTo" data-prop="gradientTo" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm" title="Gradient end color">
+                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 flex-1" title="Gradient angle">
+                                <span class="text-[10px] font-bold text-gray-400">°</span>
+                                <input type="number" id="propGradientAngle" data-prop="gradientAngle" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                            </div>
+                            <button onclick="toggleGradient(false)" class="text-xs font-semibold text-gray-500 hover:text-red-600">Remove</button>
+                        </div>
+                        <button id="gradient-add" onclick="toggleGradient(true)" class="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ Gradient</button>
                     </div>
 
                     <div id="section-stroke" class="p-5 border-b border-gray-200">
@@ -398,21 +417,23 @@
             };
         }
 
-        // Every generated slide is kept in two versions ("variants"): without an image, and with the image
-        // in the layout the AI picked. state.elements is the editable copy of the variant on screen.
+        // Every AI slide comes in two designs ("variants"): without an image and with one. state.elements is the
+        // editable copy of the variant on screen. Image pixels live in imageStore (elements only hold an imageId),
+        // so undo snapshots and the carousel sent back to the AI stay small.
+        const imageStore = new Map();
         let state = {
             tool: 'V', 
             zoom: 0.45,
             selectedIds: [],
             dragState: null,
-            slides: [],
+            slides: [], // per slide: { id, title, imagePrompt }
             currentSlide: 0,
-            theme: { bgColor: '#F8FAFC', textColor: '#0F172A', accentColor: '#4F46E5' },
-            slideData: [], // per slide: { mode: 'with' | 'without', imageUrl, variants: { with: [...], without: [...] } }
+            // per slide: { mode: 'with' | 'without', variants: { with, without }, aiIds: { with, without }, deleted: { with, without } }
+            slideData: [],
             carouselVersion: 0, // bumped on every AI carousel, so late image results for an old one are dropped
             elements: [
                 baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: 1080, h: 1350, fillColor: '#F8FAFC' }),
-                baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: 'Describe your carousel in the KaruAI chat\nand it will appear here.', fontSize: 44, fontWeight: '700', textAlign: 'center' })
+                baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: 'Describe your carousel in the KaruAI chat\nand it will appear here.', fontFamily: 'Heebo', fontSize: 44, fontWeight: '700', textAlign: 'center', lineHeight: 1.2, letterSpacing: 0 })
             ]
         };
 
@@ -462,154 +483,250 @@
         function generateId() { return Math.random().toString(36).substr(2, 9); }
 
         function normalizeHex(value, fallback) {
-            return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+            if (typeof value !== 'string') return fallback;
+            const match = value.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+            if (!match) return fallback;
+            const hex = match[1].length === 3 ? match[1].split('').map(c => c + c).join('') : match[1];
+            return `#${hex.toUpperCase()}`;
         }
 
-        // --- Slide layouts ---
         const CANVAS_W = 1080;
         const CANVAS_H = 1350;
-        const FOOTER_Y = 1250;
-        // The image frame and text area of each imageLayout the AI can pick (see karu_response_utility.ts).
-        // Images are generated at the frame's exact aspect ratio.
-        const IMAGE_LAYOUTS = {
-            top: {
-                label: 'Top banner', hint: 'Wide banner shown above the slide text.',
-                frame: { x: 90, y: 90, w: 900, h: 560, radius: 32 },
-                text: { x: 90, w: 900, top: 700, bottom: 1190, valign: 'top' }
-            },
-            bottom: {
-                label: 'Bottom banner', hint: 'Wide banner shown below the slide text.',
-                frame: { x: 90, y: 640, w: 900, h: 560, radius: 32 },
-                text: { x: 90, w: 900, top: 120, bottom: 590, valign: 'bottom' }
-            },
-            background: {
-                label: 'Full background', hint: 'Full-bleed background behind white text; keep the lower half calm, dark and low in detail.',
-                frame: { x: 0, y: 0, w: 1080, h: 1350, radius: 0 },
-                text: { x: 90, w: 900, top: 560, bottom: 1180, valign: 'bottom' }, overlay: true
-            },
-            side: {
-                label: 'Side strip', hint: 'Tall strip beside the slide text.',
-                frame: { x: 0, y: 0, w: 480, h: 1350, radius: 0 },
-                text: { x: 540, w: 450, top: 140, bottom: 1180, valign: 'center' }, compact: true
-            },
-            circle: {
-                label: 'Circle', hint: 'Cropped to a circle; keep the subject centered with space around it.',
-                frame: { x: 320, y: 110, w: 440, h: 440, radius: 9999 },
-                text: { x: 90, w: 900, top: 610, bottom: 1190, valign: 'top' }, centered: true
-            }
+
+        // --- Fonts ---
+        // The fonts the AI may use (keep in sync with CAROUSEL_FONTS in karu_response_utility.ts), with each
+        // one's Google Fonts query. They are loaded for the editor and embedded into every export.
+        const FONTS = {
+            'Heebo': 'Heebo:wght@300..900',
+            'Assistant': 'Assistant:wght@300..800',
+            'Rubik': 'Rubik:wght@300..900',
+            'Secular One': 'Secular+One',
+            'Frank Ruhl Libre': 'Frank+Ruhl+Libre:wght@300..900',
+            'Varela Round': 'Varela+Round',
+            'Karantina': 'Karantina:wght@300;400;700',
+            'Suez One': 'Suez+One',
+            'Amatic SC': 'Amatic+SC:wght@400;700',
+            'Bellefair': 'Bellefair',
+            'David Libre': 'David+Libre:wght@400;500;700',
+            'Alef': 'Alef:wght@400;700',
+            'Noto Sans Hebrew': 'Noto+Sans+Hebrew:wght@300..900',
+            'Noto Serif Hebrew': 'Noto+Serif+Hebrew:wght@300..900',
+            'Fredoka': 'Fredoka:wght@300..700',
+            'IBM Plex Sans Hebrew': 'IBM+Plex+Sans+Hebrew:wght@300;400;500;700',
+            'Inter': 'Inter:wght@300..900',
+            'Poppins': 'Poppins:wght@300;400;500;600;700;800;900',
+            'Playfair Display': 'Playfair+Display:wght@400..900',
+            'Montserrat': 'Montserrat:wght@300..900',
+            'Bebas Neue': 'Bebas+Neue',
+            'Space Grotesk': 'Space+Grotesk:wght@300..700',
+            'Abril Fatface': 'Abril+Fatface',
+            'Caveat': 'Caveat:wght@400..700'
         };
-        const NO_IMAGE_TEXT_AREA = { x: 90, w: 900, top: 140, bottom: 1180, valign: 'center' };
-        const RTL_PATTERN = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+        const DEFAULT_FONT = 'Heebo';
+        const fontCssUrl = (family) => `https://fonts.googleapis.com/css2?family=${FONTS[family]}&display=swap`;
+        const fontStack = (family) => `"${FONTS[family] ? family : DEFAULT_FONT}", system-ui, sans-serif`;
 
-        // Off-screen twin of a text element, used to measure how tall wrapped text will be
-        const textMeasurer = document.createElement('div');
-        textMeasurer.className = 'element text-element';
-        textMeasurer.dir = 'auto';
-        textMeasurer.style.cssText = 'left:-100000px;top:0;visibility:hidden;pointer-events:none;';
-        document.body.appendChild(textMeasurer);
+        Object.keys(FONTS).forEach(family => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = fontCssUrl(family);
+            document.head.appendChild(link);
+        });
+        document.getElementById('propFontFamily').innerHTML = Object.keys(FONTS)
+            .map(family => `<option value="${family}" style="font-family:${fontStack(family).replace(/"/g, "'")}">${family}</option>`).join('');
 
-        function measureTextHeight(content, fontSize, fontWeight, width) {
-            textMeasurer.style.width = `${width}px`;
-            textMeasurer.style.fontSize = `${fontSize}px`;
-            textMeasurer.style.fontWeight = fontWeight;
-            textMeasurer.textContent = content || ' ';
-            return textMeasurer.offsetHeight;
-        }
+        // --- AI slides ---
+        const ELEMENT_TYPES = ['rect', 'ellipse', 'text', 'image'];
+        const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+        const oneOf = (value, options, fallback) => (options.includes(value) ? value : fallback);
 
-        function buildSlideElements(slide, index, total, withImage) {
-            const layout = withImage ? IMAGE_LAYOUTS[slide.imageLayout] : null;
-            const area = layout ? layout.text : NO_IMAGE_TEXT_AREA;
-            const onImage = Boolean(layout?.overlay);
-            const textColor = onImage ? '#FFFFFF' : state.theme.textColor;
-            const align = layout?.centered ? 'center' : RTL_PATTERN.test(`${slide.title}${slide.content}`) ? 'right' : 'left';
-            const elements = [
-                baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: state.theme.bgColor })
-            ];
-
-            if (layout) {
-                const { x, y, w, h, radius } = layout.frame;
-                elements.push(baseElement({ id: 'image-1', type: 'image', name: 'Slide Image', x, y, w, h, radius, fillColor: '#E2E8F0', imageUrl: '' }));
-                if (layout.overlay) {
-                    elements.push(baseElement({ id: 'overlay-1', type: 'rect', name: 'Image Shade', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: '#000000', fillOpacity: 45 }));
-                }
-            }
-
-            // Shrink the type until the accent bar, title and content fit inside the text area
-            const accentW = 100, accentH = 14, accentGap = 36, textGap = 32;
-            let titleSize = Math.round((slide.type === 'cover' ? 96 : 72) * (layout?.compact ? 0.8 : 1));
-            let contentSize = layout?.compact ? 34 : 40;
-            let titleH = 0, contentH = 0, blockH = 0;
-            for (let attempt = 0; attempt < 12; attempt += 1) {
-                titleH = measureTextHeight(slide.title, titleSize, '900', area.w);
-                contentH = slide.content ? measureTextHeight(slide.content, contentSize, '500', area.w) : 0;
-                blockH = accentH + accentGap + titleH + (contentH ? textGap + contentH : 0);
-                if (blockH <= area.bottom - area.top) break;
-                titleSize = Math.max(28, Math.round(titleSize * 0.9));
-                contentSize = Math.max(20, Math.round(contentSize * 0.92));
-            }
-            const free = Math.max(0, area.bottom - area.top - blockH);
-            let y = Math.round(area.top + (area.valign === 'center' ? free / 2 : area.valign === 'bottom' ? free : 0));
-
-            const accentX = align === 'right' ? area.x + area.w - accentW : align === 'center' ? area.x + (area.w - accentW) / 2 : area.x;
-            elements.push(baseElement({ id: 'accent-1', type: 'rect', name: 'Accent', x: accentX, y, w: accentW, h: accentH, radius: 7, fillColor: state.theme.accentColor }));
-            y += accentH + accentGap;
-            elements.push(baseElement({ id: 'text-1', type: 'text', name: 'Title', x: area.x, y, w: area.w, h: 'auto', fillColor: textColor, content: slide.title, fontSize: titleSize, fontWeight: '900', textAlign: align }));
-            y += titleH + textGap;
-            if (slide.content) {
-                elements.push(baseElement({ id: 'text-2', type: 'text', name: 'Content', x: area.x, y, w: area.w, h: 'auto', fillColor: textColor, fillOpacity: onImage ? 90 : 75, content: slide.content, fontSize: contentSize, fontWeight: '500', textAlign: align }));
-            }
-            elements.push(baseElement({ id: 'footer-1', type: 'text', name: 'Slide Number', x: area.x, y: FOOTER_Y, w: area.w, h: 'auto', fillColor: onImage ? '#FFFFFF' : state.theme.accentColor, content: `KaruAI  •  ${index + 1} / ${total}`, fontSize: 24, fontWeight: '700', textAlign: align }));
-            return elements;
-        }
-
-        function setVariantImage(elements, imageUrl) {
-            elements.forEach(el => { if (el.id === 'image-1') el.imageUrl = imageUrl; });
-        }
-
-        // Keeps what the user changed by hand when the AI sends an updated carousel: moved/restyled
-        // elements keep their geometry and style, hand-edited text keeps its text, added elements stay.
-        function mergeManualEdits(fresh, previous) {
-            if (!previous) return fresh;
-            const freshIds = new Set(fresh.map(el => el.id));
-            const merged = fresh.map(el => {
-                const old = previous.find(item => item.id === el.id);
-                if (!old) return el;
-                const next = old.manual ? { ...old, content: el.content, imageUrl: el.imageUrl } : el;
-                return old.manualContent ? { ...next, content: old.content, manualContent: true } : next;
+        // Turns one element of the AI's JSON into a complete editor element, filling in safe defaults
+        function normalizeElement(raw, usedIds) {
+            const type = oneOf(raw?.type, ELEMENT_TYPES, 'rect');
+            const isText = type === 'text';
+            let id = typeof raw?.id === 'string' && raw.id.trim() ? raw.id.trim() : generateId();
+            if (usedIds.has(id)) id = generateId();
+            usedIds.add(id);
+            const el = baseElement({
+                id, type,
+                name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : type,
+                x: Math.round(num(raw.x, 0)), y: Math.round(num(raw.y, 0)),
+                w: Math.max(1, Math.round(num(raw.w, 200))),
+                h: isText ? 'auto' : Math.max(1, Math.round(num(raw.h, 200))), // text grows to fit its content
+                rotation: num(raw.rotation, 0),
+                radius: type === 'ellipse' ? 9999 : Math.max(0, num(raw.radius, 0)),
+                fillColor: normalizeHex(raw.fillColor, isText ? '#0F172A' : '#CBD5E1'),
+                fillOpacity: Math.min(100, Math.max(0, num(raw.fillOpacity, 100))),
+                strokeColor: normalizeHex(raw.strokeColor, '#000000'),
+                strokeWidth: Math.max(0, num(raw.strokeWidth, 0)),
+                strokeStyle: oneOf(raw.strokeStyle, ['solid', 'dashed', 'dotted'], 'solid'),
+                shadowType: oneOf(raw.shadowType, ['none', 'drop-shadow', 'inner-shadow'], 'none'),
+                shadowX: num(raw.shadowX, 0), shadowY: num(raw.shadowY, 0),
+                shadowBlur: Math.max(0, num(raw.shadowBlur, 0)), shadowSpread: num(raw.shadowSpread, 0),
+                shadowColor: normalizeHex(raw.shadowColor, '#000000')
             });
-            return [...merged, ...previous.filter(el => !freshIds.has(el.id))];
+            const gradientTo = normalizeHex(raw.gradientTo, null);
+            if (gradientTo && (type === 'rect' || type === 'ellipse')) {
+                el.gradientTo = gradientTo;
+                el.gradientAngle = num(raw.gradientAngle, 180);
+            }
+            if (isText) {
+                Object.assign(el, {
+                    content: String(raw.content ?? ''),
+                    fontFamily: FONTS[raw.fontFamily] ? raw.fontFamily : DEFAULT_FONT,
+                    fontSize: Math.max(6, num(raw.fontSize, 48)),
+                    fontWeight: String(Math.min(900, Math.max(100, Math.round(num(raw.fontWeight, 700) / 100) * 100))),
+                    textAlign: oneOf(raw.textAlign, ['left', 'center', 'right'], 'right'),
+                    lineHeight: Math.max(0.6, num(raw.lineHeight, 1.2)),
+                    letterSpacing: num(raw.letterSpacing, 0),
+                    italic: raw.italic === true
+                });
+            }
+            if (type === 'image') el.fillColor = '#E2E8F0'; // placeholder color until the image arrives
+            return el;
         }
 
-        function applyCarousel(carousel) {
+        // The image element of a slide's image version that the AI's imagePrompt is generated for
+        // (the first image there that the user did not upload)
+        function imageSlot(data) {
+            return data?.variants.with.find(el => el.type === 'image' && !el.uploaded);
+        }
+        const hasSlotImage = (data) => Boolean(imageSlot(data)?.imageId);
+
+        // The carousel as the editor holds it (with the user's manual edits), for the AI to edit
+        function carouselForAI() {
             rememberCurrentSlide();
-            const previousSlides = state.slides;
-            const previousData = state.slideData;
-            state.theme = {
-                bgColor: normalizeHex(carousel.theme?.bgColor, '#F8FAFC'),
-                textColor: normalizeHex(carousel.theme?.textColor, '#0F172A'),
-                accentColor: normalizeHex(carousel.theme?.accentColor, '#4F46E5')
-            };
-            const slides = carousel.slides.map((slide, index) => ({
-                id: Number.isInteger(slide.id) ? slide.id : index + 1,
-                type: typeof slide.type === 'string' ? slide.type : 'content',
-                title: typeof slide.title === 'string' ? slide.title : '',
-                content: typeof slide.content === 'string' ? slide.content : '',
-                imagePrompt: typeof slide.imagePrompt === 'string' ? slide.imagePrompt.trim() : '',
-                imageLayout: IMAGE_LAYOUTS[slide.imageLayout] ? slide.imageLayout : 'top'
-            }));
-            state.slides = slides;
-            state.slideData = slides.map((slide, index) => {
-                const previous = previousData[index];
-                const sameLayout = previousSlides[index]?.imageLayout === slide.imageLayout;
-                const variants = {
-                    without: mergeManualEdits(buildSlideElements(slide, index, slides.length, false), previous?.variants.without),
-                    with: mergeManualEdits(buildSlideElements(slide, index, slides.length, true), sameLayout ? previous?.variants.with : null)
-                };
-                // An image the user already approved survives an edit, as long as its frame keeps its shape
-                const imageUrl = sameLayout && previous?.imageUrl ? previous.imageUrl : null;
-                if (imageUrl) setVariantImage(variants.with, imageUrl);
-                return { mode: imageUrl && previous.mode === 'with' ? 'with' : 'without', imageUrl, variants };
+            if (!state.slides.length) return null;
+            const forAI = (elements) => elements.map(({ imageId, uploaded, ...el }) => {
+                for (const key of Object.keys(el)) {
+                    if (typeof el[key] === 'number') el[key] = Math.round(el[key] * 100) / 100;
+                }
+                return imageId ? { ...el, userImage: true } : el;
             });
+            return {
+                slides: state.slides.map((slide, index) => {
+                    const data = state.slideData[index];
+                    return {
+                        id: slide.id,
+                        title: slide.title,
+                        imagePrompt: slide.imagePrompt,
+                        showing: data.mode === 'with' ? 'withImage' : 'withoutImage',
+                        withImage: forAI(data.variants.with),
+                        withoutImage: forAI(data.variants.without)
+                    };
+                })
+            };
+        }
+
+        // --- Text collisions ---
+        // The AI can only estimate how tall its text will be. Once the real fonts are loaded, text blocks it
+        // stacked too tightly are pushed apart, and shrunk if the slide runs out of room. Rotated or faded
+        // text (deliberate overlaps such as a giant number behind a title) and untouched text are left alone.
+        async function loadFontsFor(elements) {
+            const faces = new Set(elements.filter(el => el.type === 'text')
+                .map(el => `${el.italic ? 'italic ' : ''}${el.fontWeight} 40px ${fontStack(el.fontFamily)}`));
+            await Promise.all([...faces].map(face => document.fonts.load(face, 'אבג Abc 123').catch(() => [])));
+        }
+
+        const measureBox = document.createElement('div');
+        measureBox.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none;';
+        document.body.appendChild(measureBox);
+
+        function textHeight(el) {
+            const node = createElementNode({ ...el, x: 0, y: 0, rotation: 0 }, 0);
+            measureBox.appendChild(node);
+            const height = node.offsetHeight;
+            node.remove();
+            return height;
+        }
+
+        function separateTextBlocks(elements, isChanged) {
+            const GAP = 24;
+            const BOTTOM_MARGIN = 40;
+            const blocks = elements.filter(el => el.type === 'text' && el.rotation === 0 && el.fillOpacity >= 50 && el.content.trim());
+            if (!blocks.some(isChanged)) return;
+            const startY = new Map(blocks.map(el => [el, el.y]));
+            for (let attempt = 0; attempt < 6; attempt += 1) {
+                blocks.forEach(el => { el.y = startY.get(el); });
+                blocks.sort((a, b) => a.y - b.y);
+                const heights = new Map(blocks.map(el => [el, textHeight(el)]));
+                for (let i = 0; i < blocks.length; i += 1) {
+                    for (let j = i + 1; j < blocks.length; j += 1) {
+                        const [upper, lower] = [blocks[i], blocks[j]];
+                        if (!isChanged(upper) && !isChanged(lower)) continue;
+                        if (upper.x >= lower.x + lower.w || lower.x >= upper.x + upper.w) continue; // side by side
+                        const clearY = Math.round(upper.y + heights.get(upper) + GAP);
+                        if (lower.y < clearY) lower.y = clearY;
+                    }
+                }
+                if (Math.max(...blocks.map(el => el.y + heights.get(el))) <= CANVAS_H - BOTTOM_MARGIN) return;
+                blocks.forEach(el => { if (isChanged(el)) el.fontSize = Math.max(12, Math.round(el.fontSize * 0.9)); });
+            }
+        }
+
+        const TEXT_LAYOUT_KEYS = ['content', 'x', 'y', 'w', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'italic', 'rotation'];
+
+        async function applyCarousel(carousel) {
+            await loadFontsFor((carousel.slides ?? []).flatMap(slide => [slide?.withImage, slide?.withoutImage])
+                .filter(Array.isArray).flat().map(el => normalizeElement(el, new Set())));
+            rememberCurrentSlide();
+            const previous = new Map(state.slides.map((slide, index) => [slide.id, state.slideData[index]]));
+            const slideIds = new Set();
+            const slides = [];
+            const slideData = [];
+
+            carousel.slides.forEach((raw, index) => {
+                let id = Number.isInteger(raw?.id) ? raw.id : index + 1;
+                if (slideIds.has(id)) id = Math.max(0, ...slideIds, ...previous.keys()) + 1;
+                slideIds.add(id);
+                const before = previous.get(id);
+                const data = { mode: 'without', variants: {}, aiIds: {}, deleted: {} };
+
+                for (const [mode, key] of [['with', 'withImage'], ['without', 'withoutImage']]) {
+                    const usedIds = new Set();
+                    let elements = (Array.isArray(raw[key]) ? raw[key] : []).map(el => normalizeElement(el, usedIds));
+                    // The no-image design keeps no AI image slots (uploaded images have ids starting with "upload")
+                    if (mode === 'without') elements = elements.filter(el => el.type !== 'image' || el.id.startsWith('upload'));
+
+                    // Whatever the user deleted by hand stays deleted, even if the AI sends it again: everything the
+                    // AI sent last time that is no longer in the slide, plus everything deleted before that.
+                    const deleted = new Set(before?.deleted[mode] ?? []);
+                    if (before) {
+                        const kept = new Set(before.variants[mode].map(el => el.id));
+                        (before.aiIds[mode] ?? []).forEach(elementId => { if (!kept.has(elementId)) deleted.add(elementId); });
+                    }
+                    elements = elements.filter(el => !deleted.has(el.id));
+
+                    // Approved and uploaded images stay attached to the element that keeps their id
+                    if (before) {
+                        elements.forEach(el => {
+                            const old = el.type === 'image' && before.variants[mode].find(item => item.id === el.id && item.imageId);
+                            if (old) Object.assign(el, { imageId: old.imageId, uploaded: old.uploaded });
+                        });
+                    }
+
+                    // Only text the AI added or changed gets moved; text exactly as the user left it stays put
+                    const isChanged = (el) => {
+                        const old = before?.variants[mode].find(item => item.id === el.id);
+                        return !old || TEXT_LAYOUT_KEYS.some(key => old[key] !== el[key]);
+                    };
+                    separateTextBlocks(elements, isChanged);
+
+                    data.variants[mode] = elements;
+                    data.aiIds[mode] = elements.map(el => el.id);
+                    data.deleted[mode] = [...deleted];
+                }
+                data.mode = before?.mode === 'with' && hasSlotImage(data) ? 'with' : 'without';
+                slides.push({
+                    id,
+                    title: typeof raw.title === 'string' ? raw.title : '',
+                    imagePrompt: typeof raw.imagePrompt === 'string' ? raw.imagePrompt.trim() : ''
+                });
+                slideData.push(data);
+            });
+
+            state.slides = slides;
+            state.slideData = slideData;
             state.carouselVersion += 1;
             loadSlide(Math.min(state.currentSlide, slides.length - 1));
         }
@@ -632,8 +749,9 @@
 
         function setSlideModeAt(index, mode) {
             const data = state.slideData[index];
-            if (!data || data.mode === mode || (mode === 'with' && !data.imageUrl)) return;
+            if (!data || data.mode === mode) return;
             if (index === state.currentSlide) rememberCurrentSlide();
+            if (mode === 'with' && !hasSlotImage(data)) return;
             data.mode = mode;
             refreshSlide(index);
         }
@@ -645,8 +763,11 @@
             const data = state.slideData[index];
             if (!data) return;
             if (index === state.currentSlide) rememberCurrentSlide();
-            data.imageUrl = imageUrl;
-            setVariantImage(data.variants.with, imageUrl);
+            const slot = imageSlot(data);
+            if (!slot) return;
+            const imageId = `img-${generateId()}`;
+            imageStore.set(imageId, imageUrl);
+            slot.imageId = imageId;
             data.mode = 'with';
             refreshSlide(index);
         }
@@ -659,6 +780,182 @@
                 refreshPromptCards();
             }
         }
+
+        // --- Brand: every color and font in the carousel, editable everywhere at once ---
+
+        function allElementLists() {
+            if (!state.slideData.length) return [state.elements];
+            return state.slideData.flatMap((data, index) => index === state.currentSlide
+                ? [state.elements, data.variants[data.mode === 'with' ? 'without' : 'with']]
+                : [data.variants.with, data.variants.without]);
+        }
+
+        const COLOR_KEYS = ['fillColor', 'gradientTo', 'strokeColor', 'shadowColor'];
+
+        function collectBrand() {
+            const colors = new Map();
+            const fonts = new Map();
+            const count = (map, key) => map.set(key, (map.get(key) || 0) + 1);
+            allElementLists().flat().forEach(el => {
+                if (el.type !== 'image') count(colors, normalizeHex(el.fillColor, '#000000'));
+                if (el.gradientTo) count(colors, normalizeHex(el.gradientTo, '#000000'));
+                if (el.strokeWidth > 0) count(colors, normalizeHex(el.strokeColor, '#000000'));
+                if (el.shadowType !== 'none') count(colors, normalizeHex(el.shadowColor, '#000000'));
+                if (el.type === 'text') count(fonts, FONTS[el.fontFamily] ? el.fontFamily : DEFAULT_FONT);
+            });
+            const byUse = (map) => [...map.entries()].sort((a, b) => b[1] - a[1]);
+            return { colors: byUse(colors), fonts: byUse(fonts) };
+        }
+
+        // Applies a change to every element of every slide, in both versions
+        function updateAllElements(update) {
+            rememberCurrentSlide();
+            if (state.slideData.length) {
+                state.slideData.forEach(data => [data.variants.with, data.variants.without].forEach(list => list.forEach(update)));
+                const data = state.slideData[state.currentSlide];
+                state.elements = cloneElements(data.variants[data.mode]);
+            } else {
+                state.elements.forEach(update);
+            }
+            resetHistory(); // undo is per slide, so it cannot undo a change made to all slides
+            renderAll();
+        }
+
+        function replaceColor(from, to) {
+            if (from === to) return;
+            updateAllElements(el => COLOR_KEYS.forEach(key => {
+                if (normalizeHex(el[key], null) === from) el[key] = to;
+            }));
+        }
+
+        function replaceFont(from, to) {
+            updateAllElements(el => {
+                if (el.type === 'text' && (FONTS[el.fontFamily] ? el.fontFamily : DEFAULT_FONT) === from) el.fontFamily = to;
+            });
+        }
+
+        let brandSignature = '';
+        function renderBrandPanel() {
+            if (document.getElementById('panel-brand').style.display !== 'block') return;
+            const { colors, fonts } = collectBrand();
+            const signature = JSON.stringify([colors, fonts]);
+            if (signature === brandSignature) return; // don't rebuild under an open color picker
+            brandSignature = signature;
+
+            const colorGrid = document.getElementById('brand-colors');
+            colorGrid.innerHTML = '';
+            colors.forEach(([hex, uses]) => {
+                const item = document.createElement('label');
+                item.className = 'relative flex flex-col items-center gap-1 cursor-pointer group';
+                item.title = `${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`;
+                const swatch = document.createElement('span');
+                swatch.className = 'w-10 h-10 rounded-full border border-gray-200 shadow-sm group-hover:ring-2 group-hover:ring-indigo-400 transition-all';
+                swatch.style.backgroundColor = hex;
+                const label = document.createElement('span');
+                label.className = 'text-[10px] font-mono text-gray-500';
+                label.textContent = hex;
+                const picker = document.createElement('input');
+                picker.type = 'color';
+                picker.value = hex;
+                picker.className = 'absolute top-0 w-10 h-10 opacity-0 cursor-pointer';
+                picker.addEventListener('change', () => replaceColor(hex, picker.value.toUpperCase()));
+                item.append(swatch, label, picker);
+                colorGrid.appendChild(item);
+            });
+
+            const fontList = document.getElementById('brand-fonts');
+            fontList.innerHTML = '';
+            fonts.forEach(([family, uses]) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2';
+                const select = document.createElement('select');
+                select.className = 'flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-indigo-500 text-sm text-slate-700';
+                select.style.fontFamily = fontStack(family);
+                select.innerHTML = document.getElementById('propFontFamily').innerHTML;
+                select.value = family;
+                select.addEventListener('change', () => replaceFont(family, select.value));
+                const usage = document.createElement('span');
+                usage.className = 'text-[10px] text-gray-400 w-12 text-right';
+                usage.textContent = `${uses} text${uses === 1 ? '' : 's'}`;
+                row.append(select, usage);
+                fontList.appendChild(row);
+            });
+            if (!fonts.length) fontList.innerHTML = '<p class="text-xs text-gray-400">No text yet.</p>';
+        }
+
+        // --- Gradient & uploaded images ---
+
+        function toggleGradient(on) {
+            state.selectedIds.forEach(id => {
+                const el = state.elements.find(item => item.id === id);
+                if (!el || (el.type !== 'rect' && el.type !== 'ellipse')) return;
+                if (on) {
+                    el.gradientTo = el.gradientTo || '#FFFFFF';
+                    el.gradientAngle = el.gradientAngle ?? 180;
+                } else {
+                    delete el.gradientTo;
+                    delete el.gradientAngle;
+                }
+            });
+            saveHistory();
+            renderAll();
+        }
+
+        function pickImageFile() { document.getElementById('image-file-input').click(); }
+
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Adds an image from the user's computer to the slide on screen, centered and fitted to 640 px
+        async function addImageFile(file) {
+            if (!file?.type.startsWith('image/')) {
+                alert('Please choose an image file.');
+                return;
+            }
+            try {
+                const dataUrl = await readFileAsDataUrl(file);
+                const image = await loadImage(dataUrl);
+                const scale = 640 / Math.max(image.naturalWidth, image.naturalHeight);
+                const w = Math.max(1, Math.round(image.naturalWidth * scale));
+                const h = Math.max(1, Math.round(image.naturalHeight * scale));
+                const imageId = `upload-${generateId()}`;
+                imageStore.set(imageId, dataUrl);
+                const el = baseElement({
+                    id: `upload-${generateId()}`, type: 'image', name: file.name.replace(/\.[^.]+$/, '') || 'Image',
+                    x: Math.round((CANVAS_W - w) / 2), y: Math.round((CANVAS_H - h) / 2), w, h,
+                    fillColor: '#E2E8F0', imageId, uploaded: true
+                });
+                state.elements.push(el);
+                state.selectedIds = [el.id];
+                switchLeftTab('layers');
+                switchRightTab('design');
+                saveHistory();
+                renderAll();
+            } catch (error) {
+                alert(error instanceof Error ? error.message : 'Could not add the image.');
+            }
+        }
+
+        function handleImageFile(event) {
+            const file = event.target.files?.[0];
+            event.target.value = ''; // allow picking the same file again
+            if (file) addImageFile(file);
+        }
+
+        const workspaceEl = document.getElementById('workspace');
+        workspaceEl.addEventListener('dragover', (e) => { if (e.dataTransfer?.types.includes('Files')) e.preventDefault(); });
+        workspaceEl.addEventListener('drop', (e) => {
+            const file = e.dataTransfer?.files?.[0];
+            if (!file) return;
+            e.preventDefault();
+            addImageFile(file);
+        });
 
         // Builds the DOM for one element; shared by the editor canvas, the thumbnails and the PNG export
         function createElementNode(el, index) {
@@ -678,20 +975,28 @@
                 div.dir = 'auto';
                 div.textContent = el.content;
                 div.style.color = el.fillColor;
+                div.style.fontFamily = fontStack(el.fontFamily);
                 div.style.fontSize = `${el.fontSize}px`;
                 div.style.fontWeight = el.fontWeight;
+                div.style.fontStyle = el.italic ? 'italic' : 'normal';
+                div.style.lineHeight = String(el.lineHeight ?? 1.2);
+                div.style.letterSpacing = `${el.letterSpacing ?? 0}px`;
                 div.style.textAlign = el.textAlign;
                 div.style.textShadow = el.shadowType === 'drop-shadow' ? `${el.shadowX}px ${el.shadowY}px ${el.shadowBlur}px ${el.shadowColor}40` : 'none';
             } else if (el.type === 'image') {
-                if (el.imageUrl) {
-                    div.style.backgroundImage = `url("${el.imageUrl}")`;
+                const src = imageStore.get(el.imageId);
+                if (src) {
+                    div.style.backgroundImage = `url("${src}")`;
                     div.style.backgroundSize = 'cover';
                     div.style.backgroundPosition = 'center';
                 } else {
                     div.style.backgroundColor = el.fillColor; // placeholder until the image is generated
                 }
+                if (el.strokeWidth > 0) div.style.border = `${el.strokeWidth}px ${el.strokeStyle} ${el.strokeColor}`;
+                if (el.shadowType === 'drop-shadow') div.style.boxShadow = `${el.shadowX}px ${el.shadowY}px ${el.shadowBlur}px ${el.shadowSpread}px ${el.shadowColor}40`;
             } else {
                 div.style.backgroundColor = el.fillColor;
+                if (el.gradientTo) div.style.backgroundImage = `linear-gradient(${el.gradientAngle ?? 180}deg, ${el.fillColor}, ${el.gradientTo})`;
                 if (el.strokeWidth > 0) div.style.border = `${el.strokeWidth}px ${el.strokeStyle} ${el.strokeColor}`;
                 if (el.shadowType !== 'none') {
                     const inset = el.shadowType === 'inner-shadow' ? 'inset ' : '';
@@ -740,8 +1045,8 @@
             toggle.classList.toggle('flex', Boolean(data));
             if (!data) return;
             const withButton = document.getElementById('variant-with');
-            withButton.disabled = !data.imageUrl;
-            withButton.title = data.imageUrl ? 'Show the version with the image' : 'Approve this slide\'s image prompt in the chat to get the image version';
+            withButton.disabled = !hasSlotImage(data);
+            withButton.title = hasSlotImage(data) ? 'Show the version with the image' : 'Approve this slide\'s image prompt in the chat to get the image version';
             [[withButton, 'with'], [document.getElementById('variant-without'), 'without']].forEach(([button, mode]) => {
                 button.className = `px-2 py-1 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${data.mode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-slate-800'}`;
             });
@@ -756,6 +1061,7 @@
             updateSelectionOverlay();
             updatePropertiesPanel();
             refreshPromptCards();
+            renderBrandPanel();
         }
 
         function renderElements() {
@@ -859,6 +1165,9 @@
             });
 
             if (el.fillColor) document.getElementById('propFillColorHex').value = el.fillColor.toUpperCase();
+            const canGradient = el.type === 'rect' || el.type === 'ellipse';
+            document.getElementById('gradient-controls').style.display = canGradient && el.gradientTo ? 'flex' : 'none';
+            document.getElementById('gradient-add').style.display = canGradient && !el.gradientTo ? 'inline' : 'none';
             
             const hasText = state.selectedIds.some(id => state.elements.find(e => e.id === id).type === 'text');
             const hasShape = state.selectedIds.some(id => state.elements.find(e => e.id === id).type !== 'text');
@@ -878,6 +1187,7 @@
             document.getElementById('tab-layers').classList.toggle('active', tab === 'layers');
             document.getElementById('panel-brand').style.display = tab === 'brand' ? 'block' : 'none';
             document.getElementById('panel-layers').style.display = tab === 'layers' ? 'block' : 'none';
+            if (tab === 'brand') renderBrandPanel();
         }
 
         function switchRightTab(tab) {
@@ -917,7 +1227,8 @@
                     fillColor: type === 'text' ? '#0f172a' : '#cbd5e1', fillOpacity: 100,
                     strokeColor: '#000000', strokeWidth: 0, strokeStyle: 'solid',
                     shadowType: 'none', shadowX: 0, shadowY: 4, shadowBlur: 4, shadowSpread: 0, shadowColor: '#000000',
-                    content: type === 'text' ? 'New Text' : '', fontSize: 64, fontWeight: '700', textAlign: 'right'
+                    content: type === 'text' ? 'New Text' : '', fontSize: 64, fontWeight: '700', textAlign: 'right',
+                    fontFamily: DEFAULT_FONT, lineHeight: 1.2, letterSpacing: 0
                 };
                 state.elements.push(newEl);
                 state.selectedIds = [newEl.id];
@@ -1106,12 +1417,6 @@
 
         window.onmouseup = () => {
             if(state.dragState) {
-                if (['move', 'resize'].includes(state.dragState.type)) {
-                    state.selectedIds.forEach(id => {
-                        const element = state.elements.find(item => item.id === id);
-                        if (element) element.manual = true;
-                    });
-                }
                 if(['move', 'resize', 'select'].includes(state.dragState.type)) saveHistory();
                 state.dragState = null;
                 document.getElementById('dragBox').style.display = 'none';
@@ -1127,16 +1432,12 @@
                 if (state.selectedIds.length === 0) return;
                 const prop = e.target.dataset.prop;
                 let val = e.target.value;
-                if (['x', 'y', 'w', 'h', 'radius', 'rotation', 'fillOpacity', 'strokeWidth', 'shadowX', 'shadowY', 'shadowBlur', 'shadowSpread', 'fontSize'].includes(prop)) val = parseFloat(val) || 0;
+                if (['x', 'y', 'w', 'h', 'radius', 'rotation', 'fillOpacity', 'strokeWidth', 'shadowX', 'shadowY', 'shadowBlur', 'shadowSpread', 'fontSize', 'lineHeight', 'letterSpacing', 'gradientAngle'].includes(prop)) val = parseFloat(val) || 0;
+                if (['fillColor', 'gradientTo', 'strokeColor', 'shadowColor'].includes(prop)) val = val.toUpperCase();
 
                 state.selectedIds.forEach(id => {
                     const el = state.elements.find(ex => ex.id === id);
-                    if (el) {
-                        el[prop] = val;
-                        // Hand-edited text and hand-edited geometry/style are kept separately when the AI updates the carousel
-                        if (prop === 'content') el.manualContent = true;
-                        else el.manual = true;
-                    }
+                    if (el) el[prop] = val;
                 });
                 
                 if (prop === 'fillColor') document.getElementById('propFillColorHex').value = val.toUpperCase();
@@ -1204,6 +1505,7 @@
             else if (e.code === 'KeyR') setTool('R');
             else if (e.code === 'KeyO') setTool('O');
             else if (e.code === 'KeyT') setTool('T');
+            else if (e.code === 'KeyI') pickImageFile();
         });
 
         function addChatBubble(text, tone = 'ai') {
@@ -1250,7 +1552,7 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: val })
+                    body: JSON.stringify({ message: val, carousel: carouselForAI() })
                 });
                 const data = await response.json().catch(() => null);
                 if (!response.ok) throw new Error(data?.error || `Request failed with status ${response.status}`);
@@ -1263,7 +1565,7 @@
                 }
                 if (!proposed || !Array.isArray(proposed.slides) || !proposed.slides.length) throw new Error('KaruAI returned no slides.');
 
-                applyCarousel(proposed);
+                await applyCarousel(proposed);
                 thinkingMessage.remove();
                 const count = state.slides.length;
                 addChatBubble(`Your carousel is ready with ${count} slide${count === 1 ? '' : 's'}. Every slide has a version with an image and one without. Approve the image prompts you like: those slides switch to their image version, the ones you skip stay without an image.`);
@@ -1286,24 +1588,24 @@
         function aspectRatioLabel(width, height) {
             const gcd = (a, b) => (b ? gcd(b, a % b) : a);
             const divisor = gcd(width, height);
-            return `${width / divisor}:${height / divisor}`;
+            if (Math.max(width, height) / divisor <= 50) return `${width / divisor}:${height / divisor}`;
+            return width >= height ? `${(width / height).toFixed(2)}:1` : `1:${(height / width).toFixed(2)}`;
         }
 
-        // The size of the frame the image goes into (the AI's layout, or the frame as the user resized it)
+        // The size of the image element the prompt is for, as the AI designed it or as the user resized it
         function imageRequestSize(index) {
             if (index === state.currentSlide) rememberCurrentSlide();
-            const frame = IMAGE_LAYOUTS[state.slides[index].imageLayout].frame;
-            const placed = state.slideData[index]?.variants.with.find(el => el.id === 'image-1');
-            const width = typeof placed?.w === 'number' ? placed.w : frame.w;
-            const height = typeof placed?.h === 'number' ? placed.h : frame.h;
-            const scale = Math.min(1, 2048 / Math.max(width, height)); // the image API accepts 64..2048 per side
+            const slot = imageSlot(state.slideData[index]);
+            const width = Math.max(1, num(slot?.w, 1080));
+            const height = Math.max(1, num(slot?.h, 1350));
+            const scale = Math.min(2048 / Math.max(width, height), 1); // the image API accepts 64..2048 per side
             return { width: Math.max(64, Math.round(width * scale)), height: Math.max(64, Math.round(height * scale)) };
         }
 
-        function composeImagePrompt(prompt, layout, { width, height }) {
+        function composeImagePrompt(prompt, { width, height }) {
             const shape = width > height ? 'landscape' : width < height ? 'portrait' : 'square';
             return `${prompt}\n\nComposition: ${shape} image with a ${aspectRatioLabel(width, height)} aspect ratio (${width}x${height}px). ` +
-                `${IMAGE_LAYOUTS[layout].hint} Keep the main subject fully inside the frame. No text, letters, logos or watermarks.`;
+                'Keep the main subject fully inside the frame. No text, letters, logos or watermarks.';
         }
 
         function createChipButton(label, onClick, primary = false) {
@@ -1321,8 +1623,8 @@
             const version = state.carouselVersion;
             const isStale = () => version !== state.carouselVersion;
             const rows = state.slides
-                .map((slide, index) => ({ index, layout: slide.imageLayout, prompt: slide.imagePrompt, busy: false, skipped: false, error: '' }))
-                .filter(row => row.prompt);
+                .map((slide, index) => ({ index, prompt: slide.imagePrompt, busy: false, skipped: false, error: '' }))
+                .filter(row => row.prompt && imageSlot(state.slideData[row.index]));
             if (!rows.length) return;
 
             const container = document.getElementById('chat-messages');
@@ -1351,7 +1653,7 @@
                     const response = await fetch('/api/images', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: composeImagePrompt(row.prompt, row.layout, size), width: size.width, height: size.height })
+                        body: JSON.stringify({ prompt: composeImagePrompt(row.prompt, size), width: size.width, height: size.height })
                     });
                     const data = await response.json().catch(() => null);
                     if (!response.ok || typeof data?.imageUrl !== 'string') throw new Error(data?.error || `Image request failed with status ${response.status}`);
@@ -1376,7 +1678,7 @@
                     if (isStale()) return;
                     const data = state.slideData[row.index];
                     if (row.busy || data.mode === 'with') continue;
-                    if (data.imageUrl) setSlideModeAt(row.index, 'with');
+                    if (hasSlotImage(data)) setSlideModeAt(row.index, 'with');
                     else await generate(row);
                 }
             };
@@ -1387,8 +1689,9 @@
                 const title = document.createElement('button');
                 title.type = 'button';
                 title.className = 'block text-xs font-semibold text-slate-800 hover:text-indigo-600 mb-1.5';
-                const size = IMAGE_LAYOUTS[row.layout].frame;
-                title.textContent = `Slide ${row.index + 1} · ${IMAGE_LAYOUTS[row.layout].label} · ${aspectRatioLabel(size.w, size.h)}`;
+                const size = imageRequestSize(row.index);
+                const slideTitle = state.slides[row.index].title;
+                title.textContent = `Slide ${row.index + 1}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
                 title.onclick = () => { if (!isStale()) selectSlide(row.index); };
                 const textarea = document.createElement('textarea');
                 textarea.className = 'w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs text-slate-700 focus:border-indigo-500 outline-none resize-y h-20 mb-2';
@@ -1426,7 +1729,7 @@
                     } else if (data.mode === 'with') {
                         status('✓ Using the image version', 'text-green-700');
                         actions.append(createChipButton('Regenerate', () => generate(row)), createChipButton('Use without image', () => skip(row)));
-                    } else if (data.imageUrl) {
+                    } else if (hasSlotImage(data)) {
                         status('Using the version without image');
                         actions.append(createChipButton('Use image', () => { row.skipped = false; setSlideModeAt(row.index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
                     } else if (row.skipped) {
@@ -1457,6 +1760,38 @@
             '.element{position:absolute;transform-origin:center;}' +
             '.text-element{white-space:pre-wrap;word-break:break-word;line-height:1.2;}';
 
+        function blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error ?? new Error('Could not read a font file.'));
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // An exported slide is drawn as an isolated image that cannot load web fonts, so each font it uses is
+        // inlined: the Google Fonts CSS with every font file in it turned into a data URL. Cached per font.
+        const embeddedFonts = new Map();
+        function embeddedFontCss(family) {
+            if (!embeddedFonts.has(family)) {
+                const task = (async () => {
+                    const response = await fetch(fontCssUrl(family));
+                    if (!response.ok) throw new Error(`Could not load the font ${family}.`);
+                    let css = await response.text();
+                    const urls = [...new Set(css.match(/url\([^)]+\)/g) ?? [])];
+                    await Promise.all(urls.map(async (token) => {
+                        const fontResponse = await fetch(token.slice(4, -1).replace(/["']/g, ''));
+                        if (!fontResponse.ok) throw new Error(`Could not load the font ${family}.`);
+                        css = css.split(token).join(`url(${await blobToDataUrl(await fontResponse.blob())})`);
+                    }));
+                    return css;
+                })();
+                task.catch(() => embeddedFonts.delete(family)); // retry on the next export
+                embeddedFonts.set(family, task);
+            }
+            return embeddedFonts.get(family);
+        }
+
         function loadImage(url) {
             return new Promise((resolve, reject) => {
                 const image = new Image();
@@ -1469,13 +1804,15 @@
         // Draws the slide with the browser's own layout engine (the same HTML as the preview, inside an
         // SVG foreignObject), so the PNG matches the canvas: same fonts, line wrapping, cropping and effects.
         async function renderSlideToCanvas(elements) {
-            const imageUrls = [...new Set(elements.filter(el => el.type === 'image' && el.imageUrl).map(el => el.imageUrl))];
+            const imageUrls = [...new Set(elements.map(el => el.type === 'image' && imageStore.get(el.imageId)).filter(Boolean))];
             await Promise.all(imageUrls.map(url => loadImage(url).then(image => image.decode?.())));
+            const families = [...new Set(elements.filter(el => el.type === 'text').map(el => (FONTS[el.fontFamily] ? el.fontFamily : DEFAULT_FONT)))];
+            const fontCss = await Promise.all(families.map(embeddedFontCss));
 
             const root = createArtboardNode(elements);
             root.style.fontFamily = getComputedStyle(document.body).fontFamily;
             const style = document.createElement('style');
-            style.textContent = EXPORT_STYLE;
+            style.textContent = `${fontCss.join('\n')}\n${EXPORT_STYLE}`;
             root.prepend(style);
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_W}" height="${CANVAS_H}">` +
                 `<foreignObject x="0" y="0" width="${CANVAS_W}" height="${CANVAS_H}">${new XMLSerializer().serializeToString(root)}</foreignObject></svg>`;
