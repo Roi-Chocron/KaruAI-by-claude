@@ -45,6 +45,11 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('[api/images] generatePollinationsImage failed:', error);
         const message = error instanceof Error ? error.message : 'Unexpected image generation error.';
+        // Rate limits and overload are temporary: the editor retries these with backoff
+        const transient = message.match(/(?:\(|status )(429|503)\b/);
+        if (transient) {
+            return NextResponse.json({ error: message, retryable: true }, { status: Number(transient[1]) });
+        }
         const status = message.includes('402') ? 402 : 502;
         return errorResponse(message, status);
     }

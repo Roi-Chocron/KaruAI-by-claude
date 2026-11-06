@@ -1,5 +1,5 @@
-import App from '../karuai_dashboard';
+import Gallery from './gallery';
 
 export default function Home() {
-  return <App />;
+  return <Gallery />;
 }

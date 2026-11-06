@@ -151,6 +151,7 @@
     <!-- MIDDLE COLUMN -->
     <main class="w-[50%] h-full flex flex-col relative shrink-0">
         <header class="h-14 border-b border-gray-200 px-4 flex items-center justify-between gap-2 bg-white shrink-0 shadow-sm z-10 whitespace-nowrap">
+            <button onclick="goToGallery()" class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-md transition-all shrink-0" title="All carousels"><i data-lucide="layout-grid" class="w-4 h-4"></i></button>
             <div class="flex gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
                 <button onclick="setTool('V')" id="tool-V" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
                 <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
@@ -161,7 +162,10 @@
             </div>
             
             <div class="flex items-center gap-3">
-                <span id="slide-label" class="text-xs font-bold text-gray-500 tracking-widest uppercase">Slide 1 of 1</span>
+                <div class="flex flex-col items-center leading-tight">
+                    <span id="slide-label" class="text-xs font-bold text-gray-500 tracking-widest uppercase">Slide 1 of 1</span>
+                    <span id="save-status" class="text-[11px] font-semibold text-gray-400"></span>
+                </div>
                 <div id="variant-toggle" class="hidden gap-0.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-[11px] font-semibold">
                     <button id="variant-with" onclick="setSlideMode('with')">Image</button>
                     <button id="variant-without" onclick="setSlideMode('without')">No image</button>
@@ -424,13 +428,14 @@
         let state = {
             tool: 'V', 
             zoom: 0.45,
+            loaded: false, // true once the saved carousel is in; nothing is saved before that
             selectedIds: [],
             dragState: null,
             slides: [], // per slide: { id, title, imagePrompt }
             currentSlide: 0,
             // per slide: { mode: 'with' | 'without', variants: { with, without }, aiIds: { with, without }, deleted: { with, without } }
             slideData: [],
-            carouselVersion: 0, // bumped on every AI carousel, so late image results for an old one are dropped
+            carouselVersion: 0, // a new number for every AI carousel, so late image results for an old one are dropped
             elements: [
                 baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: 1080, h: 1350, fillColor: '#F8FAFC' }),
                 baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: 'Describe your carousel in the KaruAI chat\nand it will appear here.', fontFamily: 'Heebo', fontSize: 44, fontWeight: '700', textAlign: 'center', lineHeight: 1.2, letterSpacing: 0 })
@@ -439,20 +444,40 @@
 
         let history = [];
         let historyIndex = -1;
+        let lastCarouselVersion = 0; // never goes back on undo, so a version number is never reused
+
+        // The carousel this editor shows (?id=), saved on the server
+        const carouselId = new URLSearchParams(location.search).get('id');
+        let carouselTitle = '';
+        const chatLog = []; // { tone: 'user' | 'ai' | 'error', text }
         let clipboard = [];
 
-        function saveHistory() {
-            if (historyIndex < history.length - 1) {
-                history = history.slice(0, historyIndex + 1);
-            }
+        // One undo history for the whole carousel: every entry is a snapshot of all slides in both versions, so
+        // undo also reverts Brand changes, image approvals and AI edits, not only the slide on screen. Each entry
+        // remembers which slide the change was made on, and undo/redo jump back to it.
+        const HISTORY_LIMIT = 100;
 
-            history.push(JSON.stringify(state.elements));
-            historyIndex++;
+        function documentSnapshot() {
+            rememberCurrentSlide();
+            return JSON.stringify({
+                slides: state.slides,
+                slideData: state.slideData,
+                carouselVersion: state.carouselVersion,
+                elements: state.slideData.length ? null : state.elements
+            });
         }
 
-        // Undo history belongs to the variant being edited, so it restarts whenever another one is loaded
+        function saveHistory() {
+            const snapshot = documentSnapshot();
+            if (history[historyIndex]?.snapshot === snapshot) return; // nothing actually changed (e.g. a click)
+            history = history.slice(0, historyIndex + 1);
+            history.push({ snapshot, slide: state.currentSlide });
+            if (history.length > HISTORY_LIMIT) history.shift();
+            historyIndex = history.length - 1;
+        }
+
         function resetHistory() {
-            history = [JSON.stringify(state.elements)];
+            history = [{ snapshot: documentSnapshot(), slide: state.currentSlide }];
             historyIndex = 0;
         }
 
@@ -464,14 +489,26 @@
             if (data) data.variants[data.mode] = cloneElements(state.elements);
         }
 
-        function loadHistory() {
-            state.elements = JSON.parse(history[historyIndex]);
-            state.selectedIds = state.selectedIds.filter(id => state.elements.find(e => e.id === id));
+        function restoreHistory(index, focusSlide) {
+            const doc = JSON.parse(history[index].snapshot);
+            state.slides = doc.slides;
+            state.slideData = doc.slideData;
+            state.carouselVersion = doc.carouselVersion;
+            if (state.slideData.length) {
+                state.currentSlide = Math.min(Math.max(0, focusSlide), state.slideData.length - 1);
+                const data = state.slideData[state.currentSlide];
+                state.elements = cloneElements(data.variants[data.mode]);
+            } else {
+                state.currentSlide = 0;
+                state.elements = doc.elements;
+            }
+            historyIndex = index;
+            state.selectedIds = state.selectedIds.filter(id => state.elements.some(el => el.id === id));
             renderAll();
         }
 
-        function undo() { if (historyIndex > 0) { historyIndex--; loadHistory(); } }
-        function redo() { if (historyIndex < history.length - 1) { historyIndex++; loadHistory(); } }
+        function undo() { if (historyIndex > 0) restoreHistory(historyIndex - 1, history[historyIndex].slide); }
+        function redo() { if (historyIndex < history.length - 1) restoreHistory(historyIndex + 1, history[historyIndex + 1].slide); }
 
         // Core Functions
         const artboard = document.getElementById('artboard');
@@ -727,8 +764,10 @@
 
             state.slides = slides;
             state.slideData = slideData;
-            state.carouselVersion += 1;
+            state.carouselVersion = ++lastCarouselVersion;
+            if (typeof carousel.title === 'string' && carousel.title.trim()) carouselTitle = carousel.title.trim().slice(0, 200);
             loadSlide(Math.min(state.currentSlide, slides.length - 1));
+            saveHistory();
         }
 
         function loadSlide(index) {
@@ -737,7 +776,6 @@
             state.currentSlide = index;
             state.elements = cloneElements(data.variants[data.mode]);
             state.selectedIds = [];
-            resetHistory();
             renderAll();
         }
 
@@ -754,6 +792,7 @@
             if (mode === 'with' && !hasSlotImage(data)) return;
             data.mode = mode;
             refreshSlide(index);
+            saveHistory();
         }
 
         function setSlideMode(mode) { setSlideModeAt(state.currentSlide, mode); }
@@ -767,9 +806,12 @@
             if (!slot) return;
             const imageId = `img-${generateId()}`;
             imageStore.set(imageId, imageUrl);
+            persistImage(imageId, imageUrl);
             slot.imageId = imageId;
             data.mode = 'with';
+            data.skipped = false;
             refreshSlide(index);
+            saveHistory();
         }
 
         function refreshSlide(index) {
@@ -778,6 +820,7 @@
             } else {
                 renderThumbnails();
                 refreshPromptCards();
+                scheduleSave();
             }
         }
 
@@ -817,8 +860,8 @@
             } else {
                 state.elements.forEach(update);
             }
-            resetHistory(); // undo is per slide, so it cannot undo a change made to all slides
             renderAll();
+            saveHistory();
         }
 
         function replaceColor(from, to) {
@@ -919,13 +962,25 @@
                 return;
             }
             try {
-                const dataUrl = await readFileAsDataUrl(file);
-                const image = await loadImage(dataUrl);
+                let dataUrl = await readFileAsDataUrl(file);
+                let image = await loadImage(dataUrl);
+                // Store a format the server accepts, at no more than 2160 px on the long side
+                const longSide = Math.max(image.naturalWidth, image.naturalHeight);
+                if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) || longSide > 2160) {
+                    const fit = Math.min(1, 2160 / longSide);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(image.naturalWidth * fit));
+                    canvas.height = Math.max(1, Math.round(image.naturalHeight * fit));
+                    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                    dataUrl = file.type === 'image/jpeg' ? canvas.toDataURL('image/jpeg', 0.92) : canvas.toDataURL('image/png');
+                    image = await loadImage(dataUrl);
+                }
                 const scale = 640 / Math.max(image.naturalWidth, image.naturalHeight);
                 const w = Math.max(1, Math.round(image.naturalWidth * scale));
                 const h = Math.max(1, Math.round(image.naturalHeight * scale));
                 const imageId = `upload-${generateId()}`;
                 imageStore.set(imageId, dataUrl);
+                persistImage(imageId, dataUrl);
                 const el = baseElement({
                     id: `upload-${generateId()}`, type: 'image', name: file.name.replace(/\.[^.]+$/, '') || 'Image',
                     x: Math.round((CANVAS_W - w) / 2), y: Math.round((CANVAS_H - h) / 2), w, h,
@@ -1062,6 +1117,7 @@
             updatePropertiesPanel();
             refreshPromptCards();
             renderBrandPanel();
+            scheduleSave();
         }
 
         function renderElements() {
@@ -1509,6 +1565,9 @@
         });
 
         function addChatBubble(text, tone = 'ai') {
+            chatLog.push({ tone, text });
+            scheduleSave();
+            document.getElementById('chat-empty')?.remove();
             const container = document.getElementById('chat-messages');
             const tones = {
                 user: 'bg-indigo-600 text-white rounded-br-sm',
@@ -1531,7 +1590,7 @@
             const container = document.getElementById('chat-messages');
             const sendButton = document.getElementById('chat-send');
             const val = input.value.trim();
-            if (!val || sendButton.disabled) return;
+            if (!val || sendButton.disabled || !state.loaded) return;
 
             switchRightTab('chat');
             const emptyState = document.getElementById('chat-empty');
@@ -1544,18 +1603,22 @@
 
             const thinkingMessage = document.createElement('div');
             thinkingMessage.className = 'flex w-full justify-start';
-            thinkingMessage.innerHTML = '<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span>KaruAI is thinking</span><span class="thinking-dots" aria-label="KaruAI is thinking"><span></span><span></span><span></span></span></div>';
+            thinkingMessage.innerHTML = '<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span data-text>KaruAI is thinking</span><span class="thinking-dots shrink-0" aria-hidden="true"><span></span><span></span><span></span></span></div>';
             container.appendChild(thinkingMessage);
             container.scrollTop = container.scrollHeight;
 
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetchWithBackoff('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: val, carousel: carouselForAI() })
+                    body: JSON.stringify({ message: val, carouselId, carousel: carouselForAI() })
+                }, ({ attempt, of }) => {
+                    thinkingMessage.querySelector('[data-text]').textContent =
+                        `We're experiencing high demand right now, so this may take a little longer. Retrying automatically (${attempt}/${of})…`;
+                    container.scrollTop = container.scrollHeight;
                 });
                 const data = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(data?.error || `Request failed with status ${response.status}`);
+                if (!response.ok) throw new Error(data?.retryable ? 'KaruAI is under heavy load right now. Please try again in a minute.' : data?.error || `Request failed with status ${response.status}`);
                 if (typeof data?.responseText !== 'string') throw new Error('The server returned no carousel data.');
                 let proposed;
                 try {
@@ -1623,7 +1686,7 @@
             const version = state.carouselVersion;
             const isStale = () => version !== state.carouselVersion;
             const rows = state.slides
-                .map((slide, index) => ({ index, prompt: slide.imagePrompt, busy: false, skipped: false, error: '' }))
+                .map((slide, index) => ({ index, prompt: slide.imagePrompt, busy: false, note: '', error: '' }))
                 .filter(row => row.prompt && imageSlot(state.slideData[row.index]));
             if (!rows.length) return;
 
@@ -1645,17 +1708,21 @@
             const generate = async (row) => {
                 if (row.busy || isStale()) return;
                 row.busy = true;
-                row.skipped = false;
+                row.note = '';
                 row.error = '';
                 render();
                 try {
                     const size = imageRequestSize(row.index);
-                    const response = await fetch('/api/images', {
+                    const response = await fetchWithBackoff('/api/images', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ prompt: composeImagePrompt(row.prompt, size), width: size.width, height: size.height })
+                    }, ({ attempt, of }) => {
+                        row.note = `High demand right now, retrying automatically (${attempt}/${of})…`;
+                        render();
                     });
                     const data = await response.json().catch(() => null);
+                    if (!response.ok && data?.retryable) throw new Error('The image service is under heavy load. Please try again in a minute.');
                     if (!response.ok || typeof data?.imageUrl !== 'string') throw new Error(data?.error || `Image request failed with status ${response.status}`);
                     if (!isStale()) applySlideImage(row.index, data.imageUrl);
                 } catch (error) {
@@ -1667,9 +1734,11 @@
             };
 
             const skip = (row) => {
-                row.skipped = true;
                 row.error = '';
+                state.slideData[row.index].skipped = true;
                 setSlideModeAt(row.index, 'without');
+                saveHistory();
+                scheduleSave();
                 render();
             };
 
@@ -1722,7 +1791,7 @@
                     if (stale) {
                         status('Replaced by a newer carousel.', 'text-gray-400');
                     } else if (row.busy) {
-                        status('Generating image…', 'text-indigo-600');
+                        status(row.note || 'Generating image…', 'text-indigo-600');
                     } else if (row.error) {
                         status(row.error, 'text-red-600 w-full');
                         actions.append(createChipButton('Retry', () => generate(row), true), createChipButton('Skip', () => skip(row)));
@@ -1731,8 +1800,8 @@
                         actions.append(createChipButton('Regenerate', () => generate(row)), createChipButton('Use without image', () => skip(row)));
                     } else if (hasSlotImage(data)) {
                         status('Using the version without image');
-                        actions.append(createChipButton('Use image', () => { row.skipped = false; setSlideModeAt(row.index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
-                    } else if (row.skipped) {
+                        actions.append(createChipButton('Use image', () => { data.skipped = false; setSlideModeAt(row.index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
+                    } else if (data.skipped) {
                         status('Skipped: the slide stays without an image');
                         actions.append(createChipButton('Approve & generate', () => generate(row), true));
                     } else {
@@ -1892,10 +1961,200 @@
         function closeDownloadMenu() { document.getElementById('download-menu').classList.add('hidden'); }
         document.addEventListener('mousedown', (e) => { if (!e.target.closest('#download-wrap')) closeDownloadMenu(); });
 
+        // --- Retries ---
+        // Rate limits (Gemini RPM/TPM, the image API) and overload are temporary, so requests that fail with
+        // 429/503 are retried with exponential backoff and jitter: the wait doubles each time, a random half of
+        // it is added so retries from many requests don't line up, and the server's own retry delay is respected.
+        // A wait longer than MAX_WAIT_SECONDS (e.g. a used-up daily quota) is not worth retrying: report it instead.
+        const RETRY = { attempts: 6, baseMs: 2000, maxMs: 30000 };
+        const MAX_WAIT_SECONDS = 90;
+        const isRetryableStatus = (status) => status === 429 || status === 503;
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function fetchWithBackoff(url, options, onRetry = () => {}) {
+            for (let attempt = 0; ; attempt += 1) {
+                const response = await fetch(url, options);
+                if (!isRetryableStatus(response.status) || attempt >= RETRY.attempts) return response;
+                const data = await response.clone().json().catch(() => null);
+                if (data?.retryable === false || data?.retryAfterSeconds > MAX_WAIT_SECONDS) return response;
+                const ceiling = Math.min(RETRY.maxMs, RETRY.baseMs * 2 ** attempt);
+                let delay = ceiling / 2 + Math.random() * (ceiling / 2);
+                if (Number.isFinite(data?.retryAfterSeconds)) delay = Math.max(delay, data.retryAfterSeconds * 1000 + Math.random() * 1000);
+                onRetry({ attempt: attempt + 1, of: RETRY.attempts, delayMs: delay });
+                await sleep(delay);
+            }
+        }
+
+        // --- Saving ---
+        // The carousel autosaves to the server a moment after every change; images are stored separately,
+        // once each, under their image id.
+
+        function persistImage(imageId, dataUrl) {
+            if (!carouselId) return;
+            fetchWithBackoff(`/api/carousels/${carouselId}/images`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageId, dataUrl })
+            }).then(response => {
+                if (!response.ok) throw new Error(`status ${response.status}`);
+            }).catch(error => {
+                console.error('Could not save an image:', error);
+                setSaveStatus('error');
+            });
+        }
+
+        function documentForSave() {
+            rememberCurrentSlide();
+            return {
+                version: 1,
+                slides: state.slides,
+                slideData: state.slideData,
+                carouselVersion: state.carouselVersion,
+                currentSlide: state.currentSlide,
+                chat: chatLog
+            };
+        }
+
+        function setSaveStatus(status) {
+            const label = document.getElementById('save-status');
+            const text = { saving: 'Saving…', saved: 'Saved', error: 'Not saved' };
+            label.textContent = text[status] ?? '';
+            label.className = `text-[11px] font-semibold ${status === 'error' ? 'text-red-500' : 'text-gray-400'}`;
+            label.title = status === 'error' ? 'Changes could not be saved. KaruAI keeps trying with every change.' : '';
+        }
+
+        // A small JPEG of the first slide, for the gallery
+        async function renderThumbnail(elements) {
+            const full = await renderSlideToCanvas(elements);
+            const thumb = document.createElement('canvas');
+            thumb.width = 432;
+            thumb.height = 540;
+            thumb.getContext('2d').drawImage(full, 0, 0, thumb.width, thumb.height);
+            return thumb.toDataURL('image/jpeg', 0.85);
+        }
+
+        let saveTimer = null;
+        let isSaving = false;
+        let saveQueued = false;
+        let lastSavedJson = '';
+        let lastThumbnailSignature = '';
+
+        function hasUnsavedChanges() {
+            return state.loaded && (isSaving || JSON.stringify(documentForSave()) !== lastSavedJson);
+        }
+
+        function scheduleSave() {
+            if (!carouselId || !state.loaded) return;
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveNow, 1200);
+        }
+
+        async function saveNow() {
+            clearTimeout(saveTimer);
+            if (!carouselId || !state.loaded) return;
+            if (isSaving) {
+                saveQueued = true;
+                return;
+            }
+            const document_ = documentForSave();
+            const json = JSON.stringify(document_);
+            if (json === lastSavedJson) return;
+            isSaving = true;
+            setSaveStatus('saving');
+            try {
+                const body = { title: carouselTitle, slideCount: state.slides.length, document: document_ };
+                const first = state.slideData[0];
+                const thumbnailElements = first ? first.variants[first.mode] : null;
+                const signature = thumbnailElements ? JSON.stringify(thumbnailElements) : '';
+                if (thumbnailElements && signature !== lastThumbnailSignature) {
+                    body.thumbnail = await renderThumbnail(thumbnailElements).catch(() => undefined);
+                }
+                const response = await fetch(`/api/carousels/${carouselId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(`status ${response.status}`);
+                lastSavedJson = json;
+                if (body.thumbnail) lastThumbnailSignature = signature;
+                setSaveStatus('saved');
+            } catch (error) {
+                console.error('Could not save the carousel:', error);
+                setSaveStatus('error');
+            } finally {
+                isSaving = false;
+                if (saveQueued) {
+                    saveQueued = false;
+                    saveNow();
+                }
+            }
+        }
+
+        async function goToGallery() {
+            await saveNow();
+            window.top.location.href = '/';
+        }
+
+        window.addEventListener('beforeunload', (e) => {
+            if (!hasUnsavedChanges()) return;
+            saveNow();
+            e.preventDefault(); // ask the browser to confirm leaving while the last change is still being saved
+        });
+
+        function showLoadError(message) {
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = '';
+            const note = document.createElement('div');
+            note.className = 'm-auto text-center text-sm text-gray-500 max-w-[80%]';
+            note.innerHTML = '<p class="mb-3"></p><button onclick="window.top.location.href=\'/\'" class="text-indigo-600 font-semibold hover:underline">Back to all carousels</button>';
+            note.querySelector('p').textContent = message;
+            container.appendChild(note);
+        }
+
+        async function loadCarousel() {
+            if (!carouselId) {
+                // Opened without a carousel: start a new one and open it at its own address
+                const response = await fetch('/api/carousels', { method: 'POST' });
+                const meta = await response.json();
+                window.top.location.replace(`/carousel/${meta.id}`);
+                return;
+            }
+            const response = await fetch(`/api/carousels/${carouselId}`);
+            if (response.status === 404) throw new Error('This carousel does not exist anymore.');
+            if (!response.ok) throw new Error(`Could not load the carousel (status ${response.status}).`);
+            const { meta, document: saved } = await response.json();
+            carouselTitle = meta.title || '';
+
+            if (saved?.slides?.length) {
+                const imageIds = new Set(saved.slideData.flatMap(data => [...data.variants.with, ...data.variants.without])
+                    .map(el => el.imageId).filter(Boolean));
+                await Promise.all([...imageIds].map(async imageId => {
+                    const imageResponse = await fetch(`/api/carousels/${carouselId}/images/${encodeURIComponent(imageId)}`);
+                    if (imageResponse.ok) imageStore.set(imageId, await blobToDataUrl(await imageResponse.blob()));
+                }));
+                state.slides = saved.slides;
+                state.slideData = saved.slideData;
+                state.carouselVersion = lastCarouselVersion = saved.carouselVersion || 0;
+                await loadFontsFor(state.slideData.flatMap(data => [...data.variants.with, ...data.variants.without]));
+            }
+            (saved?.chat ?? []).forEach(message => addChatBubble(message.text, message.tone));
+            state.loaded = true;
+            if (state.slides.length) {
+                loadSlide(Math.min(saved.currentSlide ?? 0, state.slides.length - 1));
+                renderImagePrompts();
+            } else {
+                renderAll();
+            }
+            resetHistory();
+            lastSavedJson = JSON.stringify(documentForSave());
+            setSaveStatus(saved ? 'saved' : '');
+        }
+
         // Init
         resetHistory();
         switchRightTab('chat');
         renderAll();
+        loadCarousel().catch(error => showLoadError(error instanceof Error ? error.message : 'Could not load the carousel.'));
     </script>
 </body>
 </html>

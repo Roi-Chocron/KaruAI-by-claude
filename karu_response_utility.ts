@@ -74,6 +74,7 @@ export interface CarouselSlide {
 }
 
 export interface CarouselData {
+    title: string;
     slides: CarouselSlide[];
 }
 
@@ -166,6 +167,10 @@ const ELEMENT_SCHEMA = {
 export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
     type: SchemaType.OBJECT,
     properties: {
+        title: {
+            type: SchemaType.STRING,
+            description: 'Short name of the carousel in the language the user writes in, shown in the gallery. Keep it when editing.',
+        },
         slides: {
             type: SchemaType.ARRAY,
             description: 'The carousel slides in display order',
@@ -185,7 +190,7 @@ export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
             },
         },
     },
-    required: ['slides'],
+    required: ['title', 'slides'],
 };
 
 export interface KaruResponse {

@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import * as path from 'path';
 import { generateKaruResponse, KaruResponse, KARU_SYSTEM_PROMPT } from '../../../karu_response_utility';
+import { assertExists, CarouselNotFoundError, chatHistoryFile, isCarouselId } from '../../../carousel_store';
 
 // The utility reads/writes the history file with `fs`, so this must run on the Node.js runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MODEL_NAME = 'gemini-3-flash-preview';
-const HISTORY_FILE = path.join(process.cwd(), '.karu', 'chat_history.json');
 const MAX_CAROUSEL_CHARS = 400_000;
 
 // generateKaruResponse does read -> call Gemini -> write on the history file, so two
@@ -19,8 +18,28 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
     return run;
 }
 
-function errorResponse(message: string, status: number) {
-    return NextResponse.json({ error: message }, { status });
+function errorResponse(message: string, status: number, extra?: Record<string, unknown>) {
+    return NextResponse.json({ error: message, ...extra }, { status });
+}
+
+// Gemini's 429 errors carry a RetryInfo detail ({ retryDelay: "23s" }) and a QuotaFailure detail naming the
+// quota that ran out, e.g. "...PerMinute..." (RPM/TPM, worth retrying) or "...PerDay..." (not until it resets).
+function describeRateLimit(error: any) {
+    const details: any[] = Array.isArray(error?.errorDetails) ? error.errorDetails : [];
+    const delay = details.find(detail => typeof detail?.retryDelay === 'string')?.retryDelay;
+    const seconds = typeof delay === 'string' ? parseFloat(delay) : NaN;
+    const violations: any[] = details.flatMap(detail => (Array.isArray(detail?.violations) ? detail.violations : []));
+    const daily = violations.find(violation => /PerDay/i.test(String(violation?.quotaId ?? '')));
+    return {
+        retryAfterSeconds: Number.isFinite(seconds) && seconds >= 0 ? Math.ceil(seconds) : undefined,
+        dailyLimit: daily ? String(daily.quotaValue ?? '') : null,
+    };
+}
+
+function formatWait(seconds: number | undefined) {
+    if (seconds === undefined) return 'later today';
+    if (seconds < 90 * 60) return `in about ${Math.max(1, Math.round(seconds / 60))} minutes`;
+    return `in about ${Math.round(seconds / 3600)} hours`;
 }
 
 export async function POST(request: Request) {
@@ -35,6 +54,18 @@ export async function POST(request: Request) {
     const message = (body as { message?: unknown } | null)?.message;
     if (typeof message !== 'string' || message.trim() === '') {
         return errorResponse('`message` must be a non-empty string.', 400);
+    }
+
+    // Every carousel has its own Gemini conversation
+    const carouselId = (body as { carouselId?: unknown } | null)?.carouselId;
+    if (!isCarouselId(carouselId)) {
+        return errorResponse('`carouselId` is missing or invalid.', 400);
+    }
+    try {
+        await assertExists(carouselId);
+    } catch (error) {
+        if (error instanceof CarouselNotFoundError) return errorResponse(error.message, 404);
+        throw error;
     }
 
     // The editor's current carousel, including the user's hand edits, so the model edits that instead of
@@ -55,7 +86,7 @@ export async function POST(request: Request) {
     // 2. Call the utility and map failures to HTTP status codes
     try {
         const result: KaruResponse = await enqueue(() =>
-            generateKaruResponse(message.trim(), MODEL_NAME, HISTORY_FILE, KARU_SYSTEM_PROMPT, turnContext)
+            generateKaruResponse(message.trim(), MODEL_NAME, chatHistoryFile(carouselId), KARU_SYSTEM_PROMPT, turnContext)
         );
         return NextResponse.json(result, { status: 200 });
     } catch (error: any) {
@@ -67,8 +98,23 @@ export async function POST(request: Request) {
 
         // Errors from the Gemini SDK carry the upstream HTTP status
         const upstreamStatus: number | undefined = error?.status;
+        // Rate limits (RPM/TPM) and overload are temporary: the editor retries these with backoff.
+        // Nothing was written to the history, so a retry is safe.
         if (upstreamStatus === 429) {
-            return errorResponse('Gemini rate limit reached. Please wait a moment and try again.', 429);
+            const { retryAfterSeconds, dailyLimit } = describeRateLimit(error);
+            if (dailyLimit !== null) {
+                const limit = dailyLimit ? ` (${dailyLimit} requests per day)` : '';
+                return errorResponse(
+                    `The daily Gemini quota for this API key is used up${limit}. It resets ${formatWait(retryAfterSeconds)}, ` +
+                    'or you can switch the key to a paid plan in Google AI Studio.',
+                    429,
+                    { retryable: false, retryAfterSeconds }
+                );
+            }
+            return errorResponse('Gemini rate limit reached.', 429, { retryable: true, retryAfterSeconds });
+        }
+        if (upstreamStatus === 503) {
+            return errorResponse('Gemini is overloaded right now.', 503, { retryable: true });
         }
         if (typeof upstreamStatus === 'number') {
             return errorResponse(`Gemini API error: ${error.message}`, 502);
