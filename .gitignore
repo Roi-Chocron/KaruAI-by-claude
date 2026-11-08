@@ -14,3 +14,5 @@ node_modules/
 # Next.js generated files
 next-env.d.ts
 *.tsbuildinfo
+.chrome-pids.json
+

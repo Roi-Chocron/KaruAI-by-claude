@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
-import AuthForm from '../auth-form';
+import AuthPage from '../authentication_page';
 import { getCurrentUser } from '../../karu_auth';
 
 export default async function LoginPage() {
   if (await getCurrentUser()) redirect('/');
-  return <AuthForm mode="login" />;
+  return <AuthPage initialMode="login" />;
 }
