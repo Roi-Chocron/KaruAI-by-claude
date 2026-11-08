@@ -83,6 +83,23 @@ export function getUserById(id: string): User | null {
     return row ? toUser(row) : null;
 }
 
+export function getUserByEmail(email: string): User | null {
+    const row = getDb().prepare('SELECT * FROM users WHERE email = ?').get(normalizeEmail(email));
+    return row ? toUser(row) : null;
+}
+
+export function resetUserPassword(email: string, newPassword: string): boolean {
+    const normalized = normalizeEmail(email);
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new UserInputError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    const db = getDb();
+    const user: any = db.prepare('SELECT id FROM users WHERE email = ?').get(normalized);
+    if (!user) return false;
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), user.id);
+    return true;
+}
+
 // Returns the user when the email and password match, and records the login
 export function authenticate(email: string, password: string): User | null {
     const db = getDb();
