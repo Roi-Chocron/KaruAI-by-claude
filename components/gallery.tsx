@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, ImageOff, Loader2, LogOut, Plus, Shield, Trash2 } from 'lucide-react';
-import type { CarouselMeta } from '../carousel_store';
+import type { CarouselMeta } from '@/types';
 
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [

@@ -1,5 +1,5 @@
-import { getOwnedCarousel, readThumbnail } from '../../../../../carousel_store';
-import { getCurrentUser } from '../../../../../karu_auth';
+import { getOwnedCarousel, readThumbnail } from '@/lib/carousel-store';
+import { getCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

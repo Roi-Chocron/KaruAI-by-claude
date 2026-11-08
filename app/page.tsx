@@ -1,6 +1,6 @@
-import Gallery from './gallery';
-import KaruAIHome from './karuai-home';
-import { getCurrentUser, publicUser } from '../karu_auth';
+import Gallery from '@/components/gallery';
+import KaruAIHome from '@/components/karuai-home';
+import { getCurrentUser, publicUser } from '@/lib/auth';
 
 export default async function Home() {
   const user = await getCurrentUser();

@@ -2,10 +2,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import {
-    CarouselRow, deleteCarouselRow, getCarouselRow, insertCarousel, listCarouselRows, updateCarouselRow, User,
-} from './karu_db';
+    deleteCarouselRow, getCarouselRow, insertCarousel, listCarouselRows, updateCarouselRow,
+} from '@/lib/db';
+import type { CarouselMeta, CarouselRow, HistoryEntry, UndoHistory, User } from '@/types';
 
-// Gallery metadata and ownership live in the database (karu_db.ts). The contents are files:
+export type { CarouselMeta, HistoryEntry, UndoHistory } from '@/types';
+
+// Gallery metadata and ownership live in the database (lib/db). The contents are files:
 //   .karu/carousels/<id>/carousel.json      the editor document (slides, both versions, chat log)
 //   .karu/carousels/<id>/history.json       the undo history
 //   .karu/carousels/<id>/chat_history.json  this carousel's Gemini conversation
@@ -21,8 +24,6 @@ const IMAGE_TYPES: Record<string, string> = {
     'image/webp': 'webp',
     'image/gif': 'gif',
 };
-
-export type CarouselMeta = CarouselRow;
 
 // Also used when the carousel belongs to someone else, so other people's ids are indistinguishable
 export class CarouselNotFoundError extends Error {
@@ -108,17 +109,6 @@ export async function readThumbnail(id: string): Promise<Buffer | null> {
 // --- Undo history ---
 // Entries are full snapshots with a sequence number. The editor uploads only the entries the server does not
 // have yet plus the list of sequence numbers in order, so a save stays small even with a long history.
-
-export interface HistoryEntry {
-    seq: number;
-    snapshot: string;
-    slide: number;
-}
-
-export interface UndoHistory {
-    entries: HistoryEntry[];
-    index: number;
-}
 
 export class HistoryOutOfSyncError extends Error {}
 

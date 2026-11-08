@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { authenticate } from '../../../../karu_db';
-import { publicUser, startSession } from '../../../../karu_auth';
+import { authenticate } from '@/lib/db';
+import { publicUser, startSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

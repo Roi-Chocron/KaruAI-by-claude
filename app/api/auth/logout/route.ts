@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { endSession } from '../../../../karu_auth';
+import { endSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

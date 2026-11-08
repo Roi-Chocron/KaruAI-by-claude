@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createCarousel, listCarousels } from '../../../carousel_store';
-import { getCurrentUser, unauthorized } from '../../../karu_auth';
+import { createCarousel, listCarousels } from '@/lib/carousel-store';
+import { getCurrentUser, unauthorized } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

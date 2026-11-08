@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Keeps signed-out visitors on the login and register pages. This only checks that a session cookie
-// exists; every page and API route still verifies the session itself (see karu_auth.ts).
+// exists; every page and API route still verifies the session itself (see lib/auth.ts).
 const SESSION_COOKIE = 'karu_session';
 const PUBLIC_PATHS = ['/', '/login', '/register'];
 

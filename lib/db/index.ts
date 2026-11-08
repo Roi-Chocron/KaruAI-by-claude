@@ -2,65 +2,15 @@ import { DatabaseSync } from 'node:sqlite';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
+import { SCHEMA } from './schema';
+import type { Role, User, CarouselRow, SettingKey } from '@/types';
+
+export * from './schema';
+export type { Role, User, CarouselRow, SettingKey } from '@/types';
 
 // SQLite database (Node's built-in driver) for users, sessions, carousel ownership and app settings.
 // Carousel contents (slides, images, histories) stay as files under .karu/carousels/<id>.
 const DB_FILE = path.join(process.cwd(), '.karu', 'karuai.db');
-
-export type Role = 'user' | 'admin';
-
-export interface User {
-    id: string;
-    email: string;
-    name: string;
-    role: Role;
-    createdAt: string;
-    lastLoginAt: string | null;
-    lastSeenAt: string | null;
-}
-
-export interface CarouselRow {
-    id: string;
-    ownerId: string;
-    title: string;
-    slideCount: number;
-    createdAt: string;
-    updatedAt: string;
-}
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL DEFAULT '',
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-    created_at TEXT NOT NULL,
-    last_login_at TEXT,
-    last_seen_at TEXT
-);
-CREATE TABLE IF NOT EXISTS sessions (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
-CREATE TABLE IF NOT EXISTS carousels (
-    id TEXT PRIMARY KEY,
-    owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL DEFAULT '',
-    slide_count INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS carousels_owner ON carousels(owner_id, updated_at);
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-`;
 
 const now = () => new Date().toISOString();
 
@@ -253,8 +203,6 @@ export function countCarousels(): number {
 }
 
 // --- Settings (API keys etc.), set on the admin page; .env.local values are the fallback ---
-
-export type SettingKey = 'gemini_api_key' | 'pollinations_api_key' | 'gemini_model';
 
 export const SETTING_ENV: Record<SettingKey, string> = {
     gemini_api_key: 'GEMINI_API_KEY',

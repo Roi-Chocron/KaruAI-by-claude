@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
     CarouselNotFoundError, decodeImageDataUrl, getOwnedCarousel, isImageId, saveImage,
-} from '../../../../../carousel_store';
-import { getCurrentUser, unauthorized } from '../../../../../karu_auth';
+} from '@/lib/carousel-store';
+import { getCurrentUser, unauthorized } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

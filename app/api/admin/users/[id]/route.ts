@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { deleteUser, getUserById, setUserRole } from '../../../../../karu_db';
-import { deleteCarouselFiles } from '../../../../../carousel_store';
-import { forbidden, getCurrentUser, unauthorized } from '../../../../../karu_auth';
+import { deleteUser, getUserById, setUserRole } from '@/lib/db';
+import { deleteCarouselFiles } from '@/lib/carousel-store';
+import { forbidden, getCurrentUser, unauthorized } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

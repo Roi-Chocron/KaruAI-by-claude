@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
-import App from '../../../karuai_dashboard';
-import { getCurrentUser } from '../../../karu_auth';
-import { getOwnedCarousel } from '../../../carousel_store';
+import CarouselEditor from '@/components/carousel-editor';
+import { getCurrentUser } from '@/lib/auth';
+import { getOwnedCarousel } from '@/lib/carousel-store';
 
 export default async function CarouselPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,5 +12,5 @@ export default async function CarouselPage({ params }: { params: Promise<{ id: s
   } catch {
     notFound();
   }
-  return <App carouselId={id} />;
+  return <CarouselEditor carouselId={id} />;
 }

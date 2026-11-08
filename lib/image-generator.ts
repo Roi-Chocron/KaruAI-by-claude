@@ -1,37 +1,19 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import type {
+    PollinationsImageMetrics,
+    PollinationsImageOptions,
+    PollinationsImageResult,
+} from '@/types';
+
+export type {
+    PollinationsImageMetrics,
+    PollinationsImageOptions,
+    PollinationsImageResult,
+} from '@/types';
 
 const POLLINATIONS_IMAGE_ENDPOINT = 'https://gen.pollinations.ai/image';
 const DEFAULT_METRICS_FILE = path.join(process.cwd(), '.karu', 'pollinations_image_history.json');
-
-export interface PollinationsImageOptions {
-    width?: number;
-    height?: number;
-    seed?: number;
-    safe?: boolean;
-    metricsFilename?: string;
-    timeoutMs?: number;
-    apiKey?: string; // defaults to the POLLINATIONS_API_KEY environment variable
-}
-
-export interface PollinationsImageMetrics {
-    prompt: string;
-    requestUrl: string;
-    startTime: string;
-    endTime: string;
-    durationMs: number;
-    statusCode: number;
-    contentType: string | null;
-    responseBytes: number;
-    success: boolean;
-    errorMessage?: string;
-}
-
-export interface PollinationsImageResult {
-    image: Buffer;
-    contentType: string;
-    metrics: PollinationsImageMetrics;
-}
 
 interface PollinationsImageHistory {
     requests: PollinationsImageMetrics[];

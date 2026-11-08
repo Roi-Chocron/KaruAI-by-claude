@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import AdminPanel from './admin-panel';
-import { getCurrentUser, publicUser } from '../../karu_auth';
+import AdminPanel from '@/components/admin-panel';
+import { getCurrentUser, publicUser } from '@/lib/auth';
 
 export default async function AdminPage() {
   const user = await getCurrentUser();

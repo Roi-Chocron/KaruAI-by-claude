@@ -1,27 +1,25 @@
 import { GoogleGenerativeAI, Content, ModelParams, ResponseSchema, SchemaType } from '@google/generative-ai';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import type {
+    CarouselData,
+    CarouselElement,
+    CarouselElementType,
+    CarouselSlide,
+    ConversationMetrics,
+    ConversationState,
+    KaruResponse,
+} from '@/types';
 
-// Define the structure of the JSON file storing the context memory
-export interface ConversationMetrics {
-    startTime: string;
-    endTime: string;
-    promptTokenCount: number;
-    responseTokenCount: number;
-    // Tokens for the current API call (history included in prompt + response)
-    currentRequestTokens: number;
-    // Cumulative tokens across all API calls in this conversation
-    cumulativeConversationTokens: number;
-}
-
-export interface ConversationState {
-    history: Content[];
-    lastMetrics: ConversationMetrics | null;
-}
-
-// Structured carousel output returned (as a JSON string) in KaruResponse.responseText.
-// There are no templates: the model designs every slide as free-form layers on a 1080x1350 canvas.
-export type CarouselElementType = 'rect' | 'ellipse' | 'text' | 'image';
+export type {
+    CarouselData,
+    CarouselElement,
+    CarouselElementType,
+    CarouselSlide,
+    ConversationMetrics,
+    ConversationState,
+    KaruResponse,
+} from '@/types';
 
 // Google Fonts the model may use. The dashboard editor loads (and embeds on export) the same list,
 // so keep public/advanced_dashboard_editor.html's FONTS in sync with this one.
@@ -31,52 +29,6 @@ export const CAROUSEL_FONTS = [
     'IBM Plex Sans Hebrew', 'Inter', 'Poppins', 'Playfair Display', 'Montserrat', 'Bebas Neue', 'Space Grotesk',
     'Abril Fatface', 'Caveat',
 ];
-
-export interface CarouselElement {
-    id: string;
-    type: CarouselElementType;
-    name: string;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    rotation: number;
-    radius?: number;
-    fillColor: string;
-    fillOpacity: number;
-    gradientTo?: string;
-    gradientAngle?: number;
-    strokeColor?: string;
-    strokeWidth?: number;
-    strokeStyle?: 'solid' | 'dashed' | 'dotted';
-    shadowType?: 'none' | 'drop-shadow' | 'inner-shadow';
-    shadowX?: number;
-    shadowY?: number;
-    shadowBlur?: number;
-    shadowSpread?: number;
-    shadowColor?: string;
-    content?: string;
-    fontFamily?: string;
-    fontSize?: number;
-    fontWeight?: number;
-    textAlign?: 'left' | 'center' | 'right';
-    lineHeight?: number;
-    letterSpacing?: number;
-    italic?: boolean;
-}
-
-export interface CarouselSlide {
-    id: number;
-    title: string;
-    imagePrompt: string;
-    withImage: CarouselElement[];
-    withoutImage: CarouselElement[];
-}
-
-export interface CarouselData {
-    title: string;
-    slides: CarouselSlide[];
-}
 
 export const KARU_SYSTEM_PROMPT = [
     "You are KaruAI, an expert Instagram carousel designer. Based on the user's request, create a highly engaging carousel.",
@@ -192,12 +144,6 @@ export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
     },
     required: ['title', 'slides'],
 };
-
-export interface KaruResponse {
-    responseText: string;
-    currentRequestTokens: number;
-    totalConversationTokens: number;
-}
 
 /**
  * Generates a response from Google Gemini API while managing conversation history,

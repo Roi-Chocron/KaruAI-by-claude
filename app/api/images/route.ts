@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { generatePollinationsImage } from '../../../pollinations_image_utility';
-import { getCurrentUser, unauthorized } from '../../../karu_auth';
-import { getSetting } from '../../../karu_db';
+import { generatePollinationsImage } from '@/lib/image-generator';
+import { getCurrentUser, unauthorized } from '@/lib/auth';
+import { getSetting } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

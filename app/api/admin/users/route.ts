@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { countCarousels, listUsersWithStats } from '../../../../karu_db';
-import { forbidden, getCurrentUser, unauthorized } from '../../../../karu_auth';
+import { countCarousels, listUsersWithStats } from '@/lib/db';
+import { forbidden, getCurrentUser, unauthorized } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

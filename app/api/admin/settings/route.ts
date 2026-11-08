@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { DEFAULT_GEMINI_MODEL, getStoredSetting, SETTING_ENV, SettingKey, setSetting } from '../../../../karu_db';
-import { forbidden, getCurrentUser, unauthorized } from '../../../../karu_auth';
+import { DEFAULT_GEMINI_MODEL, getStoredSetting, SETTING_ENV, setSetting } from '@/lib/db';
+import { forbidden, getCurrentUser, unauthorized } from '@/lib/auth';
+import type { SettingKey } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

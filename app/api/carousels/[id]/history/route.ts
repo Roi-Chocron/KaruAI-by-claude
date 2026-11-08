@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import {
-    CarouselNotFoundError, getOwnedCarousel, HistoryEntry, HistoryOutOfSyncError, readHistory, saveHistory,
-} from '../../../../../carousel_store';
-import { getCurrentUser, unauthorized } from '../../../../../karu_auth';
+    CarouselNotFoundError, getOwnedCarousel, HistoryOutOfSyncError, readHistory, saveHistory,
+} from '@/lib/carousel-store';
+import { getCurrentUser, unauthorized } from '@/lib/auth';
+import type { HistoryEntry } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

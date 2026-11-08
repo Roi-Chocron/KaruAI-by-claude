@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { createSession, deleteSession, getUserBySession, User } from './karu_db';
+import { createSession, deleteSession, getUserBySession } from '@/lib/db';
+import type { User } from '@/types';
 
 // Must match the name middleware.ts looks for
 export const SESSION_COOKIE = 'karu_session';

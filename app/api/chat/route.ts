@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { generateKaruResponse, KaruResponse, KARU_SYSTEM_PROMPT } from '../../../karu_response_utility';
-import { CarouselNotFoundError, chatHistoryFile, getOwnedCarousel } from '../../../carousel_store';
-import { getCurrentUser, unauthorized } from '../../../karu_auth';
-import { DEFAULT_GEMINI_MODEL, getSetting } from '../../../karu_db';
+import { generateKaruResponse, KARU_SYSTEM_PROMPT } from '@/lib/gemini';
+import { CarouselNotFoundError, chatHistoryFile, getOwnedCarousel } from '@/lib/carousel-store';
+import { getCurrentUser, unauthorized } from '@/lib/auth';
+import { DEFAULT_GEMINI_MODEL, getSetting } from '@/lib/db';
+import type { KaruResponse } from '@/types';
 
 // The utility reads/writes the history file with `fs`, so this must run on the Node.js runtime
 export const runtime = 'nodejs';
