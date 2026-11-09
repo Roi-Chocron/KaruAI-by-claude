@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "KaruAI - AI Instagram carousel generator",
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -k -n api,web -c magenta,blue \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "next dev",
+    "dev:api": "node -e \"require('fs').mkdirSync('out',{recursive:true})\" && wrangler d1 migrations apply karuai --local && wrangler dev",
     "build": "next build",
-    "start": "next start"
+    "typegen": "wrangler types worker/worker-configuration.d.ts",
+    "typecheck": "npm run typegen && tsc --noEmit && tsc --noEmit -p worker",
+    "deploy": "next build && wrangler d1 migrations apply karuai --remote && wrangler deploy",
+    "postinstall": "wrangler types worker/worker-configuration.d.ts"
   },
   "repository": {
     "type": "git",
@@ -20,7 +25,9 @@
   "homepage": "https://github.com/Roi-Chocron/KaruAI-by-claude#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@sentry/cloudflare": "^11.11.0",
     "@sentry/nextjs": "^11.11.0",
+    "hono": "^4.13.17",
     "lucide-react": "^1.68.0",
     "next": "^15.5.29",
     "posthog-js": "^1.447.3",
@@ -32,9 +39,11 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.6.2",
+    "concurrently": "^10.0.7",
     "postcss": "^8.5.32",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.159.0"
   },
   "private": true
 }

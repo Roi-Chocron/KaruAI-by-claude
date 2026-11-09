@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation';
 import AuthPage from '@/components/authentication-page';
-import { getCurrentUser } from '@/lib/auth';
 
-export default async function LoginPage() {
-  if (await getCurrentUser()) redirect('/');
-  return <AuthPage initialMode="login" />;
+export const metadata = { title: 'Sign in - KaruAI' };
+
+export default function LoginPage() {
+  return <AuthPage />;
 }

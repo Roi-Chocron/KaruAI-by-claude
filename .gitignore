@@ -22,3 +22,9 @@ next-env.d.ts
 
 # Editor-local settings
 .vscode/
+
+# Static export and Cloudflare local state
+out/
+.wrangler/
+.dev.vars
+worker/worker-configuration.d.ts

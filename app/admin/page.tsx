@@ -1,10 +1,8 @@
-import { redirect } from 'next/navigation';
-import AdminPanel from '@/components/admin-panel';
-import { getCurrentUser, publicUser } from '@/lib/auth';
+'use client';
 
-export default async function AdminPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect('/login?next=%2Fadmin');
-  if (user.role !== 'admin') redirect('/');
-  return <AdminPanel me={publicUser(user)} />;
+import AdminPanel from '@/components/admin-panel';
+import { RequireAuth } from '@/lib/session';
+
+export default function AdminPage() {
+  return <RequireAuth admin>{user => <AdminPanel me={user} />}</RequireAuth>;
 }

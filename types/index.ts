@@ -4,6 +4,7 @@ export interface User {
     id: string;
     email: string;
     name: string;
+    avatarUrl: string | null;
     role: Role;
     createdAt: string;
     lastLoginAt: string | null;
@@ -33,6 +34,9 @@ export interface UndoHistory {
     entries: HistoryEntry[];
     index: number;
 }
+
+// The signed-in user as the API hands it to the browser
+export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'avatarUrl' | 'role'>;
 
 // Conversation and Carousel data types
 export interface ConversationMetrics {
@@ -109,7 +113,6 @@ export interface PollinationsImageOptions {
     height?: number;
     seed?: number;
     safe?: boolean;
-    metricsFilename?: string;
     timeoutMs?: number;
     apiKey?: string;
 }
@@ -128,7 +131,7 @@ export interface PollinationsImageMetrics {
 }
 
 export interface PollinationsImageResult {
-    image: Buffer;
+    image: ArrayBuffer;
     contentType: string;
     metrics: PollinationsImageMetrics;
 }

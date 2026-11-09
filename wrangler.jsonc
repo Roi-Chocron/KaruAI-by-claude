@@ -1,0 +1,46 @@
+// Cloudflare Worker: serves the static Next.js export (out/) and the API under /api/*.
+// Secrets (GOOGLE_CLIENT_SECRET, GEMINI_API_KEY, ...) go in .dev.vars locally and `wrangler secret put` in production.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "karuai",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static pages are served without running the Worker (free, not counted against the request quota);
+  // only /api/* requests run it.
+  "assets": {
+    "directory": "./out",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "vars": {
+    // The public address of the app, used for the Google sign-in redirect and the Origin check.
+    // .dev.vars overrides it with http://localhost:3000 for local development.
+    "APP_URL": "https://karuai.example.workers.dev"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "karuai",
+      // Replace with the id printed by `npx wrangler d1 create karuai` before the first deploy
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    // Carousel documents, undo histories, Gemini conversations, thumbnails and images
+    { "binding": "FILES", "bucket_name": "karuai-files" }
+  ],
+
+  // Daily cleanup of expired sessions and old rate-limit and usage rows
+  "triggers": { "crons": ["17 3 * * *"] },
+
+  "observability": { "enabled": true },
+
+  "dev": { "port": 8787 }
+}

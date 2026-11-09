@@ -1875,10 +1875,14 @@
                         row.note = `High demand right now, retrying automatically (${attempt}/${of})…`;
                         render();
                     });
-                    const data = await response.json().catch(() => null);
-                    if (!response.ok && data?.retryable) throw new Error('The image service is under heavy load. Please try again in a minute.');
-                    if (!response.ok || typeof data?.imageUrl !== 'string') throw new Error(data?.error || `Image request failed with status ${response.status}`);
-                    if (!isStale() && row.index !== -1) applySlideImage(row.index, data.imageUrl);
+                    // Success is the image itself; failures are JSON
+                    if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) {
+                        const data = await response.json().catch(() => null);
+                        if (data?.retryable) throw new Error('The image service is under heavy load. Please try again in a minute.');
+                        throw new Error(data?.error || `Image request failed with status ${response.status}`);
+                    }
+                    const imageUrl = await blobToDataUrl(await response.blob());
+                    if (!isStale() && row.index !== -1) applySlideImage(row.index, imageUrl);
                 } catch (error) {
                     row.error = error instanceof Error ? error.message : 'Image generation failed.';
                 } finally {
@@ -2149,13 +2153,13 @@
         // The carousel autosaves to the server a moment after every change; images are stored separately,
         // once each, under their image id.
 
+        // Uploaded as raw bytes rather than a data URL, so the server never has to decode base64
         function persistImage(imageId, dataUrl) {
             if (!carouselId) return;
-            fetchWithBackoff(`/api/carousels/${carouselId}/images`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageId, dataUrl })
-            }).then(response => {
+            fetch(dataUrl).then(response => response.blob()).then(blob => fetchWithBackoff(
+                `/api/carousels/${carouselId}/images/${encodeURIComponent(imageId)}`,
+                { method: 'PUT', headers: { 'Content-Type': blob.type }, body: blob }
+            )).then(response => {
                 if (!response.ok) throw new Error(`status ${response.status}`);
             }).catch(error => {
                 console.error('Could not save an image:', error);
@@ -2192,7 +2196,7 @@
             thumb.width = 432;
             thumb.height = 540;
             thumb.getContext('2d').drawImage(full, 0, 0, thumb.width, thumb.height);
-            return thumb.toDataURL('image/jpeg', 0.85);
+            return new Promise((resolve, reject) => thumb.toBlob(blob => (blob ? resolve(blob) : reject(new Error('No thumbnail'))), 'image/jpeg', 0.85));
         }
 
         let saveTimer = null;
@@ -2224,23 +2228,32 @@
             isSaving = true;
             setSaveStatus('saving');
             try {
-                const body = { title: carouselTitle, slideCount: state.slides.length, document: document_ };
                 const first = state.slideData[0];
                 const thumbnailElements = first ? first.variants[first.mode] : null;
                 const signature = thumbnailElements ? JSON.stringify(thumbnailElements) : '';
-                if (json !== lastSavedJson && thumbnailElements && signature !== lastThumbnailSignature) {
-                    body.thumbnail = await renderThumbnail(thumbnailElements).catch(() => undefined);
-                }
                 if (json !== lastSavedJson) {
+                    // The body is the document itself, so the server can store it without parsing it
                     const response = await fetch(`/api/carousels/${carouselId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body)
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Carousel-Title': encodeURIComponent(carouselTitle),
+                            'X-Slide-Count': String(state.slides.length)
+                        },
+                        body: json
                     });
                     if (response.status === 401) redirectToLogin();
                     if (!response.ok) throw new Error(`status ${response.status}`);
                     lastSavedJson = json;
-                    if (body.thumbnail) lastThumbnailSignature = signature;
+                    if (thumbnailElements && signature !== lastThumbnailSignature) {
+                        const thumbnail = await renderThumbnail(thumbnailElements).catch(() => null);
+                        const thumbnailResponse = thumbnail && await fetch(`/api/carousels/${carouselId}/thumbnail`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'image/jpeg' },
+                            body: thumbnail
+                        });
+                        if (thumbnailResponse?.ok) lastThumbnailSignature = signature;
+                    }
                 }
                 await saveHistoryToServer();
                 setSaveStatus('saved');
@@ -2257,7 +2270,7 @@
         }
 
         function redirectToLogin() {
-            window.top.location.href = `/login?next=${encodeURIComponent(window.top.location.pathname)}`;
+            window.top.location.href = `/login?next=${encodeURIComponent(window.top.location.pathname + window.top.location.search)}`;
         }
 
         // --- Saving the undo history ---
@@ -2283,7 +2296,7 @@
 
         async function goToGallery() {
             await saveNow();
-            window.top.location.href = '/';
+            window.top.location.href = '/dashboard';
         }
 
         window.addEventListener('beforeunload', (e) => {
@@ -2297,7 +2310,7 @@
             container.innerHTML = '';
             const note = document.createElement('div');
             note.className = 'm-auto text-center text-sm text-gray-500 max-w-[80%]';
-            note.innerHTML = '<p class="mb-3"></p><button onclick="window.top.location.href=\'/\'" class="text-indigo-600 font-semibold hover:underline">Back to all carousels</button>';
+            note.innerHTML = '<p class="mb-3"></p><button onclick="window.top.location.href=\'/dashboard\'" class="text-indigo-600 font-semibold hover:underline">Back to all carousels</button>';
             note.querySelector('p').textContent = message;
             container.appendChild(note);
         }
@@ -2307,7 +2320,7 @@
                 // Opened without a carousel: start a new one and open it at its own address
                 const response = await fetch('/api/carousels', { method: 'POST' });
                 const meta = await response.json();
-                window.top.location.replace(`/carousel/${meta.id}`);
+                window.top.location.replace(`/carousel?id=${meta.id}`);
                 return;
             }
             const [response, historyResponse] = await Promise.all([

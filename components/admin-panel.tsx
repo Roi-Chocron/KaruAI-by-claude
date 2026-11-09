@@ -48,7 +48,7 @@ const SettingRow = ({ setting, onSaved }: { setting: Setting; onSaved: (setting:
 
   const sourceLabel = setting.source === 'admin'
     ? `Set here · ${formatDate(setting.updatedAt)}`
-    : setting.source === 'env' ? `From ${setting.envName} in .env.local`
+    : setting.source === 'env' ? `From the ${setting.envName} secret`
     : meta.secret ? 'Not set' : 'Default';
   const missing = setting.source === 'none' && meta.secret;
 
@@ -79,7 +79,7 @@ const SettingRow = ({ setting, onSaved }: { setting: Setting; onSaved: (setting:
             Save
           </button>
           {setting.source === 'admin' && (
-            <button type="button" disabled={busy} onClick={() => save(null)} className="text-sm font-semibold text-gray-500 hover:text-red-600 px-2" title="Remove and fall back to .env.local">
+            <button type="button" disabled={busy} onClick={() => save(null)} className="text-sm font-semibold text-gray-500 hover:text-red-600 px-2" title="Remove and fall back to the Worker secret">
               Clear
             </button>
           )}
@@ -134,7 +134,7 @@ export default function AdminPanel({ me }: { me: Me }) {
     <div className="min-h-screen bg-gray-50 text-slate-800">
       <header className="h-16 border-b border-gray-200 bg-white px-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <a href="/" className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-indigo-600" title="Back to carousels"><ArrowLeft size={18} /></a>
+          <a href="/dashboard" className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-indigo-600" title="Back to carousels"><ArrowLeft size={18} /></a>
           <Shield className="text-indigo-600" size={20} />
           <span className="text-xl font-bold tracking-tight text-slate-900">Admin</span>
         </div>
@@ -155,7 +155,7 @@ export default function AdminPanel({ me }: { me: Me }) {
 
         <section className="bg-white border border-gray-200 rounded-2xl p-6">
           <h2 className="flex items-center gap-2 font-bold text-slate-900 mb-1"><KeyRound size={18} /> API keys</h2>
-          <p className="text-sm text-gray-500 mb-2">Keys saved here take effect right away and override the ones in .env.local. Saved keys are never shown again in full.</p>
+          <p className="text-sm text-gray-500 mb-2">Keys saved here take effect right away and override the Worker secrets. Saved keys are never shown again in full.</p>
           {!settings ? (
             <div className="flex items-center gap-2 text-sm text-gray-400 py-4"><Loader2 size={16} className="animate-spin" /> Loading…</div>
           ) : (

@@ -36,7 +36,7 @@ export default function KaruAIHome() {
               <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium px-4 py-2 transition-colors">
                 Log in
               </Link>
-              <Link href="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5">
+              <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5">
                 Sign up free
               </Link>
             </div>
@@ -63,7 +63,7 @@ export default function KaruAIHome() {
               <Link href="/login" className="w-full text-center border-2 border-slate-200 text-slate-700 font-medium px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">
                 Log in
               </Link>
-              <Link href="/register" className="w-full text-center bg-blue-600 text-white font-medium px-6 py-3 rounded-xl shadow-md">
+              <Link href="/login" className="w-full text-center bg-blue-600 text-white font-medium px-6 py-3 rounded-xl shadow-md">
                 Sign up free
               </Link>
             </div>
@@ -97,7 +97,7 @@ export default function KaruAIHome() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/register" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-2xl transition-all transform hover:-translate-y-1 text-lg shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
+            <Link href="/login" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-2xl transition-all transform hover:-translate-y-1 text-lg shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
               Start creating for free
               <ChevronRight className="w-5 h-5" />
             </Link>
@@ -260,7 +260,7 @@ export default function KaruAIHome() {
                 </ul>
               </div>
               <Link
-                href="/register"
+                href="/login"
                 className="w-full block text-center py-3 px-4 rounded-xl font-semibold border-2 border-slate-300 text-slate-800 hover:bg-slate-100 transition-colors"
               >
                 Get Started Free
@@ -308,7 +308,7 @@ export default function KaruAIHome() {
                 </ul>
               </div>
               <Link
-                href="/register"
+                href="/login"
                 className="w-full block text-center py-3 px-4 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 transition-all"
               >
                 Choose Pro
@@ -353,7 +353,7 @@ export default function KaruAIHome() {
                 </ul>
               </div>
               <Link
-                href="/register"
+                href="/login"
                 className="w-full block text-center py-3 px-4 rounded-xl font-semibold border-2 border-slate-300 text-slate-800 hover:bg-slate-100 transition-colors"
               >
                 Get Started
@@ -384,7 +384,7 @@ export default function KaruAIHome() {
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
             Join thousands of content creators who already use KaruAI to produce amazing carousels with less effort.
           </p>
-          <Link href="/register" className="inline-block bg-white text-blue-600 hover:bg-slate-50 font-bold py-4 px-12 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105">
+          <Link href="/login" className="inline-block bg-white text-blue-600 hover:bg-slate-50 font-bold py-4 px-12 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105">
             Sign up now - It's free
           </Link>
         </div>

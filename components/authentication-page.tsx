@@ -1,55 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Mail, Lock, User, Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2 } from 'lucide-react';
 
-interface AuthPageProps {
-  initialMode?: 'login' | 'register';
+// Sign-in is with Google only: the button sends the browser to the API, which takes it through Google's
+// consent screen and back to `next` with a session
+const ERRORS: Record<string, string> = {
+  cancelled: 'Google sign-in was cancelled.',
+  state: 'The sign-in link expired. Please try again.',
+  failed: 'Google sign-in failed. Please try again.',
+  unverified: 'Your Google account has no verified email address.',
+  config: 'Google sign-in is not set up yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).',
+  rate: 'Too many sign-in attempts. Please wait a few minutes and try again.',
+};
+
+function GoogleLogo() {
+  return (
+    <svg viewBox="0 0 48 48" className="w-5 h-5" aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
 }
 
-function nextPath() {
-  if (typeof window === 'undefined') return '/';
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
-}
-
-export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
-  const [isLogin, setIsLogin] = useState(initialMode === 'login');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function AuthPage() {
+  const [href, setHref] = useState('/api/auth/google');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const payload = isLogin ? { email, password } : { name, email, password };
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.error || `Request failed with status ${res.status}`);
-      }
-
-      window.location.href = nextPath();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next');
+    if (next) setHref(`/api/auth/google?next=${encodeURIComponent(next)}`);
+    const code = params.get('error');
+    if (code) setError(ERRORS[code] ?? ERRORS.failed);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900" dir="ltr">
@@ -68,12 +55,10 @@ export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
         <div className="max-w-md w-full mx-auto mt-10 lg:mt-0">
           <div className="mb-10 text-center lg:text-left">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">
-              {isLogin ? 'Welcome back' : 'Create an account'}
+              Welcome to KaruAI
             </h1>
             <p className="text-slate-500 text-lg">
-              {isLogin 
-                ? 'Enter your details to access your workspace.' 
-                : 'Start creating stunning AI carousels today.'}
+              Sign in or create your free account with Google.
             </p>
           </div>
 
@@ -83,114 +68,19 @@ export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name Input - Only for Registration */}
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white shadow-sm"
-                    placeholder="John Doe"
-                  />
-                </div>
-              </div>
-            )}
+          <a
+            href={href}
+            className="w-full flex justify-center items-center gap-3 bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 px-4 rounded-xl border border-slate-200 shadow-sm transition-all transform hover:-translate-y-0.5"
+          >
+            <GoogleLogo />
+            Continue with Google
+          </a>
 
-            {/* Email Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white shadow-sm"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-sm font-medium text-slate-700">Password</label>
-                {isLogin && (
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium"
-                  >
-                    Forgot password?
-                  </Link>
-                )}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white shadow-sm"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5 mt-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {isLoading ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  {isLogin ? 'Sign In' : 'Create Account'}
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Toggle Login/Register */}
-          <div className="mt-10 text-center">
-            <p className="text-slate-600">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button 
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setIsLogin(!isLogin);
-                }}
-                className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                {isLogin ? 'Sign up free' : 'Log in'}
-              </button>
-            </p>
-          </div>
+          <p className="mt-8 text-center text-xs text-slate-500 leading-relaxed">
+            By continuing you agree to our{' '}
+            <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link> and{' '}
+            <Link href="/privacy" className="underline hover:text-slate-700">Privacy Policy</Link>.
+          </p>
         </div>
       </div>
 
@@ -208,12 +98,9 @@ export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
           <span className="font-extrabold text-2xl tracking-tight text-white">KaruAI</span>
         </Link>
 
-        {/* Dynamic Content based on Login/Register */}
         <div className="relative z-10 max-w-lg">
           <h2 className="text-4xl font-bold text-white mb-6 leading-tight">
-            {isLogin 
-              ? "Your creative engine is ready and waiting." 
-              : "Turn ideas into visual stories in seconds."}
+            Turn ideas into visual stories in seconds.
           </h2>
           
           <div className="space-y-5 text-blue-100 mb-12 text-lg">

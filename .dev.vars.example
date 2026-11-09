@@ -1,0 +1,18 @@
+# Copy to .dev.vars for `npm run dev` (never commit .dev.vars). In production set each with `npx wrangler secret put NAME`.
+APP_URL=http://localhost:3000
+
+# Google sign-in: https://console.cloud.google.com/apis/credentials -> OAuth client ID (Web application)
+# Authorized redirect URI: http://localhost:3000/api/auth/google/callback (and https://<your domain>/api/auth/google/callback)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# The Google account with this email becomes an admin when it signs in
+ADMIN_EMAIL=
+
+# AI keys (can also be set on the Admin page). Get a Gemini key at https://aistudio.google.com/apikey
+GEMINI_API_KEY=
+GEMINI_MODEL=
+POLLINATIONS_API_KEY=
+
+# Optional: Sentry DSN for errors in the API Worker
+SENTRY_DSN=

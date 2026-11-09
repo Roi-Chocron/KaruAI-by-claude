@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, ImageOff, Loader2, LogOut, Plus, Shield, Trash2 } from 'lucide-react';
-import type { CarouselMeta } from '@/types';
+import { logOut } from '@/lib/session';
+import type { CarouselMeta, PublicUser } from '@/types';
 
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -39,9 +40,7 @@ const Thumbnail = ({ carousel }: { carousel: CarouselMeta }) => {
   );
 };
 
-type SignedInUser = { id: string; email: string; name: string; role: 'user' | 'admin' };
-
-export default function Gallery({ user }: { user: SignedInUser }) {
+export default function Gallery({ user }: { user: PublicUser }) {
   const router = useRouter();
   const [carousels, setCarousels] = useState<CarouselMeta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,16 +63,11 @@ export default function Gallery({ user }: { user: SignedInUser }) {
       const res = await fetch('/api/carousels', { method: 'POST' });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
-      router.push(`/carousel/${data.id}`);
+      router.push(`/carousel?id=${data.id}`);
     } catch (err) {
       setIsCreating(false);
       alert(err instanceof Error ? err.message : 'Could not create a carousel.');
     }
-  };
-
-  const logOut = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
   };
 
   const deleteCarousel = async (carousel: CarouselMeta) => {
@@ -156,13 +150,13 @@ export default function Gallery({ user }: { user: SignedInUser }) {
             {carousels.map(carousel => (
               <div key={carousel.id} className="group">
                 <button
-                  onClick={() => router.push(`/carousel/${carousel.id}`)}
+                  onClick={() => router.push(`/carousel?id=${carousel.id}`)}
                   className="relative block w-full aspect-[4/5] rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm group-hover:shadow-lg group-hover:border-indigo-300 transition-all"
                 >
                   <Thumbnail carousel={carousel} />
                 </button>
                 <div className="flex items-start justify-between gap-2 mt-3">
-                  <button onClick={() => router.push(`/carousel/${carousel.id}`)} className="min-w-0 text-left">
+                  <button onClick={() => router.push(`/carousel?id=${carousel.id}`)} className="min-w-0 text-left">
                     <p className="font-semibold text-sm text-slate-800 truncate" dir="auto">{carousel.title || 'Untitled carousel'}</p>
                     <p className="text-xs text-gray-400">
                       {carousel.slideCount} slide{carousel.slideCount === 1 ? '' : 's'} · edited {timeAgo(carousel.updatedAt)}
