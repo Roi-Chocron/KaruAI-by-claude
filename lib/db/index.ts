@@ -88,18 +88,6 @@ export function getUserByEmail(email: string): User | null {
     return row ? toUser(row) : null;
 }
 
-export function resetUserPassword(email: string, newPassword: string): boolean {
-    const normalized = normalizeEmail(email);
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-        throw new UserInputError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-    }
-    const db = getDb();
-    const user: any = db.prepare('SELECT id FROM users WHERE email = ?').get(normalized);
-    if (!user) return false;
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), user.id);
-    return true;
-}
-
 // Returns the user when the email and password match, and records the login
 export function authenticate(email: string, password: string): User | null {
     const db = getDb();
@@ -176,6 +164,55 @@ export function getUserBySession(token: string): User | null {
 
 export function deleteSession(token: string) {
     getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(hashToken(token));
+}
+
+// --- Password resets ---
+
+export const PASSWORD_RESET_MINUTES = 30;
+
+// Issues a single-use reset token for the account with this email, or null when there is none.
+// Like sessions, only a hash of the token is stored. Older unused tokens for the user stop working.
+export function createPasswordReset(email: string): { token: string; user: User } | null {
+    const user = getUserByEmail(email);
+    if (!user) return null;
+    const db = getDb();
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_MINUTES * 60 * 1000).toISOString();
+    db.prepare('DELETE FROM password_resets WHERE user_id = ? OR expires_at <= ?').run(user.id, now());
+    db.prepare('INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
+        .run(hashToken(token), user.id, now(), expiresAt);
+    return { token, user };
+}
+
+// Sets a new password when the token is valid, unused and unexpired, then signs the user out everywhere.
+// Returns false for a bad token.
+export function resetPasswordWithToken(token: string, newPassword: string): boolean {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new UserInputError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    const db = getDb();
+    const time = now();
+    db.exec('BEGIN IMMEDIATE');
+    try {
+        // Claiming the token in the same statement that checks it means it can only be used once
+        const row: any = db.prepare(`
+            UPDATE password_resets SET used_at = ?
+            WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+            RETURNING user_id
+        `).get(time, hashToken(token), time);
+        if (!row) {
+            db.exec('ROLLBACK');
+            return false;
+        }
+        db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), row.user_id);
+        db.prepare('DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL').run(row.user_id);
+        db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id);
+        db.exec('COMMIT');
+        return true;
+    } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+    }
 }
 
 // --- Carousels (ownership and gallery metadata) ---

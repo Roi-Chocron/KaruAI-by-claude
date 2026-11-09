@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createUser, UserInputError } from '@/lib/db';
 import { publicUser, startSession } from '@/lib/auth';
+import { checkRateLimits, clientIp, tooManyRequests } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
     if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string') {
         return NextResponse.json({ error: 'Please fill in your name, email and password.' }, { status: 400 });
     }
+    const retryAfter = checkRateLimits([['registerIp', clientIp(request)]]);
+    if (retryAfter) return tooManyRequests(retryAfter);
     try {
         const user = createUser({ name, email, password });
         await startSession(user.id);

@@ -128,7 +128,7 @@ export default function AuthPage({ initialMode = 'login' }: AuthPageProps) {
                 <label className="block text-sm font-medium text-slate-700">Password</label>
                 {isLogin && (
                   <Link
-                    href="/reset-password"
+                    href="/forgot-password"
                     className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium"
                   >
                     Forgot password?

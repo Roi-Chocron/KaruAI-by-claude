@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { generatePollinationsImage } from '@/lib/image-generator';
 import { getCurrentUser, unauthorized } from '@/lib/auth';
 import { getSetting } from '@/lib/db';
+import { checkRateLimits, tooManyRequests } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,10 @@ function errorResponse(message: string, status: number) {
 export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return unauthorized();
+
+    // Every request is a paid Pollinations call
+    const retryAfter = checkRateLimits([['imagesUserMinute', user.id], ['imagesUserDay', user.id]]);
+    if (retryAfter) return tooManyRequests(retryAfter);
 
     let body: unknown;
     try {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { authenticate } from '@/lib/db';
+import { authenticate, normalizeEmail } from '@/lib/db';
 import { publicUser, startSession } from '@/lib/auth';
+import { checkRateLimits, clientIp, tooManyRequests } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
     if (typeof body?.email !== 'string' || typeof body?.password !== 'string') {
         return NextResponse.json({ error: 'Please enter your email and password.' }, { status: 400 });
     }
+    // Per IP against password spraying, per email against guessing one account's password from many IPs
+    const retryAfter = checkRateLimits([['loginIp', clientIp(request)], ['loginEmail', normalizeEmail(body.email)]]);
+    if (retryAfter) return tooManyRequests(retryAfter);
     const user = authenticate(body.email, body.password);
     if (!user) {
         // Same answer for an unknown email and a wrong password, so accounts cannot be probed

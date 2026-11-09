@@ -3,6 +3,7 @@ import { generateKaruResponse, KARU_SYSTEM_PROMPT } from '@/lib/gemini';
 import { CarouselNotFoundError, chatHistoryFile, getOwnedCarousel } from '@/lib/carousel-store';
 import { getCurrentUser, unauthorized } from '@/lib/auth';
 import { DEFAULT_GEMINI_MODEL, getSetting } from '@/lib/db';
+import { checkRateLimits, tooManyRequests } from '@/lib/rate-limit';
 import type { KaruResponse } from '@/types';
 
 // The utility reads/writes the history file with `fs`, so this must run on the Node.js runtime
@@ -47,6 +48,10 @@ function formatWait(seconds: number | undefined) {
 export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return unauthorized();
+
+    // Every message is a paid Gemini call
+    const retryAfter = checkRateLimits([['chatUserMinute', user.id], ['chatUserDay', user.id]]);
+    if (retryAfter) return tooManyRequests(retryAfter);
 
     // 1. Validate the request body
     let body: unknown;

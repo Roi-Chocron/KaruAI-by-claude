@@ -1,16 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export default function ResetPasswordPage() {
-  const [email, setEmail] = useState('');
+  // The token arrives in the link's fragment (#token=...), which the server and analytics never see.
+  // null = not read yet, '' = the link has no token.
+  const [token, setToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    const fromLink = new URLSearchParams(window.location.hash.slice(1)).get('token');
+    if (fromLink) {
+      setToken(fromLink);
+      // Take the token out of the address bar and browser history
+      window.history.replaceState(null, '', window.location.pathname);
+    } else {
+      // Keeps a token already read (React runs this effect twice in development)
+      setToken((current) => current ?? '');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +46,7 @@ export default function ResetPasswordPage() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, newPassword }),
+        body: JSON.stringify({ token, newPassword }),
       });
 
       const data = await res.json().catch(() => null);
@@ -76,7 +90,7 @@ export default function ResetPasswordPage() {
             Reset Password
           </h1>
           <p className="text-slate-500 text-sm">
-            Enter your account email and choose a new password.
+            Choose a new password for your account.
           </p>
         </div>
 
@@ -93,25 +107,13 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white shadow-sm text-sm"
-                placeholder="name@example.com"
-              />
-            </div>
+        {token === '' ? (
+          <div className="p-4 rounded-xl text-sm border bg-red-50 border-red-200 text-red-700">
+            This reset link is incomplete. Please{' '}
+            <Link href="/forgot-password" className="font-semibold underline">request a new one</Link>.
           </div>
-
+        ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* New Password */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
@@ -158,7 +160,7 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !token}
             className="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5 mt-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
           >
             {isLoading ? (
@@ -171,6 +173,7 @@ export default function ResetPasswordPage() {
             )}
           </button>
         </form>
+        )}
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <Link
