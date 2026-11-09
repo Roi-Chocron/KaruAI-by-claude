@@ -16,3 +16,9 @@ next-env.d.ts
 *.tsbuildinfo
 .chrome-pids.json
 
+
+# Sentry Config File
+.env.sentry-build-plugin
+
+# Editor-local settings
+.vscode/
