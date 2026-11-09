@@ -5,6 +5,7 @@ import auth from './routes/auth';
 import carousels from './routes/carousels';
 import ai from './routes/ai';
 import admin from './routes/admin';
+import account from './routes/account';
 
 // The API. Cloudflare serves the static pages from out/ itself and only runs this Worker for /api/* (see wrangler.jsonc).
 const app = createApp().basePath('/api');
@@ -13,6 +14,7 @@ app.use('*', sameOrigin);
 app.route('/auth', auth);
 app.route('/carousels', carousels);
 app.route('/admin', admin);
+app.route('/account', account);
 app.route('/', ai);
 
 app.notFound(c => c.json({ error: 'Not found.' }, 404));

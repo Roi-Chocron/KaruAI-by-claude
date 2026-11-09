@@ -7,8 +7,7 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: "https://3b49659ca01cbe5462cdcd1ff862698e@o4512394649927680.ingest.de.sentry.io/4512394658971728",
 
-  // Add optional integrations for additional features
-  integrations: [Sentry.replayIntegration()],
+  // Session Replay is added by AnalyticsProvider once the visitor accepts analytics cookies
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,

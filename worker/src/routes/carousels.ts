@@ -4,7 +4,7 @@ import {
     deleteCarouselFiles, HistoryOutOfSyncError, IMAGE_TYPES, isCarouselId, MAX_IMAGE_BYTES, readCarouselDocument,
     readHistory, readImage, readThumbnail, saveHistory, saveImage, writeCarouselDocument, writeThumbnail,
 } from '../storage';
-import { createApp, errorJson, requireUser, type AppContext } from '../app';
+import { createApp, errorJson, requireUser, useQuota, type AppContext } from '../app';
 
 // The gallery and the editor's storage. Request and response bodies that are files (the document, images,
 // thumbnails) are streamed between the browser and R2 without being parsed, which keeps the Worker's CPU time low.
@@ -32,7 +32,11 @@ carousels.use('*', requireUser);
 // The signed-in user's carousels, most recently edited first
 carousels.get('/', async c => c.json({ carousels: await listCarouselRows(c.env.DB, c.get('user').id) }));
 
-carousels.post('/', async c => c.json(await insertCarousel(c.env.DB, crypto.randomUUID(), c.get('user').id), 201));
+carousels.post('/', async c => {
+    const quota = await useQuota(c, 'carousels');
+    if (quota) return quota;
+    return c.json(await insertCarousel(c.env.DB, crypto.randomUUID(), c.get('user').id), 201);
+});
 
 carousels.get('/:id', async c => {
     const meta = await ownedCarousel(c);

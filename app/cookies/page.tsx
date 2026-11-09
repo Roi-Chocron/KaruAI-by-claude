@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, Cookie, ShieldCheck, BarChart3, Sliders, AlertCircle } from 'lucide-react';
+import { CookieSettingsButton } from '@/components/cookie-banner';
 
 export const metadata = {
   title: 'Cookie & Tracking Policy - KaruAI',
@@ -85,7 +86,25 @@ export default function CookiesPage() {
                         <td className="p-2.5 font-mono text-blue-600">karu_session</td>
                         <td className="p-2.5">KaruAI (First-party)</td>
                         <td className="p-2.5">Secure HTTP-only session token to authenticate logged-in users and safeguard account access.</td>
-                        <td className="p-2.5">Session / 30 Days</td>
+                        <td className="p-2.5">30 days</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-mono text-blue-600">karu_signed_in</td>
+                        <td className="p-2.5">KaruAI (First-party)</td>
+                        <td className="p-2.5">Tells the site that you are signed in, so the home page can open your carousels. Contains no personal data.</td>
+                        <td className="p-2.5">30 days</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-mono text-blue-600">karu_oauth</td>
+                        <td className="p-2.5">KaruAI (First-party)</td>
+                        <td className="p-2.5">Protects the Google sign-in against forgery while you are signing in.</td>
+                        <td className="p-2.5">10 minutes</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 font-mono text-blue-600">karu_consent</td>
+                        <td className="p-2.5">KaruAI (First-party)</td>
+                        <td className="p-2.5">Remembers your cookie choice.</td>
+                        <td className="p-2.5">1 year</td>
                       </tr>
                     </tbody>
                   </table>
@@ -174,10 +193,12 @@ export default function CookiesPage() {
               Most modern web browsers allow you to control cookie settings through their preferences:
             </p>
             <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
+              <li>Analytics cookies and session recordings are used only after you choose &quot;Accept all&quot; in the cookie banner. You can change your choice at any time with the button below.</li>
               <li>You can configure your browser to block or alert you about all cookies.</li>
               <li>You can clear existing cookies and cached local storage at any time via your browser settings.</li>
               <li>Please note: Blocking essential session cookies will prevent you from signing in and generating carousels on KaruAI.</li>
             </ul>
+            <CookieSettingsButton />
           </section>
 
           <section className="space-y-3">

@@ -16,3 +16,6 @@ POLLINATIONS_API_KEY=
 
 # Optional: Sentry DSN for errors in the API Worker
 SENTRY_DSN=
+
+# Local only: shows a "Dev login" form so you can sign in without Google. Ignored unless APP_URL is localhost.
+DEV_LOGIN=true

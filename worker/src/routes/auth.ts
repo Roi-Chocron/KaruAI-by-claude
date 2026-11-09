@@ -1,6 +1,9 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import { publicUser, randomToken, upsertGoogleUser } from '../db';
-import { clearSessionCookies, clientIp, createApp, currentUser, endSession, errorJson, isSecure, rateLimit, startSession, type AppContext } from '../app';
+import { normalizeEmail, publicUser, randomToken, upsertDevUser, upsertGoogleUser } from '../db';
+import {
+    clearSessionCookies, clientIp, createApp, currentUser, devLoginEnabled, endSession, errorJson, isSecure, rateLimit, startSession,
+    SUSPENDED_MESSAGE, type AppContext,
+} from '../app';
 
 // Sign-in with Google (OAuth 2.0 authorization code flow with PKCE). There are no passwords.
 
@@ -107,16 +110,35 @@ auth.get('/google/callback', async c => {
         name: typeof claims.name === 'string' ? claims.name : claims.email.split('@')[0],
         picture: typeof claims.picture === 'string' ? claims.picture : null,
     }, c.env.ADMIN_EMAIL);
+    if (user.suspendedAt) return loginError(c, 'suspended');
     await startSession(c, user.id);
     return c.redirect(`${c.env.APP_URL}${saved.next}`);
+});
+
+// Which sign-in methods the login page should offer
+auth.get('/providers', c => c.json({
+    google: !!(c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET),
+    devLogin: devLoginEnabled(c.env),
+}));
+
+// Local development only: signs in with just an email, so the app can be used without a Google OAuth client
+auth.post('/dev-login', async c => {
+    if (!devLoginEnabled(c.env)) return errorJson(c, 'Not found.', 404);
+    const body: any = await c.req.json().catch(() => null);
+    const email = typeof body?.email === 'string' ? normalizeEmail(body.email) : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return errorJson(c, 'Please enter a valid email address.', 400);
+    const user = await upsertDevUser(c.env.DB, email, c.env.ADMIN_EMAIL);
+    if (user.suspendedAt) return errorJson(c, SUSPENDED_MESSAGE, 403, { code: 'suspended' });
+    await startSession(c, user.id);
+    return c.json({ user: publicUser(user) });
 });
 
 // The signed-in user, for the pages (which are static and cannot read the session themselves)
 auth.get('/me', async c => {
     const user = await currentUser(c);
-    if (!user) {
+    if (!user || user.suspendedAt) {
         clearSessionCookies(c);
-        return errorJson(c, 'Please sign in.', 401);
+        return user ? errorJson(c, SUSPENDED_MESSAGE, 403, { code: 'suspended' }) : errorJson(c, 'Please sign in.', 401);
     }
     c.header('Cache-Control', 'no-store');
     return c.json({ user: publicUser(user) });

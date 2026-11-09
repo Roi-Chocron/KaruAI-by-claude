@@ -2,13 +2,14 @@ import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { User } from '../../types';
-import { createSession, deleteSession, getUserBySession, hitRateWindow, addUsage, SESSION_DAYS, type UsageColumn } from './db';
+import { PLANS, type PlanLimits } from '../../shared/plans';
+import { addUsage, createSession, deleteSession, getMonthlyUsage, getUserBySession, hitRateWindow, SESSION_DAYS, type UsageColumn } from './db';
 
 export type AppEnv = { Bindings: Env; Variables: { user: User } };
 export type AppContext = Context<AppEnv>;
 export const createApp = () => new Hono<AppEnv>();
 
-export const errorJson = (c: AppContext, message: string, status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 502 | 503, extra?: Record<string, unknown>) =>
+export const errorJson = (c: AppContext, message: string, status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 502 | 503, extra?: Record<string, unknown>) =>
     c.json({ error: message, ...extra }, status);
 
 // --- Sessions ---
@@ -43,15 +44,24 @@ export async function currentUser(c: AppContext): Promise<User | null> {
     return token ? getUserBySession(c.env.DB, token) : null;
 }
 
+export const SUSPENDED_MESSAGE = 'This account is suspended. Please contact support.';
+
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
     const user = await currentUser(c);
-    if (!user) {
+    if (!user || user.suspendedAt) {
         clearSessionCookies(c);
-        return errorJson(c, 'Please sign in.', 401);
+        return user ? errorJson(c, SUSPENDED_MESSAGE, 403, { code: 'suspended' }) : errorJson(c, 'Please sign in.', 401);
     }
     c.set('user', user);
     await next();
 });
+
+// The "Dev login" form works only on a local address with DEV_LOGIN=true, so a forgotten flag cannot open
+// production to anyone who types an email
+export function devLoginEnabled(env: Env): boolean {
+    const hostname = new URL(env.APP_URL).hostname;
+    return (env as { DEV_LOGIN?: string }).DEV_LOGIN === 'true' && (hostname === 'localhost' || hostname === '127.0.0.1');
+}
 
 // Use after requireUser
 export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
@@ -80,11 +90,6 @@ export const LIMITS = {
     imagesUser: { limit: 30, windowMs: MINUTE },
 } as const;
 
-// Requests per user per UTC day. Plan-specific limits will come from the user's subscription.
-export const DAILY_LIMITS: Record<UsageColumn, number> = {
-    chat_requests: 500,
-    image_requests: 500,
-};
 
 // Cloudflare sets this header itself, so a client cannot fake it
 export const clientIp = (c: AppContext) => c.req.header('cf-connecting-ip') ?? 'unknown';
@@ -103,12 +108,36 @@ export async function rateLimit(c: AppContext, rule: keyof typeof LIMITS, subjec
     return tooManyRequests(c, Math.max(1, Math.ceil((resetsAt - Date.now()) / 1000)));
 }
 
-// Counts the request against today's quota; a 429 response when the quota is used up, else null
-export async function dailyQuota(c: AppContext, column: UsageColumn): Promise<Response | null> {
-    const total = await addUsage(c.env.DB, c.get('user').id, column);
-    if (total <= DAILY_LIMITS[column]) return null;
-    const midnight = new Date();
-    midnight.setUTCHours(24, 0, 0, 0);
-    const seconds = Math.ceil((midnight.getTime() - Date.now()) / 1000);
-    return tooManyRequests(c, seconds, `You reached today's limit of ${DAILY_LIMITS[column]} requests. It resets at midnight UTC.`);
+// --- Plan quotas (monthly, see shared/plans.ts) ---
+
+const QUOTAS = {
+    carousels: { column: 'carousels_created', usage: 'carousels', limit: 'carouselsPerMonth', noun: 'new carousels' },
+    messages: { column: 'chat_requests', usage: 'messages', limit: 'aiMessagesPerMonth', noun: 'AI messages' },
+    images: { column: 'image_requests', usage: 'images', limit: 'aiImagesPerMonth', noun: 'AI images' },
+} as const satisfies Record<string, { column: UsageColumn; usage: string; limit: keyof PlanLimits; noun: string }>;
+
+export type QuotaKind = keyof typeof QUOTAS;
+
+// A 402 response when the user's plan has no `kind` left this month, else null. Unless `count` is false it also
+// counts this use; AI requests pass false and call countUsage() only once they succeeded, so failed or retried
+// requests cost nothing. Admins are counted but never limited.
+export async function useQuota(c: AppContext, kind: QuotaKind, count = true): Promise<Response | null> {
+    const user = c.get('user');
+    const quota = QUOTAS[kind];
+    const plan = PLANS[user.plan] ?? PLANS.free;
+    const limit = plan.limits[quota.limit];
+    if (limit !== null && user.role !== 'admin') {
+        const used = (await getMonthlyUsage(c.env.DB, user.id))[quota.usage];
+        if (used >= limit) {
+            return errorJson(c,
+                `You used all ${limit} ${quota.noun} of the ${plan.name} plan this month. Upgrade your plan or wait for next month.`,
+                402, { code: 'quota_exceeded', kind, limit, upgradeUrl: '/billing', retryable: false });
+        }
+    }
+    if (count) await addUsage(c.env.DB, user.id, quota.column);
+    return null;
+}
+
+export async function countUsage(c: AppContext, kind: QuotaKind) {
+    await addUsage(c.env.DB, c.get('user').id, QUOTAS[kind].column);
 }

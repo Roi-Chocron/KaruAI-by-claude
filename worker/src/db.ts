@@ -1,4 +1,5 @@
-import type { CarouselRow, PublicUser, Role, SettingKey, User } from '../../types';
+import type { CarouselRow, MonthlyUsage, PublicUser, Role, SettingKey, User } from '../../types';
+import type { PlanId } from '../../shared/plans';
 
 // D1 queries for users, sessions, carousel ownership, settings, rate limits and usage.
 // Carousel contents (slides, images, histories) live in R2 (see storage.ts).
@@ -14,13 +15,15 @@ const toUser = (row: any): User => ({
     name: row.name,
     avatarUrl: row.avatar_url ?? null,
     role: row.role,
+    plan: row.plan ?? 'free',
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at ?? null,
     lastSeenAt: row.last_seen_at ?? null,
+    suspendedAt: row.suspended_at ?? null,
 });
 
 export const publicUser = (user: User): PublicUser =>
-    ({ id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role });
+    ({ id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role, plan: user.plan });
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -54,17 +57,75 @@ export async function upsertGoogleUser(
     return (await getUserById(db, id))!;
 }
 
-export async function listUsersWithStats(db: D1Database): Promise<(User & { carouselCount: number })[]> {
+// Local development only (see routes/auth.ts): signs in by email alone, creating the account if needed
+export async function upsertDevUser(db: D1Database, email: string, adminEmail: string | undefined): Promise<User> {
+    const normalized = normalizeEmail(email);
+    const time = now();
+    const makeAdmin = !!adminEmail && normalizeEmail(adminEmail) === normalized;
+    const existing: any = await db.prepare('SELECT id FROM users WHERE email = ?').bind(normalized).first();
+    const id = existing?.id ?? crypto.randomUUID();
+    if (existing) {
+        await db.prepare("UPDATE users SET role = CASE WHEN ? THEN 'admin' ELSE role END, last_login_at = ?, last_seen_at = ? WHERE id = ?")
+            .bind(makeAdmin ? 1 : 0, time, time, id).run();
+    } else {
+        await db.prepare(`INSERT INTO users (id, email, name, role, created_at, last_login_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .bind(id, normalized, normalized.split('@')[0], makeAdmin ? 'admin' : 'user', time, time, time).run();
+    }
+    return (await getUserById(db, id))!;
+}
+
+export async function updateUserName(db: D1Database, id: string, name: string) {
+    await db.prepare('UPDATE users SET name = ? WHERE id = ?').bind(name.trim().slice(0, 100), id).run();
+}
+
+export async function countAdmins(db: D1Database): Promise<number> {
+    return Number((await db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").first<{ count: number }>())?.count ?? 0);
+}
+
+export type AdminUserRow = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'> };
+
+// Every user with their carousel count and this month's usage
+export async function listUsersWithStats(db: D1Database): Promise<AdminUserRow[]> {
     const { results } = await db.prepare(`
-        SELECT users.*, COUNT(carousels.id) AS carousel_count
-        FROM users LEFT JOIN carousels ON carousels.owner_id = users.id
+        SELECT users.*,
+            (SELECT COUNT(*) FROM carousels WHERE carousels.owner_id = users.id) AS carousel_count,
+            COALESCE(SUM(usage_daily.carousels_created), 0) AS month_carousels,
+            COALESCE(SUM(usage_daily.chat_requests), 0) AS month_messages,
+            COALESCE(SUM(usage_daily.image_requests), 0) AS month_images,
+            COALESCE(SUM(usage_daily.tokens), 0) AS month_tokens
+        FROM users LEFT JOIN usage_daily ON usage_daily.user_id = users.id AND usage_daily.day >= ?
         GROUP BY users.id ORDER BY users.created_at DESC
-    `).all();
-    return results.map((row: any) => ({ ...toUser(row), carouselCount: Number(row.carousel_count) }));
+    `).bind(monthStart()).all();
+    return results.map((row: any) => ({
+        ...toUser(row),
+        carouselCount: Number(row.carousel_count),
+        usage: {
+            carousels: Number(row.month_carousels),
+            messages: Number(row.month_messages),
+            images: Number(row.month_images),
+            tokens: Number(row.month_tokens),
+        },
+    }));
 }
 
 export async function setUserRole(db: D1Database, id: string, role: Role) {
     await db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id).run();
+}
+
+export async function setUserPlan(db: D1Database, id: string, plan: PlanId) {
+    await db.prepare('UPDATE users SET plan = ? WHERE id = ?').bind(plan, id).run();
+}
+
+// A suspended user is signed out everywhere and cannot sign in again until unsuspended
+export async function setUserSuspended(db: D1Database, id: string, suspended: boolean) {
+    await db.batch([
+        db.prepare('UPDATE users SET suspended_at = ? WHERE id = ?').bind(suspended ? now() : null, id),
+        ...(suspended ? [db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id)] : []),
+    ]);
+}
+
+export async function deleteUserSessions(db: D1Database, userId: string) {
+    await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
 }
 
 // Deletes the user with their sessions and carousel rows; returns the carousel ids so their files can go too
@@ -213,7 +274,57 @@ export async function hitRateWindow(db: D1Database, key: string, windowMs: numbe
     return { count: Number(row?.count ?? 1), resetsAt: windowStart + windowMs };
 }
 
-export type UsageColumn = 'chat_requests' | 'image_requests';
+export type UsageColumn = 'carousels_created' | 'chat_requests' | 'image_requests';
+
+// The first day of this calendar month (UTC), as stored in usage_daily.day
+export const monthStart = () => `${today().slice(0, 7)}-01`;
+
+export async function getMonthlyUsage(db: D1Database, userId: string): Promise<MonthlyUsage> {
+    const row: any = await db.prepare(`SELECT COALESCE(SUM(carousels_created), 0) AS carousels, COALESCE(SUM(chat_requests), 0) AS messages,
+        COALESCE(SUM(image_requests), 0) AS images, COALESCE(SUM(tokens), 0) AS tokens
+        FROM usage_daily WHERE user_id = ? AND day >= ?`).bind(userId, monthStart()).first();
+    return {
+        month: today().slice(0, 7),
+        carousels: Number(row?.carousels ?? 0),
+        messages: Number(row?.messages ?? 0),
+        images: Number(row?.images ?? 0),
+        tokens: Number(row?.tokens ?? 0),
+    };
+}
+
+// Every usage row of the user, for the data export
+export async function listUsage(db: D1Database, userId: string) {
+    return (await db.prepare('SELECT day, carousels_created, chat_requests, image_requests, tokens FROM usage_daily WHERE user_id = ? ORDER BY day')
+        .bind(userId).all()).results;
+}
+
+// The numbers on the admin dashboard
+export async function getAdminStats(db: D1Database) {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const twoWeeksAgo = new Date(Date.now() - 13 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const [totals, plans, month, daily] = await db.batch([
+        db.prepare(`SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM users WHERE last_seen_at >= ?) AS active_week,
+            (SELECT COUNT(*) FROM users WHERE suspended_at IS NOT NULL) AS suspended, (SELECT COUNT(*) FROM carousels) AS carousels`).bind(weekAgo),
+        db.prepare('SELECT plan, COUNT(*) AS count FROM users GROUP BY plan'),
+        db.prepare(`SELECT COALESCE(SUM(carousels_created), 0) AS carousels, COALESCE(SUM(chat_requests), 0) AS messages,
+            COALESCE(SUM(image_requests), 0) AS images, COALESCE(SUM(tokens), 0) AS tokens FROM usage_daily WHERE day >= ?`).bind(monthStart()),
+        db.prepare(`SELECT day, SUM(chat_requests) AS messages, SUM(image_requests) AS images, SUM(tokens) AS tokens
+            FROM usage_daily WHERE day >= ? GROUP BY day ORDER BY day`).bind(twoWeeksAgo),
+    ]);
+    const t: any = totals.results[0];
+    const m: any = month.results[0];
+    return {
+        users: Number(t.users),
+        activeLast7Days: Number(t.active_week),
+        suspended: Number(t.suspended),
+        carousels: Number(t.carousels),
+        plans: Object.fromEntries(plans.results.map((row: any) => [row.plan, Number(row.count)])),
+        month: { carousels: Number(m.carousels), messages: Number(m.messages), images: Number(m.images), tokens: Number(m.tokens) },
+        daily: daily.results.map((row: any) => ({
+            day: row.day, messages: Number(row.messages), images: Number(row.images), tokens: Number(row.tokens),
+        })),
+    };
+}
 
 // Counts one request of today's usage and returns today's total for that column
 export async function addUsage(db: D1Database, userId: string, column: UsageColumn): Promise<number> {

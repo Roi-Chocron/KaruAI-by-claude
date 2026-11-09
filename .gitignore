@@ -28,3 +28,4 @@ out/
 .wrangler/
 .dev.vars
 worker/worker-configuration.d.ts
+worker-configuration.d.ts

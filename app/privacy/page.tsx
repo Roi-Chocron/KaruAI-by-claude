@@ -58,52 +58,60 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-bold text-slate-900">2. Information We Collect</h2>
             <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
               <li>
-                <strong>Account Details:</strong> Email address, user name, and securely hashed passwords (using Scrypt).
+                <strong>Account Details:</strong> When you sign in with Google we receive your name, email address, profile picture and Google account ID. We never see or store a password.
               </li>
               <li>
-                <strong>User Content:</strong> Prompts, carousel slide text, uploaded assets, and generated images stored in your workspace.
+                <strong>User Content:</strong> Your prompts, carousel slides and text, uploaded images, generated images, and the editing and conversation history of each carousel.
               </li>
               <li>
-                <strong>Billing Data:</strong> Payment details are processed securely through accredited payment processors; we do not store full credit card numbers on our servers.
+                <strong>Usage Data:</strong> How many carousels, AI messages and AI images you use each month, and the AI tokens they consume, so we can apply your plan&apos;s limits.
               </li>
               <li>
-                <strong>Technical Information:</strong> IP address, browser type, device details, and authentication session cookies to maintain your login.
+                <strong>Technical Information:</strong> Your IP address (used for rate limiting and security), browser type, and the session cookie that keeps you signed in.
+              </li>
+              <li>
+                <strong>Analytics:</strong> Only if you accept analytics cookies: how you use the site (page views, clicks and, in production, masked session recordings).
               </li>
             </ul>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-slate-900">3. How We Use Information</h2>
-            <p className="leading-relaxed text-slate-600">
-              We collect and use your data for the following purposes:
-            </p>
             <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
-              <li>To provide, operate, and maintain the AI carousel generator service.</li>
-              <li>To manage your account, authenticate sessions, and protect against unauthorized access.</li>
-              <li>To handle payments, issue invoices, and manage subscription tiers.</li>
-              <li>To deliver technical support and respond to customer inquiries.</li>
-              <li>To enhance platform performance, AI prompts, and user experience.</li>
+              <li>To provide the AI carousel generator: designing slides from your prompts and generating images.</li>
+              <li>To manage your account and sessions and protect the service against abuse.</li>
+              <li>To apply the limits of your plan and, once payments are available, to manage your subscription.</li>
+              <li>To answer support requests.</li>
+              <li>With your consent, to understand how KaruAI is used and improve it.</li>
             </ul>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-slate-900">4. Sharing of Information</h2>
+            <h2 className="text-xl font-bold text-slate-900">4. Service Providers</h2>
             <p className="leading-relaxed text-slate-600">
-              We never sell or rent your personal information. We may share necessary data with trusted service providers strictly to perform essential operations (such as cloud hosting, AI model API inference, and payment processing), or if required by law.
+              We never sell or rent your personal information. We share data only with providers that run parts of the service for us:
             </p>
+            <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
+              <li><strong>Cloudflare</strong> hosts the application and stores your account and carousels.</li>
+              <li><strong>Google</strong> handles sign-in, and its Gemini API receives your prompts and current carousel to design the slides.</li>
+              <li><strong>Pollinations.ai</strong> receives the image descriptions (not your account details) to generate slide images.</li>
+              <li><strong>Sentry</strong> receives error reports so we can fix problems.</li>
+              <li><strong>PostHog, Google Analytics and Microsoft Clarity</strong> receive usage analytics, only if you accept analytics cookies.</li>
+              <li>A payment provider will process payments once paid plans open; we will never store full card numbers.</li>
+            </ul>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-slate-900">5. Data Security</h2>
+            <h2 className="text-xl font-bold text-slate-900">5. Data Security and Retention</h2>
             <p className="leading-relaxed text-slate-600">
-              We implement industry-standard technical measures, including TLS/HTTPS encryption in transit and secure cryptographic hashing for passwords, to safeguard your information against unauthorized access, loss, or disclosure.
+              All traffic is encrypted with HTTPS. Session cookies are HttpOnly and only a hash of each session token is stored. We keep your data while your account exists; daily usage records are deleted after a year. When you delete your account, your carousels and images are deleted too.
             </p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-slate-900">6. Your Rights</h2>
             <p className="leading-relaxed text-slate-600">
-              You have the right to access your personal data, request corrections, or request deletion of your account and related carousels at any time by reaching out to our support team.
+              You can download all your data and delete your account at any time on the <Link href="/account" className="text-blue-600 underline">Account</Link> page, and change your cookie choices on the <Link href="/cookies" className="text-blue-600 underline">Cookie Policy</Link> page. For corrections or any other request, contact us.
             </p>
           </section>
 

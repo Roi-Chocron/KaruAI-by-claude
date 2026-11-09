@@ -2,7 +2,7 @@ import { addTokens, DEFAULT_GEMINI_MODEL, getCarouselRow, getSetting, lockCarous
 import { chatHistoryKey, isCarouselId } from '../storage';
 import { generateKaruResponse } from '../gemini';
 import { generatePollinationsImage, ImageServiceError } from '../images';
-import { createApp, dailyQuota, errorJson, rateLimit, requireUser } from '../app';
+import { countUsage, createApp, errorJson, rateLimit, requireUser, useQuota } from '../app';
 
 const MAX_CAROUSEL_CHARS = 400_000;
 // Longer than any Gemini request takes, so a Worker that dies mid-request only blocks the carousel briefly
@@ -61,7 +61,7 @@ ai.post('/chat', requireUser, async c => {
         return errorJson(c, 'KaruAI is still answering the previous message.', 429, { retryable: true, retryAfterSeconds: 5 });
     }
     try {
-        const quota = await dailyQuota(c, 'chat_requests');
+        const quota = await useQuota(c, 'messages', false);
         if (quota) return quota;
         const [modelName, apiKey] = await Promise.all([getSetting(c.env, 'gemini_model'), getSetting(c.env, 'gemini_api_key')]);
         const result = await generateKaruResponse({
@@ -72,7 +72,7 @@ ai.post('/chat', requireUser, async c => {
             historyKey: chatHistoryKey(carouselRow.id),
             turnContext,
         });
-        c.executionCtx.waitUntil(addTokens(c.env.DB, user.id, result.currentRequestTokens));
+        c.executionCtx.waitUntil(Promise.all([countUsage(c, 'messages'), addTokens(c.env.DB, user.id, result.currentRequestTokens)]));
         return c.json(result);
     } catch (error: any) {
         console.error('[api/chat] generateKaruResponse failed:', error);
@@ -118,7 +118,7 @@ ai.post('/images', requireUser, async c => {
         return errorJson(c, '`width` and `height` must be integers between 64 and 2048.', 400);
     }
 
-    const quota = await dailyQuota(c, 'image_requests');
+    const quota = await useQuota(c, 'images', false);
     if (quota) return quota;
     try {
         const image = await generatePollinationsImage(prompt.trim(), {
@@ -127,6 +127,7 @@ ai.post('/images', requireUser, async c => {
             safe: true,
             apiKey: await getSetting(c.env, 'pollinations_api_key'),
         });
+        c.executionCtx.waitUntil(countUsage(c, 'images'));
         return new Response(image.body, { headers: { 'Content-Type': image.headers.get('content-type')!, 'Cache-Control': 'no-store' } });
     } catch (error) {
         console.error('[api/images] generatePollinationsImage failed:', error);

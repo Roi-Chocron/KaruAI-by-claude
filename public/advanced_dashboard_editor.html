@@ -2086,6 +2086,39 @@
 
         const slideFileName = (index) => `karuai-slide-${String(index + 1).padStart(2, '0')}.png`;
 
+        // Plans with a watermark (see shared/plans.ts) get a small "Made with KaruAI" mark on downloaded slides.
+        // Starts on, and loadExportPlan() turns it off for plans without one.
+        let exportWatermark = true;
+        async function loadExportPlan() {
+            const response = await fetch('/api/account').catch(() => null);
+            const data = response?.ok ? await response.json().catch(() => null) : null;
+            if (data?.plan) exportWatermark = data.plan.watermark === true && data.user?.role !== 'admin';
+        }
+
+        function addWatermark(canvas) {
+            if (!exportWatermark) return canvas;
+            const context = canvas.getContext('2d');
+            const text = 'Made with KaruAI';
+            context.save();
+            context.font = '600 26px Inter, Arial, sans-serif';
+            const width = context.measureText(text).width + 36;
+            const x = canvas.width - width - 28;
+            const y = canvas.height - 28 - 48;
+            context.globalAlpha = 0.75;
+            context.fillStyle = '#111827';
+            context.beginPath();
+            context.roundRect(x, y, width, 48, 24);
+            context.fill();
+            context.globalAlpha = 1;
+            context.fillStyle = '#ffffff';
+            context.textBaseline = 'middle';
+            context.fillText(text, x + 18, y + 25);
+            context.restore();
+            return canvas;
+        }
+
+        const renderSlideForExport = async (elements) => addWatermark(await renderSlideToCanvas(elements));
+
         let isExporting = false;
         async function runExport(task) {
             if (isExporting) return;
@@ -2105,7 +2138,7 @@
         function downloadCurrentSlide() {
             return runExport(async () => {
                 const elements = slidesForExport()[state.currentSlide] ?? state.elements;
-                saveBlob(await canvasToBlob(await renderSlideToCanvas(elements)), slideFileName(state.currentSlide));
+                saveBlob(await canvasToBlob(await renderSlideForExport(elements)), slideFileName(state.currentSlide));
             });
         }
 
@@ -2115,7 +2148,7 @@
                 const zip = new JSZip();
                 const slides = slidesForExport();
                 for (const [index, elements] of slides.entries()) {
-                    zip.file(slideFileName(index), await canvasToBlob(await renderSlideToCanvas(elements)));
+                    zip.file(slideFileName(index), await canvasToBlob(await renderSlideForExport(elements)));
                 }
                 saveBlob(await zip.generateAsync({ type: 'blob' }), 'karuai-carousel.zip');
             });
@@ -2386,6 +2419,7 @@
         switchRightTab('chat');
         renderAll();
         loadCarousel().catch(error => showLoadError(error instanceof Error ? error.message : 'Could not load the carousel.'));
+        loadExportPlan();
     </script>
 </body>
 </html>

@@ -62,6 +62,12 @@ export default function Gallery({ user }: { user: PublicUser }) {
     try {
       const res = await fetch('/api/carousels', { method: 'POST' });
       const data = await res.json().catch(() => null);
+      if (res.status === 402) {
+        // The plan's monthly carousel limit is used up
+        setIsCreating(false);
+        if (confirm(`${data?.error ?? 'Your plan limit is reached.'}\n\nSee the plans?`)) router.push('/billing');
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
       router.push(`/carousel?id=${data.id}`);
     } catch (err) {
@@ -98,10 +104,20 @@ export default function Gallery({ user }: { user: PublicUser }) {
               <Shield size={16} /> Admin
             </a>
           )}
-          <div className="text-right leading-tight">
-            <p className="text-sm font-semibold text-slate-800" dir="auto">{user.name || user.email}</p>
-            {user.name && <p className="text-xs text-gray-400">{user.email}</p>}
-          </div>
+          <a href="/account" title="Account" className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100">
+            <div className="text-right leading-tight">
+              <p className="text-sm font-semibold text-slate-800" dir="auto">{user.name || user.email}</p>
+              {user.name && <p className="text-xs text-gray-400">{user.email}</p>}
+            </div>
+            {user.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
+                {(user.name || user.email)[0].toUpperCase()}
+              </div>
+            )}
+          </a>
           <button onClick={logOut} title="Log out" className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
             <LogOut size={18} />
           </button>

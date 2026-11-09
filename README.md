@@ -21,7 +21,20 @@ Sign-in is with Google only. Static page requests don't run the Worker and don't
 4. `npm run dev` — applies the D1 migrations locally, then starts the Worker on :8787 and Next.js on
    http://localhost:3000 (which forwards `/api/*` to the Worker). Local D1/R2 data lives in `.wrangler/`.
 
-`npm run typecheck` checks both the site and the Worker.
+Without a Google OAuth client you can still sign in locally: with `DEV_LOGIN=true` in `.dev.vars` the login page
+shows a "Dev login" form that takes just an email. The API refuses it unless `APP_URL` is localhost.
+
+## Checks
+
+- `npm test` runs the API tests (`worker/test/`) inside the Workers runtime against in-memory D1 and R2,
+  with Gemini and Pollinations mocked.
+- `npm run typecheck` checks the site, the Worker and the tests.
+- GitHub Actions (`.github/workflows/ci.yml`) runs both plus the build on every push and pull request.
+
+## Plans
+
+Prices, limits and features live in `shared/plans.ts` (placeholder values for now). The API enforces the monthly
+limits; an admin sets each user's plan on the Admin page until payments are connected.
 
 ## Deploying (first time)
 

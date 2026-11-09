@@ -1,3 +1,5 @@
+import type { PlanId } from '../shared/plans';
+
 export type Role = 'user' | 'admin';
 
 export interface User {
@@ -6,9 +8,11 @@ export interface User {
     name: string;
     avatarUrl: string | null;
     role: Role;
+    plan: PlanId;
     createdAt: string;
     lastLoginAt: string | null;
     lastSeenAt: string | null;
+    suspendedAt: string | null;
 }
 
 export type SettingKey = 'gemini_api_key' | 'pollinations_api_key' | 'gemini_model';
@@ -36,7 +40,16 @@ export interface UndoHistory {
 }
 
 // The signed-in user as the API hands it to the browser
-export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'avatarUrl' | 'role'>;
+export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'avatarUrl' | 'role' | 'plan'>;
+
+// What a user used in a calendar month (UTC), as counted by the API
+export interface MonthlyUsage {
+    month: string;
+    carousels: number;
+    messages: number;
+    images: number;
+    tokens: number;
+}
 
 // Conversation and Carousel data types
 export interface ConversationMetrics {

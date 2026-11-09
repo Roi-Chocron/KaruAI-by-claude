@@ -53,7 +53,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-slate-900">2. Account Registration & Security</h2>
             <p className="leading-relaxed text-slate-600">
-              To access certain features of the platform, you must create an account. You agree to provide accurate, current, and complete information during registration. You are solely responsible for maintaining the confidentiality of your credentials and password, as well as for all activities that occur under your account.
+              To use the platform you sign in with a Google account. You are responsible for keeping that Google account secure and for all activities that occur under your KaruAI account. We may suspend accounts that abuse the service or break these terms.
             </p>
           </section>
 

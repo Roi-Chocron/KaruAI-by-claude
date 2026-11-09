@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, KeyRound, Loader2, Shield, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, KeyRound, Loader2, Shield, Trash2, Users } from 'lucide-react';
+import { PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
+import type { MonthlyUsage, PublicUser, User } from '@/types';
 
-type Me = { id: string; email: string; name: string; role: 'user' | 'admin' };
 type Setting = { key: string; value: string; source: 'admin' | 'env' | 'none'; envName: string; updatedAt: string | null };
-type AdminUser = Me & { createdAt: string; lastLoginAt: string | null; lastSeenAt: string | null; carouselCount: number };
+type AdminUser = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'> };
+type Stats = {
+  users: number;
+  activeLast7Days: number;
+  suspended: number;
+  carousels: number;
+  plans: Partial<Record<PlanId, number>>;
+  month: Omit<MonthlyUsage, 'month'>;
+  daily: { day: string; messages: number; images: number; tokens: number }[];
+};
 
 const SETTING_LABELS: Record<string, { label: string; help: string; secret: boolean }> = {
   gemini_api_key: { label: 'Gemini API key', help: 'Used to generate and edit carousels.', secret: true },
@@ -90,26 +100,55 @@ const SettingRow = ({ setting, onSaved }: { setting: Setting; onSaved: (setting:
   );
 };
 
-export default function AdminPanel({ me }: { me: Me }) {
+// AI requests per day over the last two weeks, as simple bars
+function DailyChart({ daily }: { daily: Stats['daily'] }) {
+  const days = Array.from({ length: 14 }, (_, i) => new Date(Date.now() - (13 - i) * 24 * 3600 * 1000).toISOString().slice(0, 10));
+  const byDay = new Map(daily.map(row => [row.day, row]));
+  const max = Math.max(1, ...daily.map(row => row.messages + row.images));
+  return (
+    <div className="flex items-end gap-1.5 h-32">
+      {days.map(day => {
+        const row = byDay.get(day);
+        const total = (row?.messages ?? 0) + (row?.images ?? 0);
+        return (
+          <div key={day} className="flex-1 h-full flex flex-col items-center gap-1" title={`${day}: ${row?.messages ?? 0} messages, ${row?.images ?? 0} images, ${(row?.tokens ?? 0).toLocaleString()} tokens`}>
+            <div className="flex-1 w-full flex items-end">
+              <div className="w-full bg-indigo-500 rounded-t" style={{ height: `${(total / max) * 100}%`, minHeight: total ? 2 : 0 }} />
+            </div>
+            <span className="text-[10px] text-gray-400">{day.slice(8)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function AdminPanel({ me }: { me: PublicUser }) {
   const [settings, setSettings] = useState<Setting[] | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
-  const [totalCarousels, setTotalCarousels] = useState(0);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     request<{ settings: Setting[] }>('/api/admin/settings').then(data => setSettings(data.settings)).catch(err => setError(err.message));
-    request<{ users: AdminUser[]; totalCarousels: number }>('/api/admin/users')
-      .then(data => { setUsers(data.users); setTotalCarousels(data.totalCarousels); })
-      .catch(err => setError(err.message));
+    request<{ users: AdminUser[] }>('/api/admin/users').then(data => setUsers(data.users)).catch(err => setError(err.message));
+    request<Stats>('/api/admin/stats').then(setStats).catch(err => setError(err.message));
   }, []);
 
-  const changeRole = async (user: AdminUser, role: 'user' | 'admin') => {
+  // Applies { role } / { plan } / { suspended } to the user
+  const updateUser = async (user: AdminUser, change: Record<string, unknown>) => {
     try {
-      await request(`/api/admin/users/${user.id}`, { method: 'PATCH', body: JSON.stringify({ role }) });
-      setUsers(prev => prev?.map(item => (item.id === user.id ? { ...item, role } : item)) ?? null);
+      const data = await request<{ user: User }>(`/api/admin/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(change) });
+      setUsers(prev => prev?.map(item => (item.id === user.id ? { ...item, ...data.user } : item)) ?? null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not change the role.');
+      alert(err instanceof Error ? err.message : 'Could not update the user.');
     }
+  };
+
+  const toggleSuspended = (user: AdminUser) => {
+    const suspend = !user.suspendedAt;
+    if (suspend && !confirm(`Suspend ${user.email}? They are signed out and cannot sign in until you unsuspend them.`)) return;
+    updateUser(user, { suspended: suspend });
   };
 
   const removeUser = async (user: AdminUser) => {
@@ -117,17 +156,20 @@ export default function AdminPanel({ me }: { me: Me }) {
     try {
       await request(`/api/admin/users/${user.id}`, { method: 'DELETE' });
       setUsers(prev => prev?.filter(item => item.id !== user.id) ?? null);
-      setTotalCarousels(count => count - user.carouselCount);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not delete the user.');
     }
   };
 
-  const stats = [
-    { label: 'Users', value: users?.length ?? '—' },
-    { label: 'Admins', value: users?.filter(user => user.role === 'admin').length ?? '—' },
-    { label: 'Carousels', value: users ? totalCarousels : '—' },
-    { label: 'Active in the last 24 h', value: users?.filter(user => user.lastSeenAt && Date.now() - Date.parse(user.lastSeenAt) < 24 * 3600 * 1000).length ?? '—' },
+  const tiles = [
+    { label: 'Users', value: stats?.users },
+    { label: 'Active in the last 7 days', value: stats?.activeLast7Days },
+    { label: 'Carousels', value: stats?.carousels },
+    { label: 'Paying plans', value: stats ? (stats.plans.pro ?? 0) + (stats.plans.agency ?? 0) : undefined },
+    { label: 'AI messages this month', value: stats?.month.messages },
+    { label: 'AI images this month', value: stats?.month.images },
+    { label: 'Tokens this month', value: stats?.month.tokens },
+    { label: 'Suspended', value: stats?.suspended },
   ];
 
   return (
@@ -145,13 +187,25 @@ export default function AdminPanel({ me }: { me: Me }) {
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map(stat => (
-            <div key={stat.label} className="bg-white border border-gray-200 rounded-2xl p-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
+          {tiles.map(tile => (
+            <div key={tile.label} className="bg-white border border-gray-200 rounded-2xl p-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{tile.label}</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{tile.value?.toLocaleString() ?? '—'}</p>
             </div>
           ))}
         </div>
+
+        {stats && (
+          <section className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <h2 className="flex items-center gap-2 font-bold text-slate-900"><BarChart3 size={18} /> AI requests, last 14 days</h2>
+              <p className="text-sm text-gray-500">
+                {PLAN_IDS.map(id => `${PLANS[id].name}: ${stats.plans[id] ?? 0}`).join(' · ')}
+              </p>
+            </div>
+            <DailyChart daily={stats.daily} />
+          </section>
+        )}
 
         <section className="bg-white border border-gray-200 rounded-2xl p-6">
           <h2 className="flex items-center gap-2 font-bold text-slate-900 mb-1"><KeyRound size={18} /> API keys</h2>
@@ -176,9 +230,11 @@ export default function AdminPanel({ me }: { me: Me }) {
                   <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                     <th className="py-3 pr-4">User</th>
                     <th className="py-3 pr-4">Role</th>
+                    <th className="py-3 pr-4">Plan</th>
                     <th className="py-3 pr-4">Carousels</th>
-                    <th className="py-3 pr-4">Created</th>
-                    <th className="py-3 pr-4">Last login</th>
+                    <th className="py-3 pr-4" title="New carousels / AI messages / AI images this month">This month</th>
+                    <th className="py-3 pr-4">Tokens</th>
+                    <th className="py-3 pr-4">Joined</th>
                     <th className="py-3 pr-4">Last active</th>
                     <th className="py-3" />
                   </tr>
@@ -187,16 +243,17 @@ export default function AdminPanel({ me }: { me: Me }) {
                   {users.map(user => {
                     const isMe = user.id === me.id;
                     return (
-                      <tr key={user.id} className="border-b border-gray-100 last:border-0">
+                      <tr key={user.id} className={`border-b border-gray-100 last:border-0 ${user.suspendedAt ? 'bg-red-50/50' : ''}`}>
                         <td className="py-3 pr-4">
                           <p className="font-semibold text-slate-800" dir="auto">{user.name || '—'}{isMe && <span className="ml-2 text-xs font-medium text-indigo-600">(you)</span>}</p>
                           <p className="text-xs text-gray-500">{user.email}</p>
+                          {user.suspendedAt && <p className="text-xs font-semibold text-red-600">Suspended {formatDate(user.suspendedAt)}</p>}
                         </td>
                         <td className="py-3 pr-4">
                           <select
                             value={user.role}
                             disabled={isMe}
-                            onChange={e => changeRole(user, e.target.value as 'user' | 'admin')}
+                            onChange={e => updateUser(user, { role: e.target.value })}
                             title={isMe ? 'You cannot change your own role' : undefined}
                             className={`border rounded-lg px-2 py-1 text-xs font-semibold disabled:opacity-70 ${user.role === 'admin' ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-slate-700'}`}
                           >
@@ -204,15 +261,31 @@ export default function AdminPanel({ me }: { me: Me }) {
                             <option value="admin">Admin</option>
                           </select>
                         </td>
+                        <td className="py-3 pr-4">
+                          <select
+                            value={user.plan}
+                            disabled={isMe}
+                            onChange={e => updateUser(user, { plan: e.target.value })}
+                            className="border border-gray-200 bg-white rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-70"
+                          >
+                            {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
+                          </select>
+                        </td>
                         <td className="py-3 pr-4 text-slate-700">{user.carouselCount}</td>
+                        <td className="py-3 pr-4 text-slate-700 whitespace-nowrap">{user.usage.carousels} / {user.usage.messages} / {user.usage.images}</td>
+                        <td className="py-3 pr-4 text-slate-700">{user.usage.tokens.toLocaleString()}</td>
                         <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">{formatDate(user.createdAt)}</td>
-                        <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">{formatDate(user.lastLoginAt)}</td>
                         <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">{formatDate(user.lastSeenAt)}</td>
-                        <td className="py-3 text-right">
+                        <td className="py-3 text-right whitespace-nowrap">
                           {!isMe && (
-                            <button onClick={() => removeUser(user)} title="Delete user" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
-                              <Trash2 size={16} />
-                            </button>
+                            <>
+                              <button onClick={() => toggleSuspended(user)} className={`text-xs font-semibold px-2 py-1 rounded-lg ${user.suspendedAt ? 'text-green-700 hover:bg-green-50' : 'text-amber-700 hover:bg-amber-50'}`}>
+                                {user.suspendedAt ? 'Unsuspend' : 'Suspend'}
+                              </button>
+                              <button onClick={() => removeUser(user)} title="Delete user" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+                                <Trash2 size={16} />
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>

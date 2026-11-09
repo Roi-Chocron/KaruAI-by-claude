@@ -13,6 +13,7 @@ const ERRORS: Record<string, string> = {
   unverified: 'Your Google account has no verified email address.',
   config: 'Google sign-in is not set up yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).',
   rate: 'Too many sign-in attempts. Please wait a few minutes and try again.',
+  suspended: 'This account is suspended. Please contact support.',
 };
 
 function GoogleLogo() {
@@ -26,17 +27,70 @@ function GoogleLogo() {
   );
 }
 
-export default function AuthPage() {
-  const [href, setHref] = useState('/api/auth/google');
+const safeNext = (next: string | null) => (next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
+
+// Local development only (the API refuses it anywhere else): sign in with just an email
+function DevLogin({ next }: { next: string }) {
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await fetch('/api/auth/dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    if (res?.ok) {
+      window.location.href = next;
+      return;
+    }
+    setError(data?.error || 'Could not sign in.');
+    setBusy(false);
+  };
+
+  return (
+    <form onSubmit={submit} className="mt-8 p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50">
+      <p className="text-xs font-semibold text-amber-800 mb-2">Dev login (local development only)</p>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="flex-1 min-w-0 border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
+        <button type="submit" disabled={busy} className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60">
+          Sign in
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+    </form>
+  );
+}
+
+export default function AuthPage() {
+  const [next, setNext] = useState('/dashboard');
+  const [error, setError] = useState<string | null>(null);
+  const [devLogin, setDevLogin] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const next = params.get('next');
-    if (next) setHref(`/api/auth/google?next=${encodeURIComponent(next)}`);
+    setNext(safeNext(params.get('next')));
     const code = params.get('error');
     if (code) setError(ERRORS[code] ?? ERRORS.failed);
+    fetch('/api/auth/providers')
+      .then(res => res.json())
+      .then(data => setDevLogin(data?.devLogin === true))
+      .catch(() => undefined);
   }, []);
+
+  const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900" dir="ltr">
@@ -81,6 +135,8 @@ export default function AuthPage() {
             <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link> and{' '}
             <Link href="/privacy" className="underline hover:text-slate-700">Privacy Policy</Link>.
           </p>
+
+          {devLogin && <DevLogin next={next} />}
         </div>
       </div>
 
@@ -119,22 +175,9 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Testimonial Placeholder */}
-        <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl max-w-lg">
-          <p className="text-white italic mb-4">
-            &quot;KaruAI completely transformed how I create content for LinkedIn. What used to take me 2 hours now takes me 5 minutes.&quot;
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-300 rounded-full flex items-center justify-center text-blue-800 font-bold">
-              SD
-            </div>
-            <div>
-              <p className="text-white font-semibold text-sm">Sarah Davis</p>
-              <p className="text-blue-200 text-xs">Content Creator</p>
-            </div>
-          </div>
-        </div>
-
+        <p className="relative z-10 text-sm text-blue-100">
+          Free to start · No credit card required
+        </p>
       </div>
 
     </div>

@@ -3,9 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Zap, Palette, Folder, Sparkles, Image as ImageIcon, Layout, CheckCircle, ChevronRight, Menu, X } from 'lucide-react';
+import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
 
 export default function KaruAIHome() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [yearly, setYearly] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir="ltr">
@@ -221,145 +223,25 @@ export default function KaruAIHome() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            {/* Starter Plan */}
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-8 flex flex-col justify-between hover:shadow-lg transition-all duration-300">
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-slate-900">Starter</h3>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">Free</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-6 min-h-[40px]">
-                  Perfect for beginners exploring AI-powered carousel and post creation.
-                </p>
-                <div className="mb-6">
-                  <span className="text-4xl font-extrabold text-slate-900">$0</span>
-                  <span className="text-slate-500 text-sm"> / month</span>
-                </div>
-                <ul className="space-y-3 mb-8 text-sm text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Up to 5 carousels per month</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Standard image resolution</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Basic carousel editor</span>
-                  </li>
-                  <li className="flex items-center gap-2 text-slate-400">
-                    <span className="w-5 h-5 inline-flex items-center justify-center font-bold text-slate-400">✕</span>
-                    <span>Includes KaruAI watermark</span>
-                  </li>
-                  <li className="flex items-center gap-2 text-slate-400">
-                    <span className="w-5 h-5 inline-flex items-center justify-center font-bold text-slate-400">✕</span>
-                    <span>Community support only</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/login"
-                className="w-full block text-center py-3 px-4 rounded-xl font-semibold border-2 border-slate-300 text-slate-800 hover:bg-slate-100 transition-colors"
-              >
-                Get Started Free
-              </Link>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="rounded-3xl border-2 border-blue-600 bg-white p-8 flex flex-col justify-between shadow-xl relative scale-105 transition-all duration-300">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold py-1 px-4 rounded-full uppercase tracking-wider shadow">
-                Most Popular
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-slate-900">Pro</h3>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Recommended</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-6 min-h-[40px]">
-                  For creators, marketers, and freelancers who publish content consistently.
-                </p>
-                <div className="mb-6">
-                  <span className="text-4xl font-extrabold text-slate-900">$29</span>
-                  <span className="text-slate-500 text-sm"> / month</span>
-                </div>
-                <ul className="space-y-3 mb-8 text-sm text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span className="font-medium">Up to 50 carousels per month</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>High Definition (HD) export</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>No watermarks</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Advanced editor + Unlimited AI image generation</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Priority email & chat support</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/login"
-                className="w-full block text-center py-3 px-4 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 transition-all"
-              >
-                Choose Pro
-              </Link>
-            </div>
-
-            {/* Agency / Enterprise Plan */}
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-8 flex flex-col justify-between hover:shadow-lg transition-all duration-300">
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-slate-900">Agency</h3>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700">For Teams</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-6 min-h-[40px]">
-                  For agencies and teams managing multiple brands and client accounts.
-                </p>
-                <div className="mb-6">
-                  <span className="text-4xl font-extrabold text-slate-900">$79</span>
-                  <span className="text-slate-500 text-sm"> / month</span>
-                </div>
-                <ul className="space-y-3 mb-8 text-sm text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span className="font-medium">Unlimited carousels</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Ultra HD 4K exports</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Custom brand kits (fonts, palettes, logos)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Team collaboration & workspace sharing</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <span>Dedicated account manager & VIP SLA</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/login"
-                className="w-full block text-center py-3 px-4 rounded-xl font-semibold border-2 border-slate-300 text-slate-800 hover:bg-slate-100 transition-colors"
-              >
-                Get Started
-              </Link>
-            </div>
+          <div className="flex justify-center mb-12">
+            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} />
           </div>
+
+          <PricingCards
+            yearly={yearly}
+            action={plan => (
+              <Link
+                href="/login"
+                className={`w-full block text-center py-3 px-4 rounded-xl font-semibold transition-colors ${
+                  plan.highlighted
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25'
+                    : 'border-2 border-slate-300 text-slate-800 hover:bg-slate-100'
+                }`}
+              >
+                {plan.monthlyPrice === 0 ? 'Get Started Free' : `Choose ${plan.name}`}
+              </Link>
+            )}
+          />
         </div>
       </div>
 
@@ -382,7 +264,7 @@ export default function KaruAIHome() {
             Ready to take your content to the next level?
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            Join thousands of content creators who already use KaruAI to produce amazing carousels with less effort.
+            Describe your idea, and KaruAI designs a ready-to-post carousel you can fine-tune in the editor.
           </p>
           <Link href="/login" className="inline-block bg-white text-blue-600 hover:bg-slate-50 font-bold py-4 px-12 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105">
             Sign up now - It's free

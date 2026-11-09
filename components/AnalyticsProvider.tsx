@@ -4,7 +4,10 @@ import React, { useEffect, Suspense } from 'react';
 import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
+import * as Sentry from '@sentry/nextjs';
 import { initPostHog } from '@/lib/analytics';
+import { useConsent } from '@/lib/consent';
+import { CookieBanner } from '@/components/cookie-banner';
 
 const isProd = process.env.NODE_ENV === 'production';
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
@@ -29,10 +32,16 @@ function PostHogPageViewTracker() {
   return null;
 }
 
+// Analytics and session replay load only after the visitor accepts them in the cookie banner
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  const consent = useConsent();
+  const allowed = consent === 'all';
+
   useEffect(() => {
+    if (!allowed) return;
     initPostHog();
-  }, []);
+    if (!Sentry.getClient()?.getIntegrationByName('Replay')) Sentry.addIntegration(Sentry.replayIntegration());
+  }, [allowed]);
 
   return (
     <>
@@ -42,7 +51,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       </Suspense>
 
       {/* Google Analytics 4 (GA4) - Strictly loaded ONLY in Production */}
-      {isProd && GA_MEASUREMENT_ID && (
+      {allowed && isProd && GA_MEASUREMENT_ID && (
         <>
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
@@ -62,7 +71,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Microsoft Clarity - Strictly loaded ONLY in Production */}
-      {isProd && CLARITY_PROJECT_ID && (
+      {allowed && isProd && CLARITY_PROJECT_ID && (
         <Script id="microsoft-clarity" strategy="afterInteractive">
           {`
             (function(c,l,a,r,i,t,y){
@@ -75,6 +84,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       )}
 
       {children}
+      <CookieBanner />
     </>
   );
 }

@@ -1,7 +1,8 @@
 import type { SettingKey } from '../../../types';
+import { isPlanId } from '../../../shared/plans';
 import {
-    countCarousels, DEFAULT_GEMINI_MODEL, deleteUser, getStoredSetting, getUserById, listUsersWithStats, SETTING_ENV,
-    setSetting, setUserRole,
+    countCarousels, DEFAULT_GEMINI_MODEL, deleteUser, getAdminStats, getStoredSetting, getUserById, listUsersWithStats, SETTING_ENV,
+    setSetting, setUserPlan, setUserRole, setUserSuspended,
 } from '../db';
 import { deleteCarouselFiles } from '../storage';
 import { createApp, errorJson, requireAdmin, requireUser, type AppContext } from '../app';
@@ -41,6 +42,11 @@ admin.put('/settings', async c => {
     return c.json({ setting: await describe(c.env, body.key) });
 });
 
+admin.get('/stats', async c => {
+    c.header('Cache-Control', 'no-store');
+    return c.json(await getAdminStats(c.env.DB));
+});
+
 admin.get('/users', async c => {
     const [users, totalCarousels] = await Promise.all([listUsersWithStats(c.env.DB), countCarousels(c.env.DB)]);
     return c.json({ users, totalCarousels });
@@ -54,12 +60,19 @@ async function targetUser(c: AppContext) {
     return target ? { target } : { response: errorJson(c, 'User not found.', 404) };
 }
 
+// { role?, plan?, suspended? }: changes any of the user's role, plan and suspension
 admin.patch('/users/:id', async c => {
     const { target, response } = await targetUser(c);
     if (!target) return response;
     const body: any = await c.req.json().catch(() => null);
-    if (body?.role !== 'user' && body?.role !== 'admin') return errorJson(c, '`role` must be "user" or "admin".', 400);
-    await setUserRole(c.env.DB, target.id, body.role);
+    const { role, plan, suspended } = body ?? {};
+    if (role === undefined && plan === undefined && suspended === undefined) return errorJson(c, 'Nothing to change.', 400);
+    if (role !== undefined && role !== 'user' && role !== 'admin') return errorJson(c, '`role` must be "user" or "admin".', 400);
+    if (plan !== undefined && !isPlanId(plan)) return errorJson(c, '`plan` is not a known plan.', 400);
+    if (suspended !== undefined && typeof suspended !== 'boolean') return errorJson(c, '`suspended` must be true or false.', 400);
+    if (role !== undefined) await setUserRole(c.env.DB, target.id, role);
+    if (plan !== undefined) await setUserPlan(c.env.DB, target.id, plan);
+    if (suspended !== undefined) await setUserSuspended(c.env.DB, target.id, suspended);
     return c.json({ user: await getUserById(c.env.DB, target.id) });
 });
 

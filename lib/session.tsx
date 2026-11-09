@@ -37,6 +37,7 @@ export function RequireAuth({ children, admin = false }: { children: (user: Publ
           return;
         }
         const data = await res.json().catch(() => null);
+        if (data?.code === 'suspended') throw new Error(data.error);
         if (!res.ok || !data?.user) throw new Error(data?.error || `Request failed with status ${res.status}`);
         if (admin && data.user.role !== 'admin') {
           window.location.replace('/dashboard');
