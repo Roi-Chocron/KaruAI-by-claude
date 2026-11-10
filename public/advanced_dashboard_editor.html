@@ -18,7 +18,7 @@
         } } };
     </script>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Heebo:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Heebo:wght@400;500;600;700;800&family=Karantina:wght@700&display=swap">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -39,9 +39,19 @@
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
         
         .tab-btn.active { border-bottom: 2px solid var(--accent-color); color: var(--accent-color); background: white; }
+        .font-display { font-family: 'Karantina', 'Heebo', sans-serif; }
+
+        /* The export menu */
+        .export-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; text-align: start; color: #0A0A0A; }
+        .export-item:hover:not(:disabled) { background: #F5F5F5; }
+        .export-item:disabled { color: #737373; cursor: not-allowed; }
+        .export-item > span { display: flex; flex-direction: column; min-width: 0; }
+        .export-item b { font-size: 13px; font-weight: 600; }
+        .export-item small { font-size: 12px; color: #737373; }
+        .export-item em { font-style: normal; font-size: 11px; font-weight: 600; background: #C8F135; color: #0A0A0A; padding: 2px 8px; border-radius: 6px; }
         .tab-btn:not(.active) { border-bottom: 2px solid transparent; color: #525252; }
         
-        .tool-btn.active { background: white; color: var(--accent-color); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        .tool-btn.active { background: #0A0A0A; color: #FFFFFF; }
         .tool-btn:not(.active) { color: #525252; }
 
         /* Workspace & Canvas */
@@ -129,52 +139,97 @@
         @keyframes thinking { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
     </style>
 </head>
-<body class="flex h-screen w-screen overflow-hidden bg-white text-slate-800 font-sans">
+<body class="flex flex-col h-screen w-screen overflow-hidden bg-white text-slate-800 font-sans">
+
+    <!-- TOP BAR -->
+    <header class="h-16 shrink-0 border-b border-gray-200 bg-white flex items-center gap-4 px-4 z-20">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+            <button onclick="goToGallery()" class="flex items-center gap-2 shrink-0 rounded-lg px-1.5 py-1 hover:bg-gray-100 transition-colors" title="All carousels" dir="ltr">
+                <svg width="28" height="28" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="28" height="28" rx="6" fill="#E5E5E5"/><rect x="10" y="7" width="28" height="28" rx="6" fill="#0A0A0A"/><rect x="16" y="4" width="28" height="28" rx="6" fill="#C8F135"/></svg>
+                <span class="hidden lg:inline text-[19px] font-extrabold tracking-[-0.03em] text-slate-800">KaruAI</span>
+            </button>
+            <span class="h-6 w-px bg-gray-200 shrink-0"></span>
+            <input id="carousel-title" type="text" dir="auto" maxlength="200" placeholder="Untitled carousel" title="Rename the carousel"
+                class="min-w-0 w-full max-w-sm px-2 py-1.5 rounded-lg text-[15px] font-semibold text-slate-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-colors"
+                onchange="renameCarousel(this.value)" onkeydown="if (event.key === 'Enter') this.blur()">
+            <span id="save-status" class="text-xs font-medium text-gray-400 shrink-0"></span>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+            <button onclick="undo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
+            <button onclick="redo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
+            <div class="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 text-xs font-semibold text-gray-500" dir="ltr">
+                <button onclick="changeZoom(-0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom out">−</button>
+                <span id="zoom-label" class="w-10 text-center tabular-nums">45%</span>
+                <button onclick="changeZoom(0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom in">+</button>
+            </div>
+
+            <div id="download-wrap" class="relative ms-2">
+                <button onclick="toggleDownloadMenu()" aria-haspopup="menu" class="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold ps-4 pe-3 py-2.5 rounded-[10px] hover:bg-gray-600 transition-colors">
+                    <i data-lucide="share" class="w-4 h-4"></i><span>Export</span><i data-lucide="chevron-down" class="w-4 h-4 opacity-70"></i>
+                </button>
+                <div id="download-menu" role="menu" class="hidden absolute end-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-1.5 z-50 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.25)]">
+                    <button role="menuitem" onclick="downloadCurrentSlide()" class="export-item">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                        <span><b>This slide</b><small>PNG, 1080×1350</small></span>
+                    </button>
+                    <button role="menuitem" onclick="downloadFullCarousel()" class="export-item">
+                        <i data-lucide="folder-archive" class="w-4 h-4"></i>
+                        <span><b>All slides, PNG</b><small>A ZIP with one PNG per slide</small></span>
+                    </button>
+                    <button role="menuitem" onclick="downloadFullCarousel('jpg')" class="export-item">
+                        <i data-lucide="images" class="w-4 h-4"></i>
+                        <span><b>All slides, JPG</b><small>Smaller files, in a ZIP</small></span>
+                    </button>
+                    <button role="menuitem" onclick="downloadPdf()" class="export-item">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                        <span><b>PDF document</b><small>One page per slide, for LinkedIn</small></span>
+                    </button>
+                    <div class="h-px bg-gray-200 my-1.5"></div>
+                    <button role="menuitem" disabled class="export-item" title="Publishing straight to Instagram is on the way">
+                        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+                        <span><b>Post to Instagram</b><small>Publish straight to your account</small></span>
+                        <em class="ms-auto">Soon</em>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 min-h-0">
 
     <!-- LEFT COLUMN -->
-    <aside class="w-[25%] h-full flex flex-col border-e border-gray-200 bg-white shrink-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-        <div class="flex items-center gap-1 h-14 px-2 border-b border-gray-200 shrink-0">
-            <button onclick="goToGallery()" class="p-1.5 hover:bg-gray-100 rounded-md transition-all shrink-0" title="All carousels" aria-label="All carousels">
-                <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="28" height="28" rx="6" fill="#E5E5E5"/><rect x="10" y="7" width="28" height="28" rx="6" fill="#0A0A0A"/><rect x="16" y="4" width="28" height="28" rx="6" fill="#C8F135"/></svg>
-            </button>
-            <input id="carousel-title" type="text" dir="auto" maxlength="200" placeholder="Untitled carousel" title="Rename the carousel"
-                class="flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm font-bold text-slate-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:bg-white outline-none transition-colors"
-                onchange="renameCarousel(this.value)" onkeydown="if (event.key === 'Enter') this.blur()">
-        </div>
-        <div class="flex h-12 border-b border-gray-200 shrink-0 bg-gray-50/50">
-            <button onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+    <aside class="w-64 xl:w-72 h-full flex flex-col border-e border-gray-200 bg-white shrink-0 z-10">
+        <div class="flex h-12 border-b border-gray-200 shrink-0">
+            <button onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="palette" class="w-4 h-4"></i> Brand
             </button>
-            <button onclick="switchLeftTab('layers')" id="tab-layers" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+            <button onclick="switchLeftTab('layers')" id="tab-layers" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="layers" class="w-4 h-4"></i> Layers
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto relative">
-            <div id="panel-brand" class="hidden p-6">
-                <h2 class="text-sm font-bold mb-1 text-slate-800 uppercase tracking-wider">Brand</h2>
-                <p class="text-xs text-gray-400 mb-5">Everything the carousel uses. Change one to update it on every slide.</p>
+            <div id="panel-brand" class="hidden p-5">
+                <h2 class="font-display font-bold text-3xl leading-none mb-2 text-slate-800">Brand</h2>
+                <p class="text-xs text-gray-500 mb-6 leading-relaxed">Everything the carousel uses. Change one to update it on every slide.</p>
                 <div class="mb-6">
-                    <label class="block text-xs font-semibold text-gray-500 mb-2">Colors</label>
+                    <label class="block text-xs font-semibold text-slate-800 mb-3">Colors</label>
                     <div id="brand-colors" class="grid grid-cols-4 gap-x-2 gap-y-3"></div>
                 </div>
                 <div class="mb-6">
-                    <label class="block text-xs font-semibold text-gray-500 mb-2">Fonts</label>
+                    <label class="block text-xs font-semibold text-slate-800 mb-3">Fonts</label>
                     <div id="brand-fonts" class="space-y-2"></div>
                 </div>
-                <button onclick="downloadFullCarousel()" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md transition-all mt-4">
-                    <i data-lucide="download" class="w-4 h-4"></i> Download all (ZIP)
-                </button>
-                <button onclick="downloadCurrentSlide()" class="w-full mt-3 border border-gray-200 text-slate-700 font-semibold py-2 px-2 rounded-lg text-xs hover:bg-gray-50">Download this slide (PNG)</button>
             </div>
             <div id="panel-layers" class="flex flex-col pb-4"></div>
         </div>
     </aside>
 
     <!-- MIDDLE COLUMN -->
-    <main class="w-[50%] h-full flex flex-col relative shrink-0">
-        <header class="h-14 border-b border-gray-200 px-4 flex items-center justify-between gap-2 bg-white shrink-0 shadow-sm z-10 whitespace-nowrap">
-            <div class="flex gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
+    <main class="flex-1 min-w-0 h-full flex flex-col relative">
+        <div class="h-12 border-b border-gray-200 px-3 flex items-center justify-between gap-2 bg-white shrink-0 z-10 whitespace-nowrap">
+            <div class="flex gap-0.5 border border-gray-200 p-0.5 rounded-lg">
                 <button onclick="setTool('V')" id="tool-V" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
                 <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
                 <button onclick="setTool('O')" id="tool-O" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Ellipse (O)"><i data-lucide="circle" class="w-4 h-4"></i></button>
@@ -182,50 +237,27 @@
                 <button onclick="pickImageFile()" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Add image (I) — or drop an image on the canvas"><i data-lucide="image-plus" class="w-4 h-4"></i></button>
                 <input id="image-file-input" type="file" accept="image/*" class="hidden" onchange="handleImageFile(event)">
             </div>
-            
-            <div class="flex items-center gap-3">
-                <div class="flex flex-col items-center leading-tight">
-                    <span id="slide-label" class="text-xs font-bold text-gray-500 tracking-widest uppercase">Slide 1 of 1</span>
-                    <span id="save-status" class="text-[11px] font-semibold text-gray-400"></span>
-                </div>
-                <div id="variant-toggle" class="hidden gap-0.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-[11px] font-semibold">
-                    <button id="variant-with" onclick="setSlideMode('with')">Image</button>
-                    <button id="variant-without" onclick="setSlideMode('without')">No image</button>
-                </div>
-            </div>
 
-            <div class="flex gap-2">
-                <button onclick="undo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
-                <button onclick="redo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
-                
-                <div class="ms-2 flex items-center gap-2 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500">
-                     <button onclick="changeZoom(-0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">-</button>
-                     <span id="zoom-label" class="w-10 text-center">45%</span>
-                     <button onclick="changeZoom(0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">+</button>
-                </div>
+            <span id="slide-label" class="text-xs font-semibold text-gray-500">Slide 1 of 1</span>
 
-                <div id="download-wrap" class="relative">
-                    <button onclick="toggleDownloadMenu()" class="p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all" title="Download"><i data-lucide="download" class="w-4 h-4"></i></button>
-                    <div id="download-menu" class="hidden absolute end-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
-                        <button onclick="downloadCurrentSlide()" class="w-full text-start px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">This slide (PNG)</button>
-                        <button onclick="downloadFullCarousel()" class="w-full text-start px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">All slides (ZIP)</button>
-                    </div>
-                </div>
+            <div id="variant-toggle" class="hidden gap-0.5 border border-gray-200 p-0.5 rounded-lg text-xs font-semibold">
+                <button id="variant-with" onclick="setSlideMode('with')">Image</button>
+                <button id="variant-without" onclick="setSlideMode('without')">No image</button>
             </div>
-        </header>
+        </div>
 
         <div class="workspace-wrapper" id="workspace" onmousedown="handleWorkspaceDown(event)">
             <div class="canvas-container" id="canvas-container" style="width: 1080px; height: 1350px; transform: scale(0.45);">
                 <div class="canvas-artboard" id="artboard">
                     <!-- Elements injected via JS -->
-                    
+
                     <div id="selectionOverlay">
                         <div class="resize-handle h-nw" data-handle="nw"></div>
                         <div class="resize-handle h-ne" data-handle="ne"></div>
                         <div class="resize-handle h-se" data-handle="se"></div>
                         <div class="resize-handle h-sw" data-handle="sw"></div>
                     </div>
-                    
+
                     <div id="dragBox"></div>
                     <div id="guide-v" class="snap-guide-v"></div>
                     <div id="guide-h" class="snap-guide-h"></div>
@@ -233,41 +265,42 @@
             </div>
         </div>
 
-        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 ps-5 pe-3 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
+        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 ps-5 pe-3 shrink-0 z-10">
             <div id="slide-thumbnails" class="flex-1 min-w-0 h-full flex items-center gap-4 overflow-x-auto px-1"></div>
-            <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 ps-3 border-s border-gray-100">
+            <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 ps-3 border-s border-gray-200">
                 <button id="slide-move-earlier" onclick="moveSlide(-1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide earlier"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
                 <button id="slide-move-later" onclick="moveSlide(1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide later"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                 <button onclick="duplicateSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800" title="Duplicate slide"><i data-lucide="copy" class="w-4 h-4"></i></button>
-                <button id="slide-delete" onclick="deleteSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent" title="Delete slide"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                <button id="slide-delete" onclick="deleteSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-red-700 disabled:opacity-30 disabled:hover:bg-transparent" title="Delete slide"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </div>
         </footer>
     </main>
 
     <!-- RIGHT COLUMN -->
-    <aside class="w-[25%] h-full flex flex-col border-s border-gray-200 bg-white shrink-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.02)]">
-        <div class="flex h-14 border-b border-gray-200 shrink-0 bg-gray-50/50">
-            <button onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
+    <aside class="w-80 xl:w-96 h-full flex flex-col border-s border-gray-200 bg-white shrink-0 z-10">
+        <div class="flex h-12 border-b border-gray-200 shrink-0">
+            <button onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="message-square" class="w-4 h-4"></i> KaruAI
             </button>
-            <button onclick="switchRightTab('design')" id="tab-design" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
-                <i data-lucide="edit-2" class="w-4 h-4"></i> Design
+            <button onclick="switchRightTab('design')" id="tab-design" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
+                <i data-lucide="pen-line" class="w-4 h-4"></i> Design
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto relative bg-white">
-            
-            <div id="panel-chat" class="hidden h-full flex flex-col bg-slate-50/50">
-                <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6" id="chat-messages">
-                    <p id="chat-empty" class="m-auto text-center text-sm text-gray-400 max-w-[80%]">
-                        Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.
-                    </p>
+        <div class="flex-1 min-h-0 overflow-y-auto relative bg-white">
+
+            <div id="panel-chat" class="hidden h-full flex flex-col bg-gray-50">
+                <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4" id="chat-messages">
+                    <div id="chat-empty" class="m-auto text-center max-w-[85%]">
+                        <p class="font-display font-bold text-4xl leading-[0.9] text-slate-800">Start with <span class="bg-lime px-1 rounded">one sentence.</span></p>
+                        <p class="mt-3 text-sm text-gray-500 leading-relaxed">Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.</p>
+                    </div>
                 </div>
-                <div class="p-4 border-t border-gray-200 bg-white shrink-0">
-                    <div class="relative flex items-center bg-gray-100 rounded-xl border border-gray-200 focus-within:border-indigo-500 focus-within:ring-1 transition-all">
-                        <input type="text" id="chat-input" dir="auto" placeholder="Prompt the AI..." class="w-full bg-transparent ps-4 pe-12 py-3 rounded-xl focus:outline-none text-sm text-slate-700" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
-                        <button id="chat-send" onclick="sendChat()" class="absolute end-2 w-8 h-8 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
-                            <i data-lucide="send" class="w-3 h-3 rtl:-scale-x-100"></i>
+                <div class="p-3 border-t border-gray-200 bg-white shrink-0">
+                    <div class="flex items-end gap-2 bg-white rounded-xl border border-gray-300 focus-within:border-indigo-600 p-1.5 transition-colors">
+                        <input type="text" id="chat-input" dir="auto" placeholder="Prompt the AI..." class="flex-1 min-w-0 bg-transparent px-2.5 py-2 focus:outline-none text-sm text-slate-800" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
+                        <button id="chat-send" onclick="sendChat()" aria-label="Send" class="shrink-0 w-9 h-9 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
+                            <i data-lucide="arrow-up" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
@@ -278,7 +311,7 @@
                     <i data-lucide="mouse-pointer-2" class="w-8 h-8 opacity-50"></i>
                     <p>Select an element to edit properties.</p>
                 </div>
-                
+
                 <div id="multi-state" class="hidden flex-col items-center justify-center h-40 text-gray-400 text-sm gap-4 mt-10">
                     <i data-lucide="layers" class="w-8 h-8 opacity-50"></i>
                     <p>Multiple elements selected.</p>
@@ -286,57 +319,57 @@
 
                 <div id="props-content" class="hidden">
                     <div class="p-4 border-b border-gray-200 flex gap-2">
-                        <button onclick="reorderLayer(1)" class="flex-1 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200" title="Ctrl + ]">Forward</button>
-                        <button onclick="reorderLayer(-1)" class="flex-1 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200" title="Ctrl + [">Backward</button>
-                        <button onclick="deleteSelected()" class="flex-1 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg hover:bg-red-100 flex items-center justify-center" title="Delete">
+                        <button onclick="reorderLayer(1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Ctrl + ]">Forward</button>
+                        <button onclick="reorderLayer(-1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Ctrl + [">Backward</button>
+                        <button onclick="deleteSelected()" class="flex-1 py-2 text-xs font-semibold text-red-700 border border-gray-200 rounded-lg hover:border-red-700 flex items-center justify-center" title="Delete">
                             <i data-lucide="trash-2" class="w-3 h-3"></i>
                         </button>
                     </div>
 
                     <div class="p-5 border-b border-gray-200">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Transform</h4>
+                        <h4 class="font-display font-bold text-2xl leading-none mb-4">Transform</h4>
                         <div class="grid grid-cols-2 gap-3 mb-3">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">X</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">X</span>
                                 <input type="number" id="propX" data-prop="x" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">Y</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">Y</span>
                                 <input type="number" id="propY" data-prop="y" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3 mb-3">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">W</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">W</span>
                                 <input type="number" id="propW" data-prop="w" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">H</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">H</span>
                                 <input type="number" id="propH" data-prop="h" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">°</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">°</span>
                                 <input type="number" id="propRot" data-prop="rotation" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400 w-3">R</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400 w-3">R</span>
                                 <input type="number" id="propRad" data-prop="radius" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                     </div>
 
                     <div id="section-text" class="p-5 border-b border-gray-200">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Text</h4>
-                        <textarea id="propContent" dir="auto" data-prop="content" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-500 outline-none resize-none h-24 text-slate-800"></textarea>
-                        <select id="propFontFamily" data-prop="fontFamily" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-500 text-xs text-slate-700"></select>
+                        <h4 class="font-display font-bold text-2xl leading-none mb-4">Text</h4>
+                        <textarea id="propContent" dir="auto" data-prop="content" class="w-full bg-white border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-600 outline-none resize-none h-24 text-slate-800"></textarea>
+                        <select id="propFontFamily" data-prop="fontFamily" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-600 text-xs text-slate-700"></select>
                         <div class="grid grid-cols-2 gap-3 mb-3">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                <span class="text-[10px] font-bold text-gray-400">Size</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                <span class="text-[11px] font-semibold text-gray-400">Size</span>
                                 <input type="number" id="propFontSize" data-prop="fontSize" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <select id="propFontWeight" data-prop="fontWeight" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                            <select id="propFontWeight" data-prop="fontWeight" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                                 <option value="300">Light</option>
                                 <option value="400">Regular</option>
                                 <option value="500">Medium</option>
@@ -346,50 +379,50 @@
                                 <option value="900">Black</option>
                             </select>
                         </div>
-                        <select id="propTextAlign" data-prop="textAlign" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                        <select id="propTextAlign" data-prop="textAlign" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                             <option value="left">Align Left</option>
                             <option value="center">Align Center</option>
                             <option value="right">Align Right</option>
                         </select>
                         <div class="grid grid-cols-2 gap-3 mt-3">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all" title="Line height">
-                                <span class="text-[10px] font-bold text-gray-400">LH</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all" title="Line height">
+                                <span class="text-[11px] font-semibold text-gray-400">LH</span>
                                 <input type="number" step="0.05" id="propLineHeight" data-prop="lineHeight" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all" title="Letter spacing">
-                                <span class="text-[10px] font-bold text-gray-400">LS</span>
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all" title="Letter spacing">
+                                <span class="text-[11px] font-semibold text-gray-400">LS</span>
                                 <input type="number" id="propLetterSpacing" data-prop="letterSpacing" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                     </div>
 
                     <div class="p-5 border-b border-gray-200">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Fill</h4>
+                        <h4 class="font-display font-bold text-2xl leading-none mb-4">Fill</h4>
                         <div class="flex items-center gap-3">
-                            <input type="color" id="propFillColor" data-prop="fillColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
-                            <input type="text" id="propFillColorHex" dir="ltr" class="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
+                            <input type="color" id="propFillColor" data-prop="fillColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
+                            <input type="text" id="propFillColorHex" dir="ltr" class="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
                             <div class="flex items-center gap-1 w-20 shrink-0">
-                                <input type="number" id="propFillOpacity" data-prop="fillOpacity" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
+                                <input type="number" id="propFillOpacity" data-prop="fillOpacity" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
                                 <span class="text-gray-400 text-xs font-bold">%</span>
                             </div>
                         </div>
                         <div id="gradient-controls" class="flex items-center gap-3 mt-3">
-                            <input type="color" id="propGradientTo" data-prop="gradientTo" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm" title="Gradient end color">
-                            <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 flex-1" title="Gradient angle">
-                                <span class="text-[10px] font-bold text-gray-400">°</span>
+                            <input type="color" id="propGradientTo" data-prop="gradientTo" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0" title="Gradient end color">
+                            <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 flex-1" title="Gradient angle">
+                                <span class="text-[11px] font-semibold text-gray-400">°</span>
                                 <input type="number" id="propGradientAngle" data-prop="gradientAngle" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <button onclick="toggleGradient(false)" class="text-xs font-semibold text-gray-500 hover:text-red-600">Remove</button>
                         </div>
-                        <button id="gradient-add" onclick="toggleGradient(true)" class="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ Gradient</button>
+                        <button id="gradient-add" onclick="toggleGradient(true)" class="mt-3 text-xs font-semibold text-slate-800 underline underline-offset-2">+ Gradient</button>
                     </div>
 
                     <div id="section-stroke" class="p-5 border-b border-gray-200">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Stroke</h4>
+                        <h4 class="font-display font-bold text-2xl leading-none mb-4">Stroke</h4>
                         <div class="flex items-center gap-3">
-                            <input type="color" id="propStrokeColor" data-prop="strokeColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
-                            <input type="number" id="propStrokeWidth" data-prop="strokeWidth" class="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" placeholder="W">
-                            <select id="propStrokeStyle" data-prop="strokeStyle" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                            <input type="color" id="propStrokeColor" data-prop="strokeColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
+                            <input type="number" id="propStrokeWidth" data-prop="strokeWidth" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" placeholder="W">
+                            <select id="propStrokeStyle" data-prop="strokeStyle" class="flex-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                                 <option value="solid">Solid</option>
                                 <option value="dashed">Dashed</option>
                                 <option value="dotted">Dotted</option>
@@ -398,8 +431,8 @@
                     </div>
 
                     <div class="p-5">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Effects</h4>
-                        <select id="propShadowType" data-prop="shadowType" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4 outline-none focus:border-indigo-500 text-xs text-slate-700">
+                        <h4 class="font-display font-bold text-2xl leading-none mb-4">Effects</h4>
+                        <select id="propShadowType" data-prop="shadowType" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 mb-4 outline-none focus:border-indigo-600 text-xs text-slate-700">
                             <option value="none">No Shadow</option>
                             <option value="drop-shadow">Drop Shadow</option>
                             <option id="opt-inner-shadow" value="inner-shadow">Inner Shadow</option>
@@ -407,27 +440,27 @@
 
                         <div id="shadow-controls" class="space-y-3 hidden">
                             <div class="grid grid-cols-2 gap-3">
-                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                    <span class="text-[10px] font-bold text-gray-400 w-3">X</span>
+                                <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                    <span class="text-[11px] font-semibold text-gray-400 w-3">X</span>
                                     <input type="number" id="propShadowX" data-prop="shadowX" class="w-full bg-transparent outline-none text-xs text-slate-700">
                                 </div>
-                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                    <span class="text-[10px] font-bold text-gray-400 w-3">Y</span>
+                                <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                    <span class="text-[11px] font-semibold text-gray-400 w-3">Y</span>
                                     <input type="number" id="propShadowY" data-prop="shadowY" class="w-full bg-transparent outline-none text-xs text-slate-700">
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
-                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                    <span class="text-[10px] font-bold text-gray-400 w-3">B</span>
+                                <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                    <span class="text-[11px] font-semibold text-gray-400 w-3">B</span>
                                     <input type="number" id="propShadowBlur" data-prop="shadowBlur" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Blur">
                                 </div>
-                                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
-                                    <span class="text-[10px] font-bold text-gray-400 w-3">S</span>
+                                <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
+                                    <span class="text-[11px] font-semibold text-gray-400 w-3">S</span>
                                     <input type="number" id="propShadowSpread" data-prop="shadowSpread" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Spread">
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <input type="color" id="propShadowColor" data-prop="shadowColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
+                                <input type="color" id="propShadowColor" data-prop="shadowColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
                                 <span class="text-xs text-gray-500 font-medium">Shadow Color</span>
                             </div>
                         </div>
@@ -436,6 +469,8 @@
             </div>
         </div>
     </aside>
+
+    </div>
 
     <script>
         // The interface language follows the site's choice (the karu_locale cookie), else the browser's.
@@ -464,6 +499,11 @@
             'Stroke': 'קו מתאר', 'Solid': 'רציף', 'Dashed': 'מקווקו', 'Dotted': 'מנוקד', 'Effects': 'אפקטים',
             'No Shadow': 'בלי צל', 'Drop Shadow': 'צל חיצוני', 'Inner Shadow': 'צל פנימי', 'Blur': 'טשטוש', 'Spread': 'פיזור', 'Shadow Color': 'צבע הצל',
             'Background': 'רקע', 'Hint': 'הנחיה', 'Rectangle': 'מלבן', 'Ellipse': 'אליפסה',
+            'Export': 'ייצוא', 'This slide': 'השקף הזה', 'PNG, 1080×1350': 'PNG בגודל \u20661080×1350\u2069', 'All slides, PNG': 'כל השקפים, PNG',
+            'A ZIP with one PNG per slide': 'ZIP עם קובץ PNG לכל שקף', 'All slides, JPG': 'כל השקפים, JPG', 'Smaller files, in a ZIP': 'קבצים קטנים יותר, ב־ZIP',
+            'PDF document': 'מסמך PDF', 'One page per slide, for LinkedIn': 'עמוד לכל שקף, ללינקדאין', 'Post to Instagram': 'פרסום באינסטגרם',
+            'Publish straight to your account': 'פרסום ישיר לחשבון שלכם', 'Soon': 'בקרוב', 'Publishing straight to Instagram is on the way': 'פרסום ישיר לאינסטגרם בדרך',
+            'Zoom out': 'הקטנה', 'Zoom in': 'הגדלה', 'Send': 'שליחה', 'Start with': 'מתחילים', 'one sentence.': 'במשפט אחד.',
         };
         const tr = text => (LOCALE === 'he' && HE_UI[text]) || text;
 
@@ -974,7 +1014,7 @@
                 item.className = 'relative flex flex-col items-center gap-1 cursor-pointer group';
                 item.title = L(`${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`, `${hex} · בשימוש ${uses === 1 ? 'פעם אחת' : `${uses} פעמים`}. לחיצה משנה אותו בכל מקום.`);
                 const swatch = document.createElement('span');
-                swatch.className = 'w-10 h-10 rounded-full border border-gray-200 shadow-sm group-hover:ring-2 group-hover:ring-indigo-400 transition-all';
+                swatch.className = 'w-10 h-10 rounded-full border border-gray-200 group-hover:ring-2 group-hover:ring-indigo-600 group-hover:ring-offset-2 transition-all';
                 swatch.style.backgroundColor = hex;
                 const label = document.createElement('span');
                 label.className = 'text-[10px] font-mono text-gray-500';
@@ -1156,7 +1196,7 @@
             footer.innerHTML = '';
             state.slideData.forEach((data, index) => {
                 const button = document.createElement('button');
-                button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 shadow-sm overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
+                button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
                 button.title = `${state.slides[index].title || L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${data.mode === 'with' ? L(' (with image)', ' (עם תמונה)') : ''}`;
                 const preview = createArtboardNode(index === state.currentSlide ? state.elements : data.variants[data.mode]);
                 preview.style.position = 'absolute';
@@ -1187,7 +1227,7 @@
             withButton.disabled = !hasSlotImage(data);
             withButton.title = hasSlotImage(data) ? L('Show the version with the image', 'הצגת הגרסה עם התמונה') : L('Approve this slide\'s image prompt in the chat to get the image version', 'אשרו בצ׳אט את הנחיית התמונה של השקף כדי לקבל גרסה עם תמונה');
             [[withButton, 'with'], [document.getElementById('variant-without'), 'without']].forEach(([button, mode]) => {
-                button.className = `px-2 py-1 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${data.mode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-slate-800'}`;
+                button.className = `px-2 py-1 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${data.mode === mode ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-slate-800'}`;
             });
         }
 
@@ -1786,14 +1826,14 @@
             document.getElementById('chat-empty')?.remove();
             const container = document.getElementById('chat-messages');
             const tones = {
-                user: 'bg-indigo-600 text-white rounded-br-sm',
-                ai: 'text-slate-600 bg-white rounded-bl-sm',
-                error: 'text-red-600 bg-red-50 rounded-bl-sm'
+                user: 'bg-indigo-600 text-white rounded-ee-sm',
+                ai: 'text-slate-800 bg-white border border-gray-200 rounded-es-sm',
+                error: 'text-red-700 bg-white border border-red-600 rounded-es-sm'
             };
             const wrap = document.createElement('div');
             wrap.className = `flex w-full ${tone === 'user' ? 'justify-end' : 'justify-start'}`;
             const bubble = document.createElement('div');
-            bubble.className = `max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap break-words ${tones[tone]}`;
+            bubble.className = `max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${tones[tone]}`;
             bubble.textContent = text;
             wrap.appendChild(bubble);
             container.appendChild(wrap);
@@ -1819,7 +1859,7 @@
 
             const thinkingMessage = document.createElement('div');
             thinkingMessage.className = 'flex w-full justify-start';
-            thinkingMessage.innerHTML = `<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span data-text>${L('KaruAI is thinking', 'KaruAI חושב')}</span><span class="thinking-dots shrink-0" aria-hidden="true"><span></span><span></span><span></span></span></div>`;
+            thinkingMessage.innerHTML = `<div class="max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed text-slate-800 bg-white border border-gray-200 rounded-es-sm flex items-center gap-2"><span data-text>${L('KaruAI is thinking', 'KaruAI חושב')}</span><span class="thinking-dots shrink-0" aria-hidden="true"><span></span><span></span><span></span></span></div>`;
             container.appendChild(thinkingMessage);
             container.scrollTop = container.scrollHeight;
 
@@ -1891,7 +1931,7 @@
             const button = document.createElement('button');
             button.type = 'button';
             button.className = primary
-                ? 'bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50'
+                ? 'bg-lime text-indigo-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-lime-deep disabled:opacity-50'
                 : 'border border-gray-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50';
             button.textContent = label;
             button.onclick = onClick;
@@ -1914,7 +1954,7 @@
             const wrap = document.createElement('div');
             wrap.className = 'flex w-full justify-start';
             const card = document.createElement('div');
-            card.className = 'w-full max-w-[95%] p-4 rounded-2xl shadow-sm text-sm text-slate-600 bg-white rounded-bl-sm';
+            card.className = 'w-full max-w-[95%] p-4 rounded-2xl text-sm text-slate-600 bg-white border border-gray-200 rounded-es-sm';
             const heading = document.createElement('p');
             heading.className = 'font-semibold text-slate-800 mb-1';
             heading.textContent = L('Image prompts', 'הנחיות לתמונות');
@@ -2127,9 +2167,10 @@
             return canvas;
         }
 
-        function canvasToBlob(canvas) {
+        function canvasToBlob(canvas, format = 'png') {
             return new Promise((resolve, reject) => {
-                canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Could not encode the PNG.'))), 'image/png');
+                canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error(`Could not encode the ${format.toUpperCase()}.`))),
+                    format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92);
             });
         }
 
@@ -2150,7 +2191,7 @@
             return state.slideData.length ? state.slideData.map(data => data.variants[data.mode]) : [state.elements];
         }
 
-        const slideFileName = (index) => `karuai-slide-${String(index + 1).padStart(2, '0')}.png`;
+        const slideFileName = (index, format = 'png') => `karuai-slide-${String(index + 1).padStart(2, '0')}.${format}`;
 
         // Plans with a watermark (see shared/plans.ts) get a small "Made with KaruAI" mark on downloaded slides.
         // Starts on, and loadExportPlan() turns it off for plans without one.
@@ -2208,15 +2249,48 @@
             });
         }
 
-        function downloadFullCarousel() {
+        // Every slide in a ZIP, as PNG (default) or JPG files
+        function downloadFullCarousel(format = 'png') {
             return runExport(async () => {
                 if (typeof JSZip === 'undefined') throw new Error(L('The ZIP library did not load. Check your connection and reload.', 'רכיב ה־ZIP לא נטען. בדקו את החיבור וטענו מחדש.'));
                 const zip = new JSZip();
                 const slides = slidesForExport();
                 for (const [index, elements] of slides.entries()) {
-                    zip.file(slideFileName(index), await canvasToBlob(await renderSlideForExport(elements)));
+                    zip.file(slideFileName(index, format), await canvasToBlob(await renderSlideForExport(elements), format));
                 }
                 saveBlob(await zip.generateAsync({ type: 'blob' }), 'karuai-carousel.zip');
+            });
+        }
+
+        // The PDF library is only needed for this export, so it loads on first use
+        let jsPdfLoading = null;
+        function loadJsPdf() {
+            if (window.jspdf) return Promise.resolve(window.jspdf);
+            jsPdfLoading ??= new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                script.onload = () => resolve(window.jspdf);
+                script.onerror = () => {
+                    jsPdfLoading = null;
+                    reject(new Error(L('The PDF library did not load. Check your connection and try again.', 'רכיב ה־PDF לא נטען. בדקו את החיבור ונסו שוב.')));
+                };
+                document.head.appendChild(script);
+            });
+            return jsPdfLoading;
+        }
+
+        // One PDF page per slide, at the slide's own size (LinkedIn shows PDFs as swipeable carousels)
+        function downloadPdf() {
+            return runExport(async () => {
+                const { jsPDF } = await loadJsPdf();
+                const doc = new jsPDF({ unit: 'px', format: [CANVAS_W, CANVAS_H], hotfixes: ['px_scaling'], compress: true });
+                const slides = slidesForExport();
+                for (const [index, elements] of slides.entries()) {
+                    if (index > 0) doc.addPage([CANVAS_W, CANVAS_H]);
+                    const canvas = await renderSlideForExport(elements);
+                    doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, CANVAS_W, CANVAS_H);
+                }
+                doc.save('karuai-carousel.pdf');
             });
         }
 
