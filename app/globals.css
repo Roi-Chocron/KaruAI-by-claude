@@ -1,3 +1,38 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-paper text-ink font-sans;
+  }
+  ::selection {
+    @apply bg-lime text-ink;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ink;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-5 py-3 text-[15px] font-semibold transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-paper hover:bg-graphite;
+  }
+  .btn-secondary {
+    @apply btn border border-ink text-ink hover:bg-mist;
+  }
+  .btn-lime {
+    @apply btn bg-lime text-ink hover:bg-lime-deep;
+  }
+  /* The lime "marker" behind a word in a headline */
+  .marker {
+    @apply bg-lime text-ink rounded-[0.12em] px-[0.12em] [box-decoration-break:clone] [-webkit-box-decoration-break:clone];
+  }
+}

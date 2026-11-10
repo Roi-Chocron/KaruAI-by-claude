@@ -2,320 +2,242 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Zap, Palette, Folder, Sparkles, Image as ImageIcon, Layout, CheckCircle, ChevronRight, Menu, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Menu, X } from 'lucide-react';
 import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
+import { Logo } from '@/components/brand/logo';
+import { ExampleCarousel } from '@/components/home/example-carousel';
+import { homeMessages } from '@/messages/home';
+import { localePath, type Locale } from '@/lib/i18n';
 
-export default function KaruAIHome() {
+function Headline({ text }: { text: { before: string; marked: string; after: string } }) {
+  return (
+    <>
+      {text.before}
+      <span className="marker whitespace-nowrap">{text.marked}</span>
+      {text.after}
+    </>
+  );
+}
+
+export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [yearly, setYearly] = useState(false);
+  const t = homeMessages[locale];
+  const Forward = locale === 'he' ? ArrowLeft : ArrowRight;
+  const home = localePath(locale, '/');
+  const otherLanguage = localePath(locale === 'he' ? 'en' : 'he', '/');
+
+  const navLinks = [
+    { href: '#how-it-works', label: t.nav.how },
+    { href: '#editor', label: t.nav.editor },
+    { href: '#pricing', label: t.nav.pricing },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir="ltr">
-      
+    <div className="min-h-screen bg-paper text-ink">
       {/* Navbar */}
-      <nav className="fixed w-full top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            {/* Logo */}
-            <Link href="/" className="flex-shrink-0 flex items-center gap-2 cursor-pointer">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Sparkles className="text-white w-6 h-6" />
-              </div>
-              <span className="font-extrabold text-2xl tracking-tight text-slate-900">
-                Karu<span className="text-blue-600">AI</span>
-              </span>
-            </Link>
+      <nav className="sticky top-0 z-50 bg-paper/90 backdrop-blur border-b border-line">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+          <Logo href={home} />
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">Features</a>
-              <a href="#how-it-works" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">How it Works</a>
-              <a href="#pricing" className="text-slate-600 hover:text-blue-600 font-medium transition-colors">Pricing</a>
-            </div>
-
-            {/* CTA Buttons */}
-            <div className="hidden md:flex items-center gap-4">
-              <Link href="/login" className="text-slate-600 hover:text-slate-900 font-medium px-4 py-2 transition-colors">
-                Log in
-              </Link>
-              <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5">
-                Sign up free
-              </Link>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
-              <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-slate-600 hover:text-slate-900 focus:outline-none p-2"
-                aria-label="Toggle navigation menu"
-              >
-                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
+          <div className="hidden md:flex items-center gap-8 text-[15px]">
+            {navLinks.map(link => (
+              <a key={link.href} href={link.href} className="text-graphite hover:text-ink transition-colors">{link.label}</a>
+            ))}
           </div>
+
+          <div className="hidden md:flex items-center gap-2">
+            <Link href={otherLanguage} className="px-3 py-2 text-sm text-graphite hover:text-ink transition-colors" lang={locale === 'he' ? 'en' : 'he'}>
+              {t.nav.otherLanguage}
+            </Link>
+            <Link href="/login" className="px-3 py-2 text-[15px] font-medium text-ink hover:text-graphite transition-colors">{t.nav.login}</Link>
+            <Link href="/login" className="btn-primary !py-2.5">{t.nav.start}</Link>
+          </div>
+
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 -me-2"
+            aria-label={t.nav.menu}
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
 
-        {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-2 pb-6 space-y-4 shadow-xl absolute w-full">
-            <a href="#features" className="block text-slate-600 font-medium p-2 rounded-lg hover:bg-slate-50">Features</a>
-            <a href="#how-it-works" className="block text-slate-600 font-medium p-2 rounded-lg hover:bg-slate-50">How it Works</a>
-            <div className="pt-4 flex flex-col gap-3">
-              <Link href="/login" className="w-full text-center border-2 border-slate-200 text-slate-700 font-medium px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">
-                Log in
-              </Link>
-              <Link href="/login" className="w-full text-center bg-blue-600 text-white font-medium px-6 py-3 rounded-xl shadow-md">
-                Sign up free
-              </Link>
+          <div className="md:hidden border-t border-line bg-paper px-4 pt-2 pb-6">
+            {navLinks.map(link => (
+              <a key={link.href} href={link.href} onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-lg border-b border-line">
+                {link.label}
+              </a>
+            ))}
+            <Link href={otherLanguage} className="block py-3 text-lg border-b border-line" lang={locale === 'he' ? 'en' : 'he'}>{t.nav.otherLanguage}</Link>
+            <div className="pt-5 grid grid-cols-2 gap-3">
+              <Link href="/login" className="btn-secondary">{t.nav.login}</Link>
+              <Link href="/login" className="btn-primary">{t.nav.start}</Link>
             </div>
           </div>
         )}
       </nav>
 
-      {/* Hero Section */}
-      <div className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        {/* Background Gradients */}
-        <div className="absolute top-0 left-1/2 w-full -translate-x-1/2 h-full z-0 pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl mix-blend-multiply"></div>
-          <div className="absolute top-40 right-1/4 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl mix-blend-multiply"></div>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-medium text-sm mb-8 border border-blue-100">
-            <Sparkles className="w-4 h-4" />
-            <span>The new version of KaruAI is available now!</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-8 leading-tight max-w-4xl mx-auto">
-            Create stunning carousels <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-              at the speed of AI
-            </span>
+      {/* Hero: an oversized headline, and a sample carousel that runs off the edge of the page */}
+      <header className="pt-14 md:pt-20 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="font-display font-bold text-[clamp(4.5rem,13vw,11.5rem)] leading-[0.86] max-w-[16ch]">
+            <Headline text={t.hero.title} />
           </h1>
-          
-          <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto mb-12 leading-relaxed">
-            Turn simple ideas and texts into gorgeous visual designs for Instagram and LinkedIn in seconds, no design skills required.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/login" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-10 rounded-2xl transition-all transform hover:-translate-y-1 text-lg shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
-              Start creating for free
-              <ChevronRight className="w-5 h-5" />
-            </Link>
-            <a href="#features" className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-700 font-bold py-4 px-10 rounded-2xl transition-all text-lg border-2 border-slate-200 shadow-sm flex items-center justify-center gap-2">
-              <Layout className="w-5 h-5" />
-              View examples
-            </a>
+          <div className="mt-8 md:mt-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+            <p className="text-lg md:text-xl leading-relaxed text-graphite max-w-xl">{t.hero.sub}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/login" className="btn-primary text-base px-6 py-3.5">
+                {t.hero.cta}
+                <Forward className="w-4 h-4" />
+              </Link>
+              <a href="#how-it-works" className="btn-secondary text-base px-6 py-3.5">{t.hero.secondary}</a>
+            </div>
+          </div>
+          <div className="mt-14 mb-4 flex items-center justify-between text-sm text-graphite">
+            <span>{t.hero.examplesLabel}</span>
+            <span className="flex items-center gap-1.5 font-medium text-ink">
+              {t.hero.swipe}
+              <Forward className="w-4 h-4" />
+            </span>
+          </div>
+        </div>
+        <div
+          role="region"
+          aria-label={t.hero.examplesLabel}
+          tabIndex={0}
+          className="flex gap-3 md:gap-4 overflow-x-auto snap-x snap-mandatory scroll-px-4 sm:scroll-px-6 lg:scroll-px-[max(2rem,calc((100vw_-_80rem)/2_+_2rem))] pb-16 md:pb-24 px-4 sm:px-6 lg:px-[max(2rem,calc((100vw_-_80rem)/2_+_2rem))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <ExampleCarousel t={t.example} slideClass="w-[72vw] sm:w-[44vw] md:w-[30vw] lg:w-[21rem]" />
+        </div>
+      </header>
+
+      {/* How it works */}
+      <section id="how-it-works" className="border-t border-line scroll-mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
+          <h2 className="font-display font-bold text-6xl md:text-8xl leading-none mb-12 md:mb-16">{t.how.title}</h2>
+          <ol className="grid md:grid-cols-3 border-t border-ink">
+            {t.how.steps.map((step, i) => (
+              <li key={step.title} className="pt-6 pb-10 md:pe-10 border-b md:border-b-0 border-line md:[&:not(:first-child)]:border-s md:[&:not(:first-child)]:ps-8">
+                <span className="font-display font-bold text-7xl leading-none" dir="ltr">0{i + 1}</span>
+                <h3 className="mt-6 text-2xl font-bold">{step.title}</h3>
+                <p className="mt-3 text-graphite leading-relaxed max-w-sm">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* The editor */}
+      <section id="editor" className="bg-ink text-paper scroll-mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
+          <div>
+            <h2 className="font-display font-bold text-6xl md:text-8xl leading-[0.9]">{t.editor.title}</h2>
+            <p className="mt-6 text-lg text-paper/70 max-w-md">{t.editor.sub}</p>
+            <dl className="mt-12 grid sm:grid-cols-2 gap-x-10 gap-y-8">
+              {t.editor.features.map(feature => (
+                <div key={feature.title} className="border-t border-paper/20 pt-4">
+                  <dt className="font-semibold text-lg">{feature.title}</dt>
+                  <dd className="mt-2 text-paper/70 leading-relaxed">{feature.body}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
-          <div className="mt-12 flex items-center justify-center gap-8 text-sm text-slate-500">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span>No credit card required</span>
+          {/* A sketch of the editor: one slide and the AI chat beside it */}
+          <div aria-hidden="true" className="rounded-2xl bg-paper text-ink p-3 sm:p-4 grid grid-cols-[1fr_minmax(0,0.85fr)] gap-3 sm:gap-4">
+            <div className="rounded-xl bg-mist p-4 sm:p-6 flex items-center justify-center">
+              <div className="w-full max-w-[15rem] aspect-[4/5] rounded-xl bg-ink p-[8%] flex flex-col [container-type:inline-size]">
+                <span className="text-[4cqw] font-semibold text-paper/60 self-end" dir="ltr">1/7</span>
+                <span className="mt-auto font-display font-bold text-lime text-[15cqw] leading-[0.9]">{t.example.cover}</span>
+                <span className="mt-4 h-1 w-10 bg-lime" />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span>14-day free trial</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span>Cancel anytime</span>
+            <div className="flex flex-col gap-3 text-[13px] leading-snug">
+              <div className="self-end max-w-[90%] rounded-xl rounded-ee-sm bg-ink text-paper px-3 py-2">{t.editor.chatUser}</div>
+              <div className="self-start max-w-[90%] rounded-xl rounded-es-sm bg-mist px-3 py-2">{t.editor.chatAi}</div>
+              <div className="mt-auto flex items-center justify-between rounded-lg border border-line px-3 py-2.5 text-graphite">
+                <span className="truncate">{t.editor.chatInput}</span>
+                <span className="ms-2 grid place-items-center w-6 h-6 rounded-md bg-lime text-ink flex-none">
+                  <Forward className="w-3.5 h-3.5" />
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Mockup / Preview Section */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20 pb-20">
-        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-2 md:p-4 overflow-hidden transform rotate-1 hover:rotate-0 transition-transform duration-500">
-          <div className="bg-slate-100 rounded-2xl aspect-[16/9] flex items-center justify-center relative overflow-hidden border border-slate-200">
-            {/* Fake App UI */}
-            <div className="absolute inset-0 bg-white flex">
-               <div className="w-64 bg-slate-50 border-l border-slate-200 p-6 hidden md:block">
-                  <div className="h-8 bg-slate-200 rounded-lg w-3/4 mb-8"></div>
-                  <div className="space-y-4">
-                    <div className="h-4 bg-slate-200 rounded w-full"></div>
-                    <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-                    <div className="h-4 bg-slate-200 rounded w-4/6"></div>
-                  </div>
-               </div>
-               <div className="flex-1 p-8 bg-slate-100/50 flex flex-col">
-                  <div className="h-12 bg-white border border-slate-200 rounded-xl mb-8 flex items-center px-4 shadow-sm w-full max-w-2xl mx-auto">
-                    <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                  </div>
-                  <div className="flex-1 flex gap-6 overflow-hidden">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col ${i === 3 ? 'hidden lg:flex' : ''}`}>
-                         <div className="aspect-square bg-blue-50 rounded-xl mb-4 flex items-center justify-center border border-blue-100">
-                            <ImageIcon className="w-12 h-12 text-blue-300" />
-                         </div>
-                         <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
-                         <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                      </div>
-                    ))}
-                  </div>
-               </div>
+      {/* Pricing */}
+      <section id="pricing" className="scroll-mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div>
+              <h2 className="font-display font-bold text-6xl md:text-8xl leading-none">{t.pricing.title}</h2>
+              <p className="mt-4 text-lg text-graphite">{t.pricing.sub}</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <div id="features" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">
-              Everything you need to stand out
-            </h2>
-            <p className="text-lg text-slate-600">
-              Our platform provides an end-to-end solution for creating eye-catching visual content that drives high engagement.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {/* Feature 1 */}
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                <Zap className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Lightning Fast AI</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Enter a short text or idea, and our AI will generate a complete, designed, and ready-to-publish carousel in seconds.
-              </p>
-            </div>
-            
-            {/* Feature 2 */}
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-              <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                <Palette className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Flexible Editing</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Advanced editing interface that allows you to change texts, swap images, play with colors, and tailor the content exactly to your brand.
-              </p>
-            </div>
-            
-            {/* Feature 3 */}
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-              <div className="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                <Folder className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">Organized Workspace</h3>
-              <p className="text-slate-600 leading-relaxed">
-                A smart personal workspace where all your projects are saved. Organize in folders, duplicate successful carousels, and manage everything in one place.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Pricing Section */}
-      <div id="pricing" className="py-24 bg-white border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-base font-bold text-blue-600 uppercase tracking-wide">Plans & Pricing</h2>
-            <p className="mt-2 text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Choose the perfect plan for your creative needs
-            </p>
-            <p className="mt-4 text-lg text-slate-600">
-              Start for free and upgrade anytime. All plans include access to our cutting-edge AI generation engine.
-            </p>
-          </div>
-
-          <div className="flex justify-center mb-12">
-            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} />
+            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} locale={locale} />
           </div>
 
           <PricingCards
             yearly={yearly}
+            locale={locale}
             action={plan => (
-              <Link
-                href="/login"
-                className={`w-full block text-center py-3 px-4 rounded-xl font-semibold transition-colors ${
-                  plan.highlighted
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25'
-                    : 'border-2 border-slate-300 text-slate-800 hover:bg-slate-100'
-                }`}
-              >
-                {plan.monthlyPrice === 0 ? 'Get Started Free' : `Choose ${plan.name}`}
+              <Link href="/login" className={`w-full ${plan.highlighted ? 'btn-lime' : 'btn-secondary'}`}>
+                {plan.monthlyPrice === 0 ? t.pricing.startFree : t.pricing.choose(plan.name)}
               </Link>
             )}
           />
         </div>
-      </div>
+      </section>
 
-      {/* CTA Section */}
-      <div className="py-24 bg-blue-600 relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid-pattern)"/>
-          </svg>
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
-            Ready to take your content to the next level?
+      {/* Closing call to action */}
+      <section className="bg-lime">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-10">
+          <h2 className="font-display font-bold text-[clamp(3.5rem,9vw,8rem)] leading-[0.88] max-w-[16ch]">
+            {t.cta.title.before}
+            <span className="underline decoration-[0.06em] underline-offset-[0.12em] whitespace-nowrap">{t.cta.title.marked}</span>
+            {t.cta.title.after}
           </h2>
-          <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            Describe your idea, and KaruAI designs a ready-to-post carousel you can fine-tune in the editor.
-          </p>
-          <Link href="/login" className="inline-block bg-white text-blue-600 hover:bg-slate-50 font-bold py-4 px-12 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105">
-            Sign up now - It's free
+          <Link href="/login" className="btn-primary text-lg px-8 py-4 self-start lg:self-auto">
+            {t.cta.button}
+            <Forward className="w-5 h-5" />
           </Link>
         </div>
-      </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-blue-500 w-6 h-6" />
-                <span className="font-bold text-xl text-white">KaruAI</span>
-              </div>
-              <p className="text-slate-400 max-w-sm">
-                The leading AI platform for creating carousels and visual content on social media.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-2">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#features" className="hover:text-white transition-colors">Examples</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Support & Legal</h4>
-              <ul className="space-y-2">
-                <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
-                <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/cookies" className="hover:text-white transition-colors">Cookie Policy</Link></li>
-                <li><Link href="/refund" className="hover:text-white transition-colors">Refund Policy</Link></li>
-                <li><Link href="/billing" className="hover:text-white transition-colors">Billing & Subscription</Link></li>
-              </ul>
-            </div>
+      <footer className="border-t border-line">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid gap-10 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <Logo href={home} />
+            <p className="mt-4 text-graphite max-w-xs">{t.footer.tagline}</p>
           </div>
-          <div className="border-t border-slate-800 mt-12 pt-8 text-sm flex flex-col md:flex-row justify-between items-center">
-            <p>© {new Date().getFullYear()} KaruAI. All rights reserved.</p>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              {/* Social placeholders */}
-              <div className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors"></div>
-              <div className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors"></div>
-              <div className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors"></div>
-            </div>
+          <div>
+            <h3 className="text-sm font-semibold mb-4">{t.footer.product}</h3>
+            <ul className="space-y-2.5 text-graphite">
+              {navLinks.map(link => (
+                <li key={link.href}><a href={link.href} className="hover:text-ink transition-colors">{link.label}</a></li>
+              ))}
+              <li><Link href="/login" className="hover:text-ink transition-colors">{t.nav.login}</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold mb-4">{t.footer.legal}</h3>
+            <ul className="space-y-2.5 text-graphite">
+              <li><Link href="/terms" className="hover:text-ink transition-colors">{t.footer.terms}</Link></li>
+              <li><Link href="/privacy" className="hover:text-ink transition-colors">{t.footer.privacy}</Link></li>
+              <li><Link href="/cookies" className="hover:text-ink transition-colors">{t.footer.cookies}</Link></li>
+              <li><Link href="/refund" className="hover:text-ink transition-colors">{t.footer.refund}</Link></li>
+            </ul>
           </div>
         </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 border-t border-line flex flex-wrap items-center justify-between gap-4 text-sm text-graphite">
+          <p>© {new Date().getFullYear()} KaruAI. {t.footer.rights}</p>
+          <Link href={otherLanguage} className="hover:text-ink transition-colors" lang={locale === 'he' ? 'en' : 'he'}>{t.nav.otherLanguage}</Link>
+        </div>
       </footer>
-
     </div>
   );
 }

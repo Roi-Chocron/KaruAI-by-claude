@@ -1,63 +1,61 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { PLANS, PLAN_IDS, type Plan } from '@/shared/plans';
+import { homeMessages, planCopyHe } from '@/messages/home';
+import type { Locale } from '@/lib/i18n';
 
-export function MonthlyYearlyToggle({ yearly, onChange }: { yearly: boolean; onChange: (yearly: boolean) => void }) {
+export function MonthlyYearlyToggle({ yearly, onChange, locale = 'en' }: { yearly: boolean; onChange: (yearly: boolean) => void; locale?: Locale }) {
+  const t = homeMessages[locale].pricing;
   const option = (value: boolean, label: ReactNode) => (
     <button
       type="button"
+      aria-pressed={yearly === value}
       onClick={() => onChange(value)}
-      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${yearly === value ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${yearly === value ? 'bg-ink text-paper' : 'text-graphite hover:text-ink'}`}
     >
       {label}
     </button>
   );
   return (
-    <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 border border-slate-200">
-      {option(false, 'Monthly')}
-      {option(true, <>Yearly <span className="text-green-600">−17%</span></>)}
+    <div className="inline-flex self-start md:self-auto items-center gap-1 p-1 rounded-xl border border-line bg-paper">
+      {option(false, t.monthly)}
+      {option(true, <>{t.yearly} <span className={`ms-1 rounded px-1.5 py-0.5 text-xs ${yearly ? 'bg-lime text-ink' : 'bg-mist text-ink'}`} dir="ltr">−17%</span></>)}
     </div>
   );
 }
 
 // The plan cards of the landing page and the billing page; `action` renders each card's button
-export function PricingCards({ yearly, action }: { yearly: boolean; action: (plan: Plan) => ReactNode }) {
+export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolean; action: (plan: Plan) => ReactNode; locale?: Locale }) {
+  const t = homeMessages[locale].pricing;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
       {PLAN_IDS.map(id => {
         const plan = PLANS[id];
+        const copy = locale === 'he' ? planCopyHe[id] : plan;
         const price = yearly ? plan.yearlyMonthlyPrice : plan.monthlyPrice;
+        const dark = plan.highlighted;
         return (
           <div
             key={id}
-            className={`rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 relative ${
-              plan.highlighted ? 'border-2 border-blue-600 bg-white shadow-xl md:scale-105' : 'border border-slate-200 bg-slate-50/50 hover:shadow-lg'
-            }`}
+            className={`rounded-2xl p-7 flex flex-col justify-between ${dark ? 'bg-ink text-paper' : 'bg-paper border border-line'}`}
           >
-            {plan.highlighted && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold py-1 px-4 rounded-full uppercase tracking-wider shadow">
-                {plan.badge}
-              </div>
-            )}
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
-                {!plan.highlighted && (
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">{plan.badge}</span>
-                )}
+              <div className="flex justify-between items-center gap-3 mb-3">
+                <h3 className="font-display font-bold text-4xl leading-none" dir="ltr">{plan.name}</h3>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-md ${dark ? 'bg-lime text-ink' : 'bg-mist text-ink'}`}>{copy.badge}</span>
               </div>
-              <p className="text-sm text-slate-500 mb-6 min-h-[40px]">{plan.description}</p>
-              <div className="mb-6">
-                <span className="text-4xl font-extrabold text-slate-900">${price}</span>
-                <span className="text-slate-500 text-sm"> / month</span>
-                {yearly && price > 0 && <p className="text-xs text-slate-500 mt-1">${price * 12} billed yearly</p>}
+              <p className={`text-sm mb-6 min-h-[40px] ${dark ? 'text-paper/70' : 'text-graphite'}`}>{copy.description}</p>
+              <div className="mb-6 flex items-baseline gap-2">
+                <span className="font-display font-bold text-7xl leading-none" dir="ltr">${price}</span>
+                <span className={`text-sm ${dark ? 'text-paper/70' : 'text-graphite'}`}>{t.perMonth}</span>
               </div>
-              <ul className="space-y-3 mb-8 text-sm text-slate-700">
-                {plan.features.map(feature => (
-                  <li key={feature} className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+              {yearly && price > 0 && <p className={`-mt-4 mb-6 text-xs ${dark ? 'text-paper/70' : 'text-graphite'}`}>{t.billedYearly(price * 12)}</p>}
+              <ul className={`space-y-3 mb-8 text-sm border-t pt-6 ${dark ? 'border-paper/15' : 'border-line'}`}>
+                {copy.features.map(feature => (
+                  <li key={feature} className="flex items-start gap-2.5">
+                    <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${dark ? 'text-lime' : 'text-ink'}`} strokeWidth={2.5} />
                     <span>{feature}</span>
                   </li>
                 ))}

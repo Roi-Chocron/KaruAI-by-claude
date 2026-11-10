@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { SITE_URL } from '@/lib/site';
+import { fontVariables } from '@/lib/fonts';
 
 const description = 'Describe your idea and KaruAI designs a ready-to-post Instagram carousel you can fine-tune in a full editor.';
 
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={fontVariables}>
       <body>
         <AnalyticsProvider>{children}</AnalyticsProvider>
       </body>
