@@ -36,3 +36,23 @@
     @apply bg-lime text-ink rounded-[0.12em] px-[0.12em] [box-decoration-break:clone] [-webkit-box-decoration-break:clone];
   }
 }
+
+/* The text of the legal pages */
+@layer components {
+  .legal h2 {
+    @apply font-display font-bold text-4xl leading-none mb-4;
+  }
+  .legal h3 {
+    @apply font-semibold text-lg;
+  }
+  .legal p,
+  .legal li {
+    @apply leading-relaxed text-graphite;
+  }
+  .legal a {
+    @apply text-ink underline underline-offset-2;
+  }
+  .legal strong {
+    @apply text-ink font-semibold;
+  }
+}
