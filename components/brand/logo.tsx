@@ -14,9 +14,9 @@ export function LogoMark({ size = 32, className = '' }: { size?: number; classNa
 // Mark and wordmark. The wordmark is Latin in both languages, so it stays left-to-right.
 export function Logo({ href = '/', className = '' }: { href?: string; className?: string }) {
   return (
-    <Link href={href} dir="ltr" aria-label="KaruAI" className={`inline-flex items-center gap-2 ${className}`}>
+    <Link href={href} dir="ltr" className={`inline-flex items-center gap-2 ${className}`}>
       <LogoMark />
-      <span className="text-[22px] font-extrabold tracking-[-0.03em] leading-none">karu</span>
+      <span className="text-[22px] font-extrabold tracking-[-0.03em] leading-none">KaruAI</span>
     </Link>
   );
 }

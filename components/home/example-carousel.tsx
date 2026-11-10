@@ -34,7 +34,7 @@ export function ExampleCarousel({ t, slideClass }: { t: HomeMessages['example'];
     <>
       <Slide className={`${slideClass} bg-ink`}>
         {counter(1, 'text-paper/60')}
-        <span className="mt-auto font-display font-bold text-lime text-[15cqw] leading-[0.9]">{t.cover}</span>
+        <span className="mt-auto font-display font-bold text-lime text-[13cqw] leading-[0.9]">{t.cover}</span>
         <span className="mt-[7cqw] h-[1.4cqw] w-[16cqw] bg-lime" />
       </Slide>
       {t.items.map((item, i) => {

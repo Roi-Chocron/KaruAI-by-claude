@@ -12,7 +12,12 @@ import { localePath, type Locale } from '@/lib/i18n';
 function Headline({ text }: { text: { before: string; marked: string; after: string } }) {
   return (
     <>
-      {text.before}
+      {text.before.split('\n').map((line, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </React.Fragment>
+      ))}
       <span className="marker whitespace-nowrap">{text.marked}</span>
       {text.after}
     </>
@@ -83,7 +88,7 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
       {/* Hero: an oversized headline, and a sample carousel that runs off the edge of the page */}
       <header className="pt-14 md:pt-20 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="font-display font-bold text-[clamp(4.5rem,13vw,11.5rem)] leading-[0.86] max-w-[16ch]">
+          <h1 className="font-display font-bold text-[clamp(4rem,9.5vw,10rem)] leading-[0.88]">
             <Headline text={t.hero.title} />
           </h1>
           <div className="mt-8 md:mt-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
@@ -96,13 +101,7 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
               <a href="#how-it-works" className="btn-secondary text-base px-6 py-3.5">{t.hero.secondary}</a>
             </div>
           </div>
-          <div className="mt-14 mb-4 flex items-center justify-between text-sm text-graphite">
-            <span>{t.hero.examplesLabel}</span>
-            <span className="flex items-center gap-1.5 font-medium text-ink">
-              {t.hero.swipe}
-              <Forward className="w-4 h-4" />
-            </span>
-          </div>
+          <p className="mt-14 mb-4 text-sm text-graphite">{t.hero.examplesLabel}</p>
         </div>
         <div
           role="region"
