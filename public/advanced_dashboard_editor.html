@@ -2391,6 +2391,13 @@
             }
             (saved?.chat ?? []).forEach(message => addChatBubble(message.text, message.tone));
             state.loaded = true;
+            // A new carousel opened from one of the gallery's example prompts: type it in, the user sends it
+            const startPrompt = new URLSearchParams(location.search).get('prompt');
+            if (startPrompt && !saved?.chat?.length && !state.slides.length) {
+                const input = document.getElementById('chat-input');
+                input.value = startPrompt;
+                input.focus();
+            }
             if (state.slides.length) {
                 loadSlide(Math.min(saved.currentSlide ?? 0, state.slides.length - 1));
                 renderImagePrompts();

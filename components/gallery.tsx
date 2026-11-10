@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, ImageOff, Loader2, LogOut, Plus, Shield, Trash2 } from 'lucide-react';
 import { logOut } from '@/lib/session';
+import StarterPrompts from '@/components/starter-prompts';
 import type { CarouselMeta, PublicUser } from '@/types';
 
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -56,7 +57,8 @@ export default function Gallery({ user }: { user: PublicUser }) {
       .catch(err => setError(err instanceof Error ? err.message : 'Could not load the carousels.'));
   }, []);
 
-  const createCarousel = async () => {
+  // With a prompt (from the empty gallery's examples) the editor opens with it typed into the chat
+  const createCarousel = async (prompt?: string) => {
     if (isCreating) return;
     setIsCreating(true);
     try {
@@ -69,7 +71,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
         return;
       }
       if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
-      router.push(`/carousel?id=${data.id}`);
+      router.push(`/carousel?id=${data.id}${prompt ? `&prompt=${encodeURIComponent(prompt)}` : ''}`);
     } catch (err) {
       setIsCreating(false);
       alert(err instanceof Error ? err.message : 'Could not create a carousel.');
@@ -122,7 +124,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
             <LogOut size={18} />
           </button>
           <button
-            onClick={createCarousel}
+            onClick={() => createCarousel()}
             disabled={isCreating}
             className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-60"
           >
@@ -147,9 +149,10 @@ export default function Gallery({ user }: { user: PublicUser }) {
             <Bot size={40} className="mx-auto text-indigo-300 mb-4" />
             <p className="font-semibold text-slate-700 mb-1">No carousels yet</p>
             <p className="text-sm text-gray-500 mb-6">Create your first one and describe it to KaruAI.</p>
-            <button onClick={createCarousel} disabled={isCreating} className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-60">
+            <button onClick={() => createCarousel()} disabled={isCreating} className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-60">
               New carousel
             </button>
+            <StarterPrompts onPick={createCarousel} disabled={isCreating} />
           </div>
         )}
 
