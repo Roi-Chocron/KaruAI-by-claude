@@ -2,19 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { Logo } from '@/components/brand/logo';
+import { MarkedText } from '@/components/brand/marked-text';
+import { Slide } from '@/components/home/example-carousel';
+import { LanguageSwitch } from '@/components/language-switch';
+import { UserLocaleRoot } from '@/components/locale-root';
+import { authMessages } from '@/messages/auth';
+import { homeMessages } from '@/messages/home';
+import { localePath, type Locale } from '@/lib/i18n';
 
 // Sign-in is with Google only: the button sends the browser to the API, which takes it through Google's
 // consent screen and back to `next` with a session
-const ERRORS: Record<string, string> = {
-  cancelled: 'Google sign-in was cancelled.',
-  state: 'The sign-in link expired. Please try again.',
-  failed: 'Google sign-in failed. Please try again.',
-  unverified: 'Your Google account has no verified email address.',
-  config: 'Google sign-in is not set up yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).',
-  rate: 'Too many sign-in attempts. Please wait a few minutes and try again.',
-  suspended: 'This account is suspended. Please contact support.',
-};
 
 function GoogleLogo() {
   return (
@@ -54,8 +52,8 @@ function DevLogin({ next }: { next: string }) {
   };
 
   return (
-    <form onSubmit={submit} className="mt-8 p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50">
-      <p className="text-xs font-semibold text-amber-800 mb-2">Dev login (local development only)</p>
+    <form onSubmit={submit} dir="ltr" lang="en" className="mt-10 p-4 rounded-xl border border-dashed border-graphite bg-mist">
+      <p className="text-xs font-semibold mb-2">Dev login (local development only)</p>
       <div className="flex gap-2">
         <input
           type="email"
@@ -63,27 +61,28 @@ function DevLogin({ next }: { next: string }) {
           value={email}
           onChange={e => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="flex-1 min-w-0 border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+          aria-label="Email"
+          className="flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm bg-paper focus:outline-none focus:border-ink"
         />
-        <button type="submit" disabled={busy} className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60">
+        <button type="submit" disabled={busy} className="btn-primary !py-2 !px-4 text-sm disabled:opacity-60">
           Sign in
         </button>
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-700 mt-2">{error}</p>}
     </form>
   );
 }
 
-export default function AuthPage() {
+function SignIn({ locale }: { locale: Locale }) {
+  const t = authMessages[locale];
   const [next, setNext] = useState('/dashboard');
-  const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [devLogin, setDevLogin] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNext(safeNext(params.get('next')));
-    const code = params.get('error');
-    if (code) setError(ERRORS[code] ?? ERRORS.failed);
+    setErrorCode(params.get('error'));
     fetch('/api/auth/providers')
       .then(res => res.json())
       .then(data => setDevLogin(data?.devLogin === true))
@@ -91,95 +90,69 @@ export default function AuthPage() {
   }, []);
 
   const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
+  const error = errorCode ? t.errors[errorCode] ?? t.errors.failed : null;
+  const example = homeMessages[locale].example;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900" dir="ltr">
-      
-      {/* Left Form Section */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 md:px-24 py-12 relative z-10">
-        
-        {/* Logo (Mobile Top) */}
-        <Link href="/" className="absolute top-8 left-8 lg:hidden flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="text-white w-5 h-5" />
-          </div>
-          <span className="font-extrabold text-xl tracking-tight">KaruAI</span>
-        </Link>
+    <div className="min-h-screen bg-paper text-ink grid lg:grid-cols-2">
+      <div className="flex flex-col px-6 sm:px-12 lg:px-16 py-8">
+        <div className="flex items-center justify-between">
+          <Logo href={localePath(locale, '/')} />
+          <LanguageSwitch locale={locale} />
+        </div>
 
-        <div className="max-w-md w-full mx-auto mt-10 lg:mt-0">
-          <div className="mb-10 text-center lg:text-left">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">
-              Welcome to KaruAI
-            </h1>
-            <p className="text-slate-500 text-lg">
-              Sign in or create your free account with Google.
-            </p>
-          </div>
+        <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto lg:mx-0 py-16">
+          <h1 className="font-display font-bold text-6xl sm:text-7xl leading-[0.9]">{t.title}</h1>
+          <p className="mt-4 text-lg text-graphite">{t.sub}</p>
 
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div role="alert" className="mt-8 p-4 rounded-xl border border-red-700 text-red-700 text-sm">
               {error}
             </div>
           )}
 
-          <a
-            href={href}
-            className="w-full flex justify-center items-center gap-3 bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 px-4 rounded-xl border border-slate-200 shadow-sm transition-all transform hover:-translate-y-0.5"
-          >
+          <a href={href} className="btn mt-8 w-full border border-ink bg-paper text-ink hover:bg-mist py-3.5">
             <GoogleLogo />
-            Continue with Google
+            {t.google}
           </a>
 
-          <p className="mt-8 text-center text-xs text-slate-500 leading-relaxed">
-            By continuing you agree to our{' '}
-            <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link> and{' '}
-            <Link href="/privacy" className="underline hover:text-slate-700">Privacy Policy</Link>.
+          <p className="mt-6 text-sm text-graphite leading-relaxed">
+            {t.agree.before}
+            <Link href="/terms" className="text-ink underline underline-offset-2">{t.agree.terms}</Link>
+            {t.agree.and}
+            <Link href="/privacy" className="text-ink underline underline-offset-2">{t.agree.privacy}</Link>
+            {t.agree.after}
           </p>
 
           {devLogin && <DevLogin next={next} />}
         </div>
       </div>
 
-      {/* Right Brand Section (Hidden on Mobile) */}
-      <div className="hidden lg:flex w-1/2 bg-blue-600 relative overflow-hidden flex-col justify-between p-12">
-        {/* Background Decorative Elements */}
-        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-50"></div>
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-purple-500 rounded-full blur-3xl opacity-40"></div>
-
-        {/* Logo */}
-        <Link href="/" className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-            <Sparkles className="text-blue-600 w-7 h-7" />
-          </div>
-          <span className="font-extrabold text-2xl tracking-tight text-white">KaruAI</span>
-        </Link>
-
-        <div className="relative z-10 max-w-lg">
-          <h2 className="text-4xl font-bold text-white mb-6 leading-tight">
-            Turn ideas into visual stories in seconds.
-          </h2>
-          
-          <div className="space-y-5 text-blue-100 mb-12 text-lg">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-blue-300 shrink-0 mt-0.5" />
-              <p>AI-powered generation of stunning carousels for social media.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-blue-300 shrink-0 mt-0.5" />
-              <p>Fully customizable templates, colors, and typography to match your brand.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-blue-300 shrink-0 mt-0.5" />
-              <p>Organize, duplicate, and manage all your creations in one smart workspace.</p>
-            </div>
-          </div>
+      {/* The other half: what you get, as three slides of the landing page's sample carousel */}
+      <div className="hidden lg:flex flex-col bg-ink text-paper p-12 xl:p-16 overflow-hidden lg:sticky lg:top-0 lg:h-screen">
+        <h2 className="font-display font-bold text-6xl xl:text-7xl leading-[0.9]">
+          <MarkedText text={t.panelTitle} />
+        </h2>
+        <div aria-hidden="true" className="relative flex-1 min-h-[16rem] my-10">
+          <Slide className="absolute w-44 xl:w-52 top-[12%] start-0 -rotate-6 bg-mist text-ink">
+            <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">02</span>
+            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[1].title}</span>
+          </Slide>
+          <Slide className="absolute w-44 xl:w-52 top-[6%] start-[9rem] xl:start-[10.5rem] rotate-2 bg-lime text-ink">
+            <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">01</span>
+            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[0].title}</span>
+          </Slide>
+          <Slide className="absolute w-44 xl:w-52 top-0 start-[18rem] xl:start-[21rem] rotate-[8deg] bg-paper text-ink">
+            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.9]">{example.cover}</span>
+            <span className="mt-[7cqw] h-[1.4cqw] w-[16cqw] bg-ink" />
+          </Slide>
         </div>
-
-        <p className="relative z-10 text-sm text-blue-100">
-          Free to start · No credit card required
-        </p>
+        <p className="text-paper/70">{t.panelNote}</p>
       </div>
-
     </div>
   );
+}
+
+export default function AuthPage() {
+  return <UserLocaleRoot>{locale => <SignIn locale={locale} />}</UserLocaleRoot>;
 }

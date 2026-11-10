@@ -13,3 +13,7 @@ export function localePath(locale: Locale, path: string) {
 }
 
 export type Messages<T> = { en: T; he: T };
+
+// The language of the signed-in pages (which have one address for both languages): remembered in a cookie,
+// set by the language links and by visiting the English or Hebrew landing page
+export const LOCALE_COOKIE = 'karu_locale';

@@ -14,9 +14,9 @@ const THEMES: Theme[] = [
 ];
 
 // Sizes inside a slide are in cqw (percent of the slide's width), so the text scales with the slide
-function Slide({ className, children }: { className: string; children: ReactNode }) {
+export function Slide({ className, children }: { className: string; children: ReactNode }) {
   return (
-    <div className={`relative flex-none aspect-[4/5] rounded-2xl overflow-hidden snap-start [container-type:inline-size] ${className}`}>
+    <div className={`${/\babsolute\b/.test(className) ? '' : 'relative '}flex-none aspect-[4/5] rounded-2xl overflow-hidden snap-start [container-type:inline-size] ${className}`}>
       <div className="absolute inset-0 p-[8cqw] flex flex-col items-start">{children}</div>
     </div>
   );

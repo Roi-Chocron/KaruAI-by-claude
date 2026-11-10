@@ -1,8 +1,7 @@
 import type { Messages } from '@/lib/i18n';
 import type { PlanId } from '@/shared/plans';
+import type { Marked } from '@/components/brand/marked-text';
 
-// A headline with one phrase on the lime marker: `before` + `marked` + `after`; \n starts a new line
-type Marked = { before: string; marked: string; after: string };
 
 const en = {
   meta: {

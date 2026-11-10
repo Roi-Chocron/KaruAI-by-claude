@@ -5,24 +5,10 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Menu, X } from 'lucide-react';
 import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
 import { Logo } from '@/components/brand/logo';
+import { MarkedText } from '@/components/brand/marked-text';
 import { ExampleCarousel } from '@/components/home/example-carousel';
 import { homeMessages } from '@/messages/home';
 import { localePath, type Locale } from '@/lib/i18n';
-
-function Headline({ text }: { text: { before: string; marked: string; after: string } }) {
-  return (
-    <>
-      {text.before.split('\n').map((line, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <br />}
-          {line}
-        </React.Fragment>
-      ))}
-      <span className="marker whitespace-nowrap">{text.marked}</span>
-      {text.after}
-    </>
-  );
-}
 
 export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -89,7 +75,7 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
       <header className="pt-14 md:pt-20 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="font-display font-bold text-[clamp(4rem,9.5vw,10rem)] leading-[0.88]">
-            <Headline text={t.hero.title} />
+            <MarkedText text={t.hero.title} />
           </h1>
           <div className="mt-8 md:mt-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
             <p className="text-lg md:text-xl leading-relaxed text-graphite max-w-xl">{t.hero.sub}</p>

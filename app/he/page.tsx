@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function HebrewHome() {
   return (
-    <LocaleRoot locale="he">
+    <LocaleRoot locale="he" remember>
       <SignedInRedirect />
       <KaruAIHome locale="he" />
     </LocaleRoot>
