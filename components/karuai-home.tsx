@@ -47,8 +47,9 @@ export default function KaruAIHome() {
             <div className="md:hidden flex items-center">
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-slate-600 hover:text-slate-900 focus:outline-none p-2"
+                className="text-slate-600 hover:text-slate-900 p-2"
                 aria-label="Toggle navigation menu"
+                aria-expanded={isMobileMenuOpen}
               >
                 {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
@@ -286,7 +287,7 @@ export default function KaruAIHome() {
               </p>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
+              <h2 className="text-white font-semibold mb-4">Product</h2>
               <ul className="space-y-2">
                 <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
                 <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
@@ -294,12 +295,13 @@ export default function KaruAIHome() {
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Support & Legal</h4>
+              <h2 className="text-white font-semibold mb-4">Support & Legal</h2>
               <ul className="space-y-2">
                 <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
                 <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link href="/cookies" className="hover:text-white transition-colors">Cookie Policy</Link></li>
                 <li><Link href="/refund" className="hover:text-white transition-colors">Refund Policy</Link></li>
+                <li><Link href="/accessibility" className="hover:text-white transition-colors">Accessibility Statement</Link></li>
                 <li><Link href="/billing" className="hover:text-white transition-colors">Billing & Subscription</Link></li>
               </ul>
             </div>

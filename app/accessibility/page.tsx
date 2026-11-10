@@ -1,0 +1,117 @@
+import React from 'react';
+import Link from 'next/link';
+import { Sparkles, ArrowLeft, Accessibility } from 'lucide-react';
+
+export const metadata = {
+  title: 'Accessibility Statement - KaruAI',
+  description: 'How KaruAI makes its website accessible, what is not accessible yet, and how to contact our accessibility coordinator.',
+};
+
+// Text in [square brackets] is a placeholder to fill in before launch
+const Placeholder = ({ children }: { children: React.ReactNode }) => (
+  <mark className="bg-amber-100 text-amber-900 rounded px-1">[{children}]</mark>
+);
+
+export default function AccessibilityPage() {
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans" dir="ltr">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 py-6 px-4 sm:px-8">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow">
+              <Sparkles className="text-white w-5 h-5" />
+            </div>
+            <span className="font-extrabold text-xl tracking-tight text-slate-900">
+              Karu<span className="text-blue-600">AI</span>
+            </span>
+          </Link>
+          <Link
+            href="/"
+            className="text-sm font-medium text-slate-600 hover:text-blue-600 flex items-center gap-1.5 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Home</span>
+          </Link>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-8 py-12">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 sm:p-12 space-y-8">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-3 border border-blue-100">
+              <Accessibility className="w-4 h-4" />
+              <span>Accessibility</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+              Accessibility Statement
+            </h1>
+            <p className="text-sm text-slate-500">
+              Last updated: <Placeholder>date</Placeholder>
+            </p>
+          </div>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-slate-900">1. Our Commitment</h2>
+            <p className="leading-relaxed text-slate-600">
+              <strong><Placeholder>business name</Placeholder></strong>, which operates <strong>KaruAI</strong>, wants everyone, including people with disabilities, to be able to use our website and services independently and with ease. We work to make the site accessible in line with the Equal Rights for Persons with Disabilities Law, 5758-1998, and its regulations on accessibility of services.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-slate-900">2. Accessibility Standard</h2>
+            <p className="leading-relaxed text-slate-600">
+              We aim to meet Israeli Standard IS 5568, which is based on the Web Content Accessibility Guidelines (WCAG) 2.1 at level AA.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-slate-900">3. What We Have Done</h2>
+            <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
+              <li>The site can be used with a keyboard, and the element in focus is clearly marked.</li>
+              <li>Pages use headings, labels and landmarks so screen readers can announce them correctly.</li>
+              <li>Buttons that show only an icon have a text name, and images have text alternatives or are marked as decorative.</li>
+              <li>Text and controls have sufficient color contrast, and the page language is declared.</li>
+              <li>The site works with the browser&apos;s zoom and with the accessibility settings of the operating system.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-slate-900">4. Known Limitations</h2>
+            <p className="leading-relaxed text-slate-600">
+              Despite our efforts, some parts of the site may not be fully accessible yet:
+            </p>
+            <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
+              <li>
+                The carousel editor is a visual design tool. Placing, resizing and arranging elements on the canvas is done mostly with a mouse, and it is designed for computer screens rather than phones.
+              </li>
+              <li>
+                Carousels generated by the AI are images. Their colors and text are chosen by the AI and by you, so they may not meet contrast requirements; please review them before you publish.
+              </li>
+            </ul>
+            <p className="leading-relaxed text-slate-600">
+              If you need help with any of these, contact us and we will do our best to help or provide the content in another way.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-slate-900">5. Accessibility Coordinator</h2>
+            <p className="leading-relaxed text-slate-600">
+              If you run into an accessibility problem, or have a question or suggestion, please contact our accessibility coordinator. We will reply as soon as we can.
+            </p>
+            <ul className="space-y-1.5 text-slate-600 pl-2">
+              <li><strong>Name:</strong> <Placeholder>accessibility coordinator&apos;s name</Placeholder></li>
+              <li><strong>Email:</strong> <Placeholder>accessibility coordinator&apos;s email</Placeholder></li>
+              <li><strong>Phone:</strong> <Placeholder>accessibility coordinator&apos;s phone</Placeholder></li>
+              <li><strong>Mailing address:</strong> <Placeholder>business address</Placeholder></li>
+            </ul>
+            <p className="leading-relaxed text-slate-600">
+              To help us fix the problem quickly, please describe it, tell us which page it was on, and which browser and assistive technology (if any) you used.
+            </p>
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}

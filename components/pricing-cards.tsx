@@ -9,6 +9,7 @@ export function MonthlyYearlyToggle({ yearly, onChange }: { yearly: boolean; onC
     <button
       type="button"
       onClick={() => onChange(value)}
+      aria-pressed={yearly === value}
       className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${yearly === value ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}
     >
       {label}

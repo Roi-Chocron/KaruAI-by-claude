@@ -70,7 +70,7 @@ const SettingRow = ({ setting, onSaved }: { setting: Setting; onSaved: (setting:
           <p className="text-xs text-gray-500 mb-2">{meta.help}</p>
           <p className="text-xs">
             <span className="font-mono text-slate-700">{setting.value || '—'}</span>
-            <span className={`ml-2 ${missing ? 'text-red-500' : 'text-gray-400'}`}>{sourceLabel}</span>
+            <span className={`ml-2 ${missing ? 'text-red-600' : 'text-gray-500'}`}>{sourceLabel}</span>
           </p>
         </div>
         <form
@@ -83,6 +83,7 @@ const SettingRow = ({ setting, onSaved }: { setting: Setting; onSaved: (setting:
             onChange={e => setDraft(e.target.value)}
             placeholder={meta.secret ? 'Paste a new key' : 'New model name'}
             autoComplete="off"
+            aria-label={meta.label}
             className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <button type="submit" disabled={busy || !draft.trim()} className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
@@ -115,7 +116,7 @@ function DailyChart({ daily }: { daily: Stats['daily'] }) {
             <div className="flex-1 w-full flex items-end">
               <div className="w-full bg-indigo-500 rounded-t" style={{ height: `${(total / max) * 100}%`, minHeight: total ? 2 : 0 }} />
             </div>
-            <span className="text-[10px] text-gray-400">{day.slice(8)}</span>
+            <span className="text-[10px] text-gray-500">{day.slice(8)}</span>
           </div>
         );
       })}
@@ -176,9 +177,9 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
     <div className="min-h-screen bg-gray-50 text-slate-800">
       <header className="h-16 border-b border-gray-200 bg-white px-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <a href="/dashboard" className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-indigo-600" title="Back to carousels"><ArrowLeft size={18} /></a>
+          <a href="/dashboard" className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-indigo-600" title="Back to carousels" aria-label="Back to carousels"><ArrowLeft size={18} /></a>
           <Shield className="text-indigo-600" size={20} />
-          <span className="text-xl font-bold tracking-tight text-slate-900">Admin</span>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Admin</h1>
         </div>
         <span className="text-sm text-gray-500">{me.email}</span>
       </header>
@@ -211,7 +212,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
           <h2 className="flex items-center gap-2 font-bold text-slate-900 mb-1"><KeyRound size={18} /> API keys</h2>
           <p className="text-sm text-gray-500 mb-2">Keys saved here take effect right away and override the Worker secrets. Saved keys are never shown again in full.</p>
           {!settings ? (
-            <div className="flex items-center gap-2 text-sm text-gray-400 py-4"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+            <div role="status" className="flex items-center gap-2 text-sm text-gray-500 py-4"><Loader2 size={16} className="animate-spin" /> Loading…</div>
           ) : (
             settings.map(setting => (
               <SettingRow key={setting.key} setting={setting} onSaved={next => setSettings(prev => prev?.map(item => (item.key === next.key ? next : item)) ?? null)} />
@@ -222,7 +223,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
         <section className="bg-white border border-gray-200 rounded-2xl p-6">
           <h2 className="flex items-center gap-2 font-bold text-slate-900 mb-4"><Users size={18} /> Users</h2>
           {!users ? (
-            <div className="flex items-center gap-2 text-sm text-gray-400 py-4"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+            <div role="status" className="flex items-center gap-2 text-sm text-gray-500 py-4"><Loader2 size={16} className="animate-spin" /> Loading…</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -254,6 +255,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
                             value={user.role}
                             disabled={isMe}
                             onChange={e => updateUser(user, { role: e.target.value })}
+                            aria-label={`Role of ${user.email}`}
                             title={isMe ? 'You cannot change your own role' : undefined}
                             className={`border rounded-lg px-2 py-1 text-xs font-semibold disabled:opacity-70 ${user.role === 'admin' ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-slate-700'}`}
                           >
@@ -266,6 +268,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
                             value={user.plan}
                             disabled={isMe}
                             onChange={e => updateUser(user, { plan: e.target.value })}
+                            aria-label={`Plan of ${user.email}`}
                             className="border border-gray-200 bg-white rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-70"
                           >
                             {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
@@ -282,7 +285,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
                               <button onClick={() => toggleSuspended(user)} className={`text-xs font-semibold px-2 py-1 rounded-lg ${user.suspendedAt ? 'text-green-700 hover:bg-green-50' : 'text-amber-700 hover:bg-amber-50'}`}>
                                 {user.suspendedAt ? 'Unsuspend' : 'Suspend'}
                               </button>
-                              <button onClick={() => removeUser(user)} title="Delete user" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+                              <button onClick={() => removeUser(user)} title="Delete user" aria-label={`Delete ${user.email}`} className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50">
                                 <Trash2 size={16} />
                               </button>
                             </>

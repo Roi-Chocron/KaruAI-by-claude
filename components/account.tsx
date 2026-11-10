@@ -74,7 +74,7 @@ export default function AccountPage() {
 
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
         {!account ? (
-          !error && <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+          !error && <div role="status" className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Loading…</div>
         ) : (
           <>
             <section className={card}>
@@ -145,6 +145,7 @@ export default function AccountPage() {
                   value={confirmEmail}
                   onChange={e => setConfirmEmail(e.target.value)}
                   placeholder={`Type ${account.user.email} to confirm`}
+                  aria-label={`Type ${account.user.email} to confirm deleting your account`}
                   className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
                 <button

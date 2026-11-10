@@ -24,9 +24,9 @@ const Thumbnail = ({ carousel }: { carousel: CarouselMeta }) => {
   const [failed, setFailed] = useState(false);
   if (carousel.slideCount === 0 || failed) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-300">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-400">
         <ImageOff size={32} />
-        <span className="text-xs font-medium text-gray-400">{carousel.slideCount === 0 ? 'Empty' : 'No preview'}</span>
+        <span className="text-xs font-medium text-gray-500">{carousel.slideCount === 0 ? 'Empty' : 'No preview'}</span>
       </div>
     );
   }
@@ -107,7 +107,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
           <a href="/account" title="Account" className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100">
             <div className="text-right leading-tight">
               <p className="text-sm font-semibold text-slate-800" dir="auto">{user.name || user.email}</p>
-              {user.name && <p className="text-xs text-gray-400">{user.email}</p>}
+              {user.name && <p className="text-xs text-gray-500">{user.email}</p>}
             </div>
             {user.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -118,7 +118,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
               </div>
             )}
           </a>
-          <button onClick={logOut} title="Log out" className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+          <button onClick={logOut} title="Log out" aria-label="Log out" className="p-2 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50">
             <LogOut size={18} />
           </button>
           <button
@@ -139,7 +139,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
 
         {!error && carousels === null && (
-          <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+          <div role="status" className="flex items-center gap-2 text-sm text-gray-500"><Loader2 size={16} className="animate-spin" /> Loading…</div>
         )}
 
         {carousels?.length === 0 && (
@@ -156,9 +156,9 @@ export default function Gallery({ user }: { user: PublicUser }) {
         {carousels && carousels.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             <button
-              onClick={createCarousel}
+              onClick={() => createCarousel()}
               disabled={isCreating}
-              className="aspect-[4/5] rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+              className="aspect-[4/5] rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
             >
               <Plus size={32} />
               <span className="text-sm font-semibold">New carousel</span>
@@ -167,6 +167,7 @@ export default function Gallery({ user }: { user: PublicUser }) {
               <div key={carousel.id} className="group">
                 <button
                   onClick={() => router.push(`/carousel?id=${carousel.id}`)}
+                  aria-label={`Open ${carousel.title || 'Untitled carousel'}`}
                   className="relative block w-full aspect-[4/5] rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm group-hover:shadow-lg group-hover:border-indigo-300 transition-all"
                 >
                   <Thumbnail carousel={carousel} />
@@ -174,14 +175,15 @@ export default function Gallery({ user }: { user: PublicUser }) {
                 <div className="flex items-start justify-between gap-2 mt-3">
                   <button onClick={() => router.push(`/carousel?id=${carousel.id}`)} className="min-w-0 text-left">
                     <p className="font-semibold text-sm text-slate-800 truncate" dir="auto">{carousel.title || 'Untitled carousel'}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-500">
                       {carousel.slideCount} slide{carousel.slideCount === 1 ? '' : 's'} · edited {timeAgo(carousel.updatedAt)}
                     </p>
                   </button>
                   <button
                     onClick={() => deleteCarousel(carousel)}
                     title="Delete carousel"
-                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    aria-label={`Delete ${carousel.title || 'Untitled carousel'}`}
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
                   >
                     <Trash2 size={16} />
                   </button>
