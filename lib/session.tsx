@@ -51,8 +51,8 @@ export function RequireAuth({ children, admin = false }: { children: (user: Publ
 
   if (user) return <>{children(user)}</>;
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">
-      {error ?? <Loader2 className="animate-spin text-indigo-500" size={28} />}
+    <div className="min-h-screen flex items-center justify-center bg-paper text-sm text-graphite px-6 text-center">
+      {error ?? <Loader2 className="animate-spin text-ink" size={28} />}
     </div>
   );
 }

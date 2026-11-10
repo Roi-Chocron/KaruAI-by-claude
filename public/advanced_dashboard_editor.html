@@ -2412,6 +2412,13 @@
             }
             lastSavedJson = JSON.stringify(documentForSave());
             setSaveStatus(saved ? 'saved' : '');
+            // A new carousel opened from one of the gallery's ideas (?prompt=) starts with it in the chat box
+            const startPrompt = new URLSearchParams(location.search).get('prompt');
+            const chatInput = document.getElementById('chat-input');
+            if (startPrompt && !state.slides.length && !chatInput.value) {
+                chatInput.value = startPrompt.slice(0, 500);
+                chatInput.focus();
+            }
         }
 
         // Init

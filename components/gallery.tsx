@@ -2,35 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, ImageOff, Loader2, LogOut, Plus, Shield, Trash2 } from 'lucide-react';
-import { logOut } from '@/lib/session';
+import { ImageOff, Loader2, Plus, Trash2 } from 'lucide-react';
+import { AppShell, PageHeading } from '@/components/app-shell';
+import { appMessages, type AppMessages } from '@/messages/app';
+import type { Locale } from '@/lib/i18n';
 import type { CarouselMeta, PublicUser } from '@/types';
 
-const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 365 * 24 * 3600], ['month', 30 * 24 * 3600], ['week', 7 * 24 * 3600],
   ['day', 24 * 3600], ['hour', 3600], ['minute', 60],
 ];
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, locale: Locale, justNow: string) {
   const seconds = (new Date(iso).getTime() - Date.now()) / 1000;
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
   for (const [unit, size] of UNITS) {
-    if (Math.abs(seconds) >= size) return relativeTime.format(Math.round(seconds / size), unit);
+    if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
   }
-  return 'just now';
+  return justNow;
 }
 
-const Thumbnail = ({ carousel }: { carousel: CarouselMeta }) => {
+const Thumbnail = ({ carousel, t }: { carousel: CarouselMeta; t: AppMessages['gallery'] }) => {
   const [failed, setFailed] = useState(false);
   if (carousel.slideCount === 0 || failed) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-300">
-        <ImageOff size={32} />
-        <span className="text-xs font-medium text-gray-400">{carousel.slideCount === 0 ? 'Empty' : 'No preview'}</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-mist text-graphite">
+        <ImageOff size={28} strokeWidth={1.5} />
+        <span className="text-xs font-medium">{carousel.slideCount === 0 ? t.empty : t.noPreview}</span>
       </div>
     );
   }
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`/api/carousels/${carousel.id}/thumbnail?v=${encodeURIComponent(carousel.updatedAt)}`}
       alt=""
@@ -40,7 +43,8 @@ const Thumbnail = ({ carousel }: { carousel: CarouselMeta }) => {
   );
 };
 
-export default function Gallery({ user }: { user: PublicUser }) {
+function CarouselGrid({ locale }: { locale: Locale }) {
+  const t = appMessages[locale].gallery;
   const router = useRouter();
   const [carousels, setCarousels] = useState<CarouselMeta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +57,11 @@ export default function Gallery({ user }: { user: PublicUser }) {
         if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
         setCarousels(data.carousels);
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Could not load the carousels.'));
-  }, []);
+      .catch(err => setError(err instanceof Error ? err.message : t.loadFailed));
+  }, [t.loadFailed]);
 
-  const createCarousel = async () => {
+  // `prompt` (one of the empty state's ideas) goes into the new carousel's chat box
+  const createCarousel = async (prompt?: string) => {
     if (isCreating) return;
     setIsCreating(true);
     try {
@@ -65,132 +70,114 @@ export default function Gallery({ user }: { user: PublicUser }) {
       if (res.status === 402) {
         // The plan's monthly carousel limit is used up
         setIsCreating(false);
-        if (confirm(`${data?.error ?? 'Your plan limit is reached.'}\n\nSee the plans?`)) router.push('/billing');
+        if (confirm(`${data?.error ?? t.limitReached}\n\n${t.seePlans}`)) router.push('/billing');
         return;
       }
       if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
-      router.push(`/carousel?id=${data.id}`);
+      router.push(`/carousel?id=${data.id}${prompt ? `&prompt=${encodeURIComponent(prompt)}` : ''}`);
     } catch (err) {
       setIsCreating(false);
-      alert(err instanceof Error ? err.message : 'Could not create a carousel.');
+      alert(err instanceof Error ? err.message : t.createFailed);
     }
   };
 
   const deleteCarousel = async (carousel: CarouselMeta) => {
-    if (!confirm(`Delete "${carousel.title || 'Untitled carousel'}"? This cannot be undone.`)) return;
+    if (!confirm(t.confirmDelete(carousel.title || t.untitled))) return;
     const res = await fetch(`/api/carousels/${carousel.id}`, { method: 'DELETE' });
     if (!res.ok) {
-      alert('Could not delete the carousel.');
+      alert(t.deleteFailed);
       return;
     }
     setCarousels(prev => prev?.filter(item => item.id !== carousel.id) ?? null);
   };
 
+  const newButton = (
+    <button onClick={() => createCarousel()} disabled={isCreating} className="btn-primary self-start sm:self-auto disabled:opacity-60">
+      {isCreating ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+      {t.newCarousel}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-800">
-      <header className="h-16 border-b border-gray-200 bg-white px-8 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow">
-            <Bot className="text-white" size={20} />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900">KaruAI</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <a href="/billing" className="text-sm font-medium text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
-            Billing & Plan
-          </a>
-          {user.role === 'admin' && (
-            <a href="/admin" className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-gray-100">
-              <Shield size={16} /> Admin
-            </a>
-          )}
-          <a href="/account" title="Account" className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100">
-            <div className="text-right leading-tight">
-              <p className="text-sm font-semibold text-slate-800" dir="auto">{user.name || user.email}</p>
-              {user.name && <p className="text-xs text-gray-400">{user.email}</p>}
-            </div>
-            {user.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
-                {(user.name || user.email)[0].toUpperCase()}
-              </div>
-            )}
-          </a>
-          <button onClick={logOut} title="Log out" className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
-            <LogOut size={18} />
-          </button>
-          <button
-            onClick={createCarousel}
-            disabled={isCreating}
-            className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-60"
-          >
-            {isCreating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            New carousel
-          </button>
-        </div>
-      </header>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <PageHeading title={t.title} sub={t.sub} action={carousels?.length ? newButton : undefined} />
 
-      <main className="max-w-6xl mx-auto px-8 py-10">
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">Your carousels</h1>
-        <p className="text-sm text-gray-500 mb-8">Everything is saved automatically. Open a carousel to keep working on it.</p>
+      {error && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{error}</p>}
 
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
+      {!error && carousels === null && (
+        <div className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+      )}
 
-        {!error && carousels === null && (
-          <div className="flex items-center gap-2 text-sm text-gray-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
-        )}
-
-        {carousels?.length === 0 && (
-          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-16 text-center">
-            <Bot size={40} className="mx-auto text-indigo-300 mb-4" />
-            <p className="font-semibold text-slate-700 mb-1">No carousels yet</p>
-            <p className="text-sm text-gray-500 mb-6">Create your first one and describe it to KaruAI.</p>
-            <button onClick={createCarousel} disabled={isCreating} className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-60">
-              New carousel
+      {carousels?.length === 0 && (
+        <div className="rounded-2xl bg-lime p-8 sm:p-12 lg:p-16 grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-end">
+          <div>
+            <h2 className="font-display font-bold text-6xl sm:text-7xl lg:text-8xl leading-[0.88]">
+              {t.emptyTitle.before}
+              <span className="underline decoration-[0.06em] underline-offset-[0.12em] whitespace-nowrap">{t.emptyTitle.marked}</span>
+            </h2>
+            <p className="mt-6 text-lg max-w-md">{t.emptyBody}</p>
+            <button onClick={() => createCarousel()} disabled={isCreating} className="btn-primary mt-8 text-base px-6 py-3.5 disabled:opacity-60">
+              {isCreating ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+              {t.newCarousel}
             </button>
           </div>
-        )}
+          <div>
+            <p className="text-sm font-semibold mb-3">{t.emptyIdeas}</p>
+            <ul className="space-y-2">
+              {t.ideas.map(idea => (
+                <li key={idea}>
+                  <button
+                    onClick={() => createCarousel(idea)}
+                    disabled={isCreating}
+                    className="w-full text-start rounded-xl bg-paper px-4 py-3.5 border border-ink/10 hover:border-ink transition-colors"
+                  >
+                    {idea}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
-        {carousels && carousels.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-            <button
-              onClick={createCarousel}
-              disabled={isCreating}
-              className="aspect-[4/5] rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
-            >
-              <Plus size={32} />
-              <span className="text-sm font-semibold">New carousel</span>
-            </button>
-            {carousels.map(carousel => (
-              <div key={carousel.id} className="group">
+      {carousels && carousels.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
+          {carousels.map(carousel => {
+            const title = carousel.title || t.untitled;
+            return (
+              <div key={carousel.id} className="group min-w-0">
                 <button
                   onClick={() => router.push(`/carousel?id=${carousel.id}`)}
-                  className="relative block w-full aspect-[4/5] rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm group-hover:shadow-lg group-hover:border-indigo-300 transition-all"
+                  aria-label={title}
+                  className="relative block w-full aspect-[4/5] rounded-xl overflow-hidden bg-paper border border-line group-hover:border-ink transition-colors"
                 >
-                  <Thumbnail carousel={carousel} />
+                  <Thumbnail carousel={carousel} t={t} />
                 </button>
                 <div className="flex items-start justify-between gap-2 mt-3">
-                  <button onClick={() => router.push(`/carousel?id=${carousel.id}`)} className="min-w-0 text-left">
-                    <p className="font-semibold text-sm text-slate-800 truncate" dir="auto">{carousel.title || 'Untitled carousel'}</p>
-                    <p className="text-xs text-gray-400">
-                      {carousel.slideCount} slide{carousel.slideCount === 1 ? '' : 's'} · edited {timeAgo(carousel.updatedAt)}
+                  <button onClick={() => router.push(`/carousel?id=${carousel.id}`)} className="min-w-0 text-start">
+                    <p className="font-semibold truncate" dir="auto">{title}</p>
+                    <p className="text-sm text-graphite">
+                      {t.slides(carousel.slideCount)} · {t.edited(timeAgo(carousel.updatedAt, locale, t.justNow))}
                     </p>
                   </button>
                   <button
                     onClick={() => deleteCarousel(carousel)}
-                    title="Delete carousel"
-                    className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    title={t.delete}
+                    aria-label={`${t.delete}: ${title}`}
+                    className="p-1.5 -m-1 rounded-lg text-graphite hover:text-red-700 hover:bg-mist md:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+            );
+          })}
+        </div>
+      )}
+    </main>
   );
+}
+
+export default function Gallery({ user }: { user: PublicUser }) {
+  return <AppShell user={user} active="carousels">{locale => <CarouselGrid locale={locale} />}</AppShell>;
 }

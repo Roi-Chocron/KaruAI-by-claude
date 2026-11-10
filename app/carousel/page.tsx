@@ -7,8 +7,9 @@ import { RequireAuth } from '@/lib/session';
 
 // /carousel?id=<id>. The editor itself loads the carousel and shows a message when it is not the user's.
 function Editor() {
-  const id = useSearchParams().get('id') ?? '';
-  return <RequireAuth>{() => <CarouselEditor carouselId={id} />}</RequireAuth>;
+  const params = useSearchParams();
+  const id = params.get('id') ?? '';
+  return <RequireAuth>{() => <CarouselEditor carouselId={id} prompt={params.get('prompt')} />}</RequireAuth>;
 }
 
 export default function CarouselPage() {

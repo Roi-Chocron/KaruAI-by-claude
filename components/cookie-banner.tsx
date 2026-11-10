@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { setConsent, useConsent } from '@/lib/consent';
+import { useLocale } from '@/lib/locale';
 
 const COPY = {
   en: {
@@ -23,7 +24,10 @@ const COPY = {
 
 export function CookieBanner() {
   const consent = useConsent();
-  const locale = /^\/he(\/|$)/.test(usePathname() ?? '') ? 'he' : 'en';
+  // The landing pages have a fixed language; the others follow the visitor's choice
+  const pathname = usePathname() ?? '';
+  const userLocale = useLocale();
+  const locale = /^\/he(\/|$)/.test(pathname) ? 'he' : pathname === '/' ? 'en' : userLocale;
   if (consent !== null) return null;
   const t = COPY[locale];
   return (
