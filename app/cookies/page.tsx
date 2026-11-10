@@ -1,15 +1,12 @@
-import { LegalPage } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
 import { ShieldCheck, BarChart3, Sliders, AlertCircle } from 'lucide-react';
 import { CookieSettingsButton } from '@/components/cookie-banner';
 
-export const metadata = {
-  title: 'Cookie & Tracking Policy - KaruAI',
-  description: 'Details about the cookies, tracking technologies, analytics, and error monitoring tools used on KaruAI.',
-};
+export const metadata = legalMetadata('en', '/cookies', 'Cookie & Tracking Policy - KaruAI', 'Details about the cookies, tracking technologies, analytics, and error monitoring tools used on KaruAI.');
 
 export default function CookiesPage() {
   return (
-    <LegalPage title="Cookie & Tracking Policy" updated="November 2026">
+    <LegalPage path="/cookies" title="Cookie & Tracking Policy" updated="November 2026">
 
       <section>
         <h2>1. What Are Cookies and Tracking Technologies?</h2>

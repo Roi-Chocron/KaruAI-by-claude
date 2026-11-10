@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { LegalPage } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
 
-export const metadata = {
-  title: 'Privacy Policy - KaruAI',
-  description: 'Privacy Policy and data protection standards for KaruAI users.',
-};
+export const metadata = legalMetadata('en', '/privacy', 'Privacy Policy - KaruAI', 'Privacy Policy and data protection standards for KaruAI users.');
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="November 2026">
+    <LegalPage path="/privacy" title="Privacy Policy" updated="November 2026">
 
       <section>
         <h2>1. Overview</h2>

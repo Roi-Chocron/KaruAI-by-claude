@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { LegalPage } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
 
-export const metadata = {
-  title: 'Terms of Service - KaruAI',
-  description: 'Terms of Service for using the KaruAI platform and AI carousel generation services.',
-};
+export const metadata = legalMetadata('en', '/terms', 'Terms of Service - KaruAI', 'Terms of Service for using the KaruAI platform and AI carousel generation services.');
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" updated="November 2026">
+    <LegalPage path="/terms" title="Terms of Service" updated="November 2026">
 
       <section>
         <h2>1. Acceptance of Terms</h2>
