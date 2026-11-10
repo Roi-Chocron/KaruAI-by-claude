@@ -2,13 +2,21 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download, Loader2, LogOut, Trash2, UserRound } from 'lucide-react';
+import { Check, Download, Loader2, LogOut } from 'lucide-react';
 import { resetUser } from '@/lib/analytics';
+import { AppShell, Avatar, PageHeading } from '@/components/app-shell';
 import { fetchAccount, UsageMeter, type AccountSummary } from '@/components/billing';
+import { appMessages } from '@/messages/app';
+import type { Locale } from '@/lib/i18n';
+import type { PublicUser } from '@/types';
 
-const card = 'bg-white rounded-2xl border border-slate-200 shadow-sm p-6';
+const card = 'rounded-2xl border border-line p-6 sm:p-8';
+const heading = 'font-display font-bold text-4xl leading-none mb-6';
+const field = 'w-full border border-line rounded-[10px] px-3.5 py-3 bg-paper focus:outline-none focus:border-ink';
 
-export default function AccountPage() {
+function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
+  const t = appMessages[locale].account;
+  const tb = appMessages[locale].billing;
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -19,8 +27,8 @@ export default function AccountPage() {
   useEffect(() => {
     fetchAccount()
       .then(data => { setAccount(data); setName(data.user.name); })
-      .catch(err => setError(err instanceof Error ? err.message : 'Could not load your account.'));
-  }, []);
+      .catch(err => setError(err instanceof Error ? err.message : t.loadFailed));
+  }, [t.loadFailed]);
 
   const send = async (url: string, init: RequestInit) => {
     const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json' } });
@@ -37,12 +45,12 @@ export default function AccountPage() {
       setNameStatus('saved');
     } catch (err) {
       setNameStatus('idle');
-      alert(err instanceof Error ? err.message : 'Could not save the name.');
+      alert(err instanceof Error ? err.message : t.saveFailed);
     }
   };
 
   const logOutEverywhere = async () => {
-    if (!confirm('Sign out on every device, this one included?')) return;
+    if (!confirm(t.confirmLogOutAll)) return;
     await send('/api/account/logout-all', { method: 'POST' }).catch(() => undefined);
     resetUser();
     window.location.href = '/';
@@ -50,7 +58,7 @@ export default function AccountPage() {
 
   const deleteAccount = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!confirm('Delete your account and all your carousels for good? This cannot be undone.')) return;
+    if (!confirm(t.confirmDelete)) return;
     setDeleting(true);
     try {
       await send('/api/account', { method: 'DELETE', body: JSON.stringify({ confirmEmail }) });
@@ -58,107 +66,97 @@ export default function AccountPage() {
       window.location.href = '/';
     } catch (err) {
       setDeleting(false);
-      alert(err instanceof Error ? err.message : 'Could not delete the account.');
+      alert(err instanceof Error ? err.message : t.deleteFailed);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 py-10 px-4 sm:px-6 lg:px-8 font-sans" dir="ltr">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div>
-          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors mb-2">
-            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Account</h1>
-        </div>
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <PageHeading title={t.title} />
 
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
-        {!account ? (
-          !error && <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
-        ) : (
-          <>
-            <section className={card}>
-              <h2 className="flex items-center gap-2 font-semibold mb-4"><UserRound size={18} /> Profile</h2>
-              <div className="flex items-center gap-4 mb-5">
-                {account.user.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={account.user.avatarUrl} alt="" referrerPolicy="no-referrer" className="w-14 h-14 rounded-full" />
-                ) : (
-                  <div className="w-14 h-14 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl font-bold">
-                    {(account.user.name || account.user.email)[0].toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm text-slate-500">Signed in with Google as</p>
-                  <p className="font-medium">{account.user.email}</p>
-                </div>
+      {error && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{error}</p>}
+      {!account ? (
+        !error && <div className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+      ) : (
+        <div className="space-y-4">
+          <section className={card}>
+            <h2 className={heading}>{t.profile}</h2>
+            <div className="flex items-center gap-4 mb-6">
+              <Avatar user={user} size={56} />
+              <div className="min-w-0">
+                <p className="text-sm text-graphite">{t.signedInAs}</p>
+                <p className="font-medium truncate">{account.user.email}</p>
               </div>
-              <form onSubmit={saveName} className="flex gap-2 items-end">
-                <label className="flex-1">
-                  <span className="block text-sm font-medium text-slate-700 mb-1.5">Name</span>
-                  <input
-                    value={name}
-                    onChange={e => { setName(e.target.value); setNameStatus('idle'); }}
-                    maxLength={100}
-                    dir="auto"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-                <button type="submit" disabled={!name.trim() || nameStatus === 'saving'} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl disabled:opacity-50">
-                  {nameStatus === 'saved' ? 'Saved' : 'Save'}
-                </button>
-              </form>
-            </section>
-
-            <section className={card}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-semibold">Plan: {account.plan.name}</h2>
-                <Link href="/billing" className="text-sm font-semibold text-blue-600 hover:underline">Billing & plans</Link>
-              </div>
-              <div className="space-y-4">
-                <UsageMeter label="New carousels this month" used={account.usage.carousels} limit={account.plan.limits.carouselsPerMonth} />
-                <UsageMeter label="AI design messages this month" used={account.usage.messages} limit={account.plan.limits.aiMessagesPerMonth} />
-                <UsageMeter label="AI images this month" used={account.usage.images} limit={account.plan.limits.aiImagesPerMonth} />
-              </div>
-            </section>
-
-            <section className={card}>
-              <h2 className="font-semibold mb-4">Your data</h2>
-              <div className="flex flex-wrap gap-3">
-                <a href="/api/account/export" className="inline-flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">
-                  <Download size={16} /> Download my data
-                </a>
-                <button onClick={logOutEverywhere} className="inline-flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">
-                  <LogOut size={16} /> Sign out everywhere
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-3">The download is a JSON file with your account, usage and every carousel ({account.carouselCount}).</p>
-            </section>
-
-            <section className={`${card} border-red-200`}>
-              <h2 className="flex items-center gap-2 font-semibold text-red-700 mb-2"><Trash2 size={18} /> Delete account</h2>
-              <p className="text-sm text-slate-600 mb-4">
-                Deletes your account, all {account.carouselCount} carousels and their images. This cannot be undone.
-              </p>
-              <form onSubmit={deleteAccount} className="flex flex-col sm:flex-row gap-2">
+            </div>
+            <form onSubmit={saveName} className="flex gap-2 items-end">
+              <label className="flex-1">
+                <span className="block text-sm font-medium mb-2">{t.name}</span>
                 <input
-                  value={confirmEmail}
-                  onChange={e => setConfirmEmail(e.target.value)}
-                  placeholder={`Type ${account.user.email} to confirm`}
-                  className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                  value={name}
+                  onChange={e => { setName(e.target.value); setNameStatus('idle'); }}
+                  maxLength={100}
+                  dir="auto"
+                  className={field}
                 />
-                <button
-                  type="submit"
-                  disabled={deleting || confirmEmail.trim().toLowerCase() !== account.user.email}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl disabled:opacity-40"
-                >
-                  {deleting ? 'Deleting…' : 'Delete account'}
-                </button>
-              </form>
-            </section>
-          </>
-        )}
-      </div>
-    </div>
+              </label>
+              <button type="submit" disabled={!name.trim() || nameStatus === 'saving'} className="btn-primary disabled:opacity-50">
+                {nameStatus === 'saved' ? <><Check size={16} /> {t.saved}</> : t.save}
+              </button>
+            </form>
+          </section>
+
+          <section className={card}>
+            <div className="flex justify-between items-start gap-4 mb-6">
+              <h2 className={`${heading} !mb-0`}>{t.plan(account.plan.name)}</h2>
+              <Link href="/billing" className="text-sm font-semibold underline underline-offset-4 whitespace-nowrap">{t.managePlan}</Link>
+            </div>
+            <div className="space-y-5">
+              <UsageMeter label={t.thisMonth(tb.carousels)} used={account.usage.carousels} limit={account.plan.limits.carouselsPerMonth} unlimited={tb.unlimited} />
+              <UsageMeter label={t.thisMonth(tb.messages)} used={account.usage.messages} limit={account.plan.limits.aiMessagesPerMonth} unlimited={tb.unlimited} />
+              <UsageMeter label={t.thisMonth(tb.images)} used={account.usage.images} limit={account.plan.limits.aiImagesPerMonth} unlimited={tb.unlimited} />
+            </div>
+          </section>
+
+          <section className={card}>
+            <h2 className={heading}>{t.data}</h2>
+            <div className="flex flex-wrap gap-3">
+              <a href="/api/account/export" className="btn-secondary text-sm">
+                <Download size={16} /> {t.download}
+              </a>
+              <button onClick={logOutEverywhere} className="btn-secondary text-sm">
+                <LogOut size={16} className="rtl:-scale-x-100" /> {t.logOutAll}
+              </button>
+            </div>
+            <p className="text-sm text-graphite mt-4">{t.downloadNote(account.carouselCount)}</p>
+          </section>
+
+          <section className={`${card} !border-red-700`}>
+            <h2 className={`${heading} text-red-700`}>{t.deleteTitle}</h2>
+            <p className="text-graphite mb-5">{t.deleteBody(account.carouselCount)}</p>
+            <form onSubmit={deleteAccount} className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={confirmEmail}
+                onChange={e => setConfirmEmail(e.target.value)}
+                placeholder={t.confirmPlaceholder(account.user.email)}
+                aria-label={t.confirmPlaceholder(account.user.email)}
+                dir="auto"
+                className={`${field} flex-1 text-sm focus:!border-red-700`}
+              />
+              <button
+                type="submit"
+                disabled={deleting || confirmEmail.trim().toLowerCase() !== account.user.email}
+                className="btn bg-red-700 text-paper hover:bg-red-800 disabled:opacity-40"
+              >
+                {deleting ? t.deleting : t.deleteButton}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+    </main>
   );
+}
+
+export default function Account({ user }: { user: PublicUser }) {
+  return <AppShell user={user} active="account">{locale => <AccountPage user={user} locale={locale} />}</AppShell>;
 }

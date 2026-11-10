@@ -74,7 +74,8 @@ const en = {
     confirmLogOutAll: 'Sign out on every device, this one included?',
     downloadNote: (n: number) => `A JSON file with your account, usage and every carousel (${n}).`,
     deleteTitle: 'Delete account',
-    deleteBody: (n: number) => `Deletes your account, all ${n} carousels and their images. This can't be undone.`,
+    deleteBody: (n: number) =>
+      `Deletes your account, ${n === 1 ? 'your carousel and its images' : `all ${n} carousels and their images`}. This can't be undone.`,
     confirmPlaceholder: (email: string) => `Type ${email} to confirm`,
     confirmDelete: 'Delete your account and all your carousels for good? This can’t be undone.',
     deleting: 'Deleting…',
@@ -158,7 +159,7 @@ const he: AppMessages = {
     confirmLogOutAll: 'להתנתק מכל המכשירים, כולל המכשיר הזה?',
     downloadNote: n => `קובץ JSON עם החשבון, השימוש וכל הקרוסלות שלכם (${n}).`,
     deleteTitle: 'מחיקת החשבון',
-    deleteBody: n => `מוחק את החשבון, את כל ${n} הקרוסלות ואת התמונות שלהן. אי אפשר לבטל את זה.`,
+    deleteBody: n => `מוחק את החשבון, ${n === 1 ? 'את הקרוסלה ואת התמונות שלה' : `את כל ${n} הקרוסלות ואת התמונות שלהן`}. אי אפשר לבטל את זה.`,
     confirmPlaceholder: email => `הקלידו ${email} לאישור`,
     confirmDelete: 'למחוק לצמיתות את החשבון ואת כל הקרוסלות? אי אפשר לבטל את זה.',
     deleting: 'מוחק…',

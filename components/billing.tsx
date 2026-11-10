@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, CreditCard, Loader2, Receipt } from 'lucide-react';
+import { CreditCard, Loader2, Receipt } from 'lucide-react';
+import { AppShell, PageHeading } from '@/components/app-shell';
+import { appMessages } from '@/messages/app';
+import type { Locale } from '@/lib/i18n';
 import { RequireAuth } from '@/lib/session';
 import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
 import type { Plan } from '@/shared/plans';
@@ -18,111 +20,104 @@ export async function fetchAccount(): Promise<AccountSummary> {
 }
 
 // The first day of next month, when the monthly limits reset
-const resetDate = () => {
+const resetDate = (locale: Locale) => {
   const date = new Date();
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)).toLocaleDateString('en-GB', { dateStyle: 'long' });
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1))
+    .toLocaleDateString(locale === 'he' ? 'he-IL' : 'en-GB', { dateStyle: 'long', timeZone: 'UTC' });
 };
 
-export function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+export function UsageMeter({ label, used, limit, unlimited }: { label: string; used: number; limit: number | null; unlimited: string }) {
   const share = limit ? Math.min(1, used / limit) : 0;
-  const color = share >= 1 ? 'bg-red-500' : share >= 0.8 ? 'bg-amber-500' : 'bg-blue-600';
+  const color = share >= 1 ? 'bg-red-700' : share >= 0.8 ? 'bg-amber-500' : 'bg-ink';
   return (
     <div>
-      <div className="flex justify-between text-sm mb-1.5">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="text-slate-500">{used.toLocaleString()} / {limit === null ? 'Unlimited' : limit.toLocaleString()}</span>
+      <div className="flex justify-between gap-4 text-sm mb-2">
+        <span className="font-medium">{label}</span>
+        <span className="text-graphite tabular-nums" dir="ltr">{used.toLocaleString()} / {limit === null ? unlimited : limit.toLocaleString()}</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-mist overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${limit === null ? 0 : share * 100}%` }} />
       </div>
     </div>
   );
 }
 
-function BillingPage() {
+function BillingPage({ locale }: { locale: Locale }) {
+  const t = appMessages[locale].billing;
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [yearly, setYearly] = useState(false);
 
   useEffect(() => {
-    fetchAccount().then(setAccount).catch(err => setError(err instanceof Error ? err.message : 'Could not load your plan.'));
-  }, []);
+    fetchAccount().then(setAccount).catch(err => setError(err instanceof Error ? err.message : t.loadFailed));
+  }, [t.loadFailed]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 py-10 px-4 sm:px-6 lg:px-8 font-sans" dir="ltr">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div>
-          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors mb-2">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Billing & Plan</h1>
-          <p className="text-slate-500 mt-1">Your plan, this month&apos;s usage, and the available plans.</p>
-        </div>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <PageHeading title={t.title} sub={t.sub} />
 
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4 mb-8">{error}</p>}
 
-        {!account ? (
-          !error && <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <section className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Current plan: {account.plan.name}</h2>
-                  <p className="text-slate-500 text-sm mt-1">Limits reset on {resetDate()}.</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-slate-900">${account.plan.monthlyPrice}</div>
-                  <div className="text-sm text-slate-500">per month</div>
-                </div>
+      {!account ? (
+        !error && <div className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <section className="lg:col-span-2 rounded-2xl bg-ink text-paper p-7 sm:p-9">
+            <div className="flex justify-between items-start gap-6 mb-8">
+              <div>
+                <p className="text-sm text-paper/70">{t.current}</p>
+                <h2 className="font-display font-bold text-6xl leading-none mt-1" dir="ltr">{account.plan.name}</h2>
+                <p className="text-sm text-paper/70 mt-3">{t.resets(resetDate(locale))}</p>
               </div>
-              <div className="space-y-5">
-                <UsageMeter label="New carousels" used={account.usage.carousels} limit={account.plan.limits.carouselsPerMonth} />
-                <UsageMeter label="AI design messages" used={account.usage.messages} limit={account.plan.limits.aiMessagesPerMonth} />
-                <UsageMeter label="AI images" used={account.usage.images} limit={account.plan.limits.aiImagesPerMonth} />
+              <div className="text-end">
+                <span className="font-display font-bold text-6xl leading-none" dir="ltr">${account.plan.monthlyPrice}</span>
+                <p className="text-sm text-paper/70">{t.perMonth}</p>
               </div>
-            </section>
-
-            <div className="space-y-8">
-              <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <h2 className="flex items-center gap-2 font-semibold text-slate-900 mb-2"><CreditCard size={18} /> Payment method</h2>
-                <p className="text-sm text-slate-500">Online payments are coming soon. Until then, contact us to change your plan.</p>
-              </section>
-              <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <h2 className="flex items-center gap-2 font-semibold text-slate-900 mb-2"><Receipt size={18} /> Invoices</h2>
-                <p className="text-sm text-slate-500">No invoices yet.</p>
-              </section>
             </div>
-          </div>
-        )}
+            <div className="space-y-6 rounded-xl bg-paper text-ink p-6">
+              <UsageMeter label={t.carousels} used={account.usage.carousels} limit={account.plan.limits.carouselsPerMonth} unlimited={t.unlimited} />
+              <UsageMeter label={t.messages} used={account.usage.messages} limit={account.plan.limits.aiMessagesPerMonth} unlimited={t.unlimited} />
+              <UsageMeter label={t.images} used={account.usage.images} limit={account.plan.limits.aiImagesPerMonth} unlimited={t.unlimited} />
+            </div>
+          </section>
 
-        <section className="pt-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
-            <h2 className="text-2xl font-bold text-slate-900">Plans</h2>
-            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} />
+          <div className="grid gap-4 content-start">
+            <section className="rounded-2xl border border-line p-6">
+              <h2 className="flex items-center gap-2 font-semibold mb-2"><CreditCard size={18} strokeWidth={1.75} /> {t.payment}</h2>
+              <p className="text-sm text-graphite leading-relaxed">{t.paymentBody}</p>
+            </section>
+            <section className="rounded-2xl border border-line p-6">
+              <h2 className="flex items-center gap-2 font-semibold mb-2"><Receipt size={18} strokeWidth={1.75} /> {t.invoices}</h2>
+              <p className="text-sm text-graphite">{t.invoicesBody}</p>
+            </section>
           </div>
-          <PricingCards
-            yearly={yearly}
-            action={plan => (
-              <button
-                type="button"
-                disabled
-                className={`w-full py-3 px-4 rounded-xl font-semibold border-2 ${
-                  plan.id === account?.plan.id ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-400 bg-white'
-                }`}
-              >
-                {plan.id === account?.plan.id ? 'Your current plan' : 'Coming soon'}
-              </button>
-            )}
-          />
-        </section>
-      </div>
-    </div>
+        </div>
+      )}
+
+      <section className="mt-20">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
+          <h2 className="font-display font-bold text-5xl md:text-6xl leading-none">{t.plans}</h2>
+          <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} locale={locale} />
+        </div>
+        <PricingCards
+          yearly={yearly}
+          locale={locale}
+          action={plan => (
+            <button
+              type="button"
+              disabled
+              className={`btn w-full ${plan.id === account?.plan.id ? (plan.highlighted ? 'bg-lime text-ink' : 'bg-ink text-paper') : plan.highlighted ? 'border border-paper/30 text-paper/70' : 'border border-line text-graphite'}`}
+            >
+              {plan.id === account?.plan.id ? t.yourPlan : t.soon}
+            </button>
+          )}
+        />
+      </section>
+    </main>
   );
 }
 
 // The page as the /billing route shows it: only for signed-in users
 export function ProtectedBillingPage() {
-  return <RequireAuth>{() => <BillingPage />}</RequireAuth>;
+  return <RequireAuth>{user => <AppShell user={user} active="billing">{locale => <BillingPage locale={locale} />}</AppShell>}</RequireAuth>;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { LogOut, Menu, X } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
@@ -100,8 +100,11 @@ function Frame({ user, active, locale, children }: { user: PublicUser; active: A
   );
 }
 
-// The title row every signed-in page starts with
+// The title row every signed-in page starts with; it also names the browser tab
 export function PageHeading({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
+  useEffect(() => {
+    document.title = `${title} - KaruAI`;
+  }, [title]);
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
       <div>
