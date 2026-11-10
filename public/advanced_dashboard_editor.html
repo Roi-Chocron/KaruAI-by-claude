@@ -105,8 +105,8 @@
         .h-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
         .h-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
 
-        .layer-item.active { background-color: #F5F5F5; border-left: 4px solid var(--accent-color); color: var(--accent-color); font-weight: 600;}
-        .layer-item:not(.active) { border-left: 4px solid transparent; }
+        .layer-item.active { background-color: #F5F5F5; border-inline-start: 4px solid var(--accent-color); color: var(--accent-color); font-weight: 600;}
+        .layer-item:not(.active) { border-inline-start: 4px solid transparent; }
 
         /* Drag Selection Box */
         #dragBox {
@@ -132,7 +132,7 @@
 <body class="flex h-screen w-screen overflow-hidden bg-white text-slate-800 font-sans">
 
     <!-- LEFT COLUMN -->
-    <aside class="w-[25%] h-full flex flex-col border-r border-gray-200 bg-white shrink-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+    <aside class="w-[25%] h-full flex flex-col border-e border-gray-200 bg-white shrink-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
         <div class="flex items-center gap-1 h-14 px-2 border-b border-gray-200 shrink-0">
             <button onclick="goToGallery()" class="p-1.5 hover:bg-gray-100 rounded-md transition-all shrink-0" title="All carousels" aria-label="All carousels">
                 <svg width="24" height="24" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="28" height="28" rx="6" fill="#E5E5E5"/><rect x="10" y="7" width="28" height="28" rx="6" fill="#0A0A0A"/><rect x="16" y="4" width="28" height="28" rx="6" fill="#C8F135"/></svg>
@@ -198,7 +198,7 @@
                 <button onclick="undo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
                 <button onclick="redo()" class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
                 
-                <div class="ml-2 flex items-center gap-2 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500">
+                <div class="ms-2 flex items-center gap-2 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500">
                      <button onclick="changeZoom(-0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">-</button>
                      <span id="zoom-label" class="w-10 text-center">45%</span>
                      <button onclick="changeZoom(0.1)" class="px-2 py-1 hover:bg-white rounded hover:text-slate-800 transition-all">+</button>
@@ -206,9 +206,9 @@
 
                 <div id="download-wrap" class="relative">
                     <button onclick="toggleDownloadMenu()" class="p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all" title="Download"><i data-lucide="download" class="w-4 h-4"></i></button>
-                    <div id="download-menu" class="hidden absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
-                        <button onclick="downloadCurrentSlide()" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">This slide (PNG)</button>
-                        <button onclick="downloadFullCarousel()" class="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">All slides (ZIP)</button>
+                    <div id="download-menu" class="hidden absolute end-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
+                        <button onclick="downloadCurrentSlide()" class="w-full text-start px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">This slide (PNG)</button>
+                        <button onclick="downloadFullCarousel()" class="w-full text-start px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-gray-50">All slides (ZIP)</button>
                     </div>
                 </div>
             </div>
@@ -233,9 +233,9 @@
             </div>
         </div>
 
-        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 pl-5 pr-3 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
+        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 ps-5 pe-3 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] z-10">
             <div id="slide-thumbnails" class="flex-1 min-w-0 h-full flex items-center gap-4 overflow-x-auto px-1"></div>
-            <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 pl-3 border-l border-gray-100">
+            <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 ps-3 border-s border-gray-100">
                 <button id="slide-move-earlier" onclick="moveSlide(-1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide earlier"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
                 <button id="slide-move-later" onclick="moveSlide(1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide later"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                 <button onclick="duplicateSlide()" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800" title="Duplicate slide"><i data-lucide="copy" class="w-4 h-4"></i></button>
@@ -245,7 +245,7 @@
     </main>
 
     <!-- RIGHT COLUMN -->
-    <aside class="w-[25%] h-full flex flex-col border-l border-gray-200 bg-white shrink-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.02)]">
+    <aside class="w-[25%] h-full flex flex-col border-s border-gray-200 bg-white shrink-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.02)]">
         <div class="flex h-14 border-b border-gray-200 shrink-0 bg-gray-50/50">
             <button onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-xs uppercase tracking-wider transition-colors">
                 <i data-lucide="message-square" class="w-4 h-4"></i> KaruAI
@@ -265,9 +265,9 @@
                 </div>
                 <div class="p-4 border-t border-gray-200 bg-white shrink-0">
                     <div class="relative flex items-center bg-gray-100 rounded-xl border border-gray-200 focus-within:border-indigo-500 focus-within:ring-1 transition-all">
-                        <input type="text" id="chat-input" placeholder="Prompt the AI..." class="w-full bg-transparent pl-4 pr-12 py-3 rounded-xl focus:outline-none text-sm text-slate-700" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
-                        <button id="chat-send" onclick="sendChat()" class="absolute right-2 w-8 h-8 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
-                            <i data-lucide="send" class="w-3 h-3 -ml-0.5"></i>
+                        <input type="text" id="chat-input" dir="auto" placeholder="Prompt the AI..." class="w-full bg-transparent ps-4 pe-12 py-3 rounded-xl focus:outline-none text-sm text-slate-700" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
+                        <button id="chat-send" onclick="sendChat()" class="absolute end-2 w-8 h-8 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
+                            <i data-lucide="send" class="w-3 h-3 rtl:-scale-x-100"></i>
                         </button>
                     </div>
                 </div>
@@ -329,7 +329,7 @@
 
                     <div id="section-text" class="p-5 border-b border-gray-200">
                         <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Text</h4>
-                        <textarea id="propContent" data-prop="content" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-500 outline-none resize-none h-24 text-slate-800"></textarea>
+                        <textarea id="propContent" dir="auto" data-prop="content" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-500 outline-none resize-none h-24 text-slate-800"></textarea>
                         <select id="propFontFamily" data-prop="fontFamily" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-500 text-xs text-slate-700"></select>
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-500 transition-all">
@@ -367,8 +367,8 @@
                         <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Fill</h4>
                         <div class="flex items-center gap-3">
                             <input type="color" id="propFillColor" data-prop="fillColor" class="w-8 h-8 rounded cursor-pointer border-0 p-0 shadow-sm">
-                            <input type="text" id="propFillColorHex" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
-                            <div class="flex items-center gap-1 w-20">
+                            <input type="text" id="propFillColorHex" dir="ltr" class="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
+                            <div class="flex items-center gap-1 w-20 shrink-0">
                                 <input type="number" id="propFillOpacity" data-prop="fillOpacity" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
                                 <span class="text-gray-400 text-xs font-bold">%</span>
                             </div>
@@ -438,6 +438,55 @@
     </aside>
 
     <script>
+        // The interface language follows the site's choice (the karu_locale cookie), else the browser's.
+        // Hebrew mirrors the panels; the canvas and the slide strip stay left-to-right like the exported images.
+        const LOCALE = document.cookie.match(/(?:^|; )karu_locale=(en|he)/)?.[1]
+            ?? (navigator.language.toLowerCase().startsWith('he') ? 'he' : 'en');
+        const L = (en, he) => (LOCALE === 'he' ? he : en);
+
+        // The page's fixed text in Hebrew, by its English wording
+        const HE_UI = {
+            'All carousels': 'כל הקרוסלות', 'Untitled carousel': 'קרוסלה ללא שם', 'Rename the carousel': 'שינוי שם הקרוסלה',
+            'Brand': 'מותג', 'Layers': 'שכבות', 'Everything the carousel uses. Change one to update it on every slide.': 'כל מה שהקרוסלה משתמשת בו. שינוי כאן מתעדכן בכל השקפים.',
+            'Colors': 'צבעים', 'Fonts': 'גופנים', 'Download all (ZIP)': 'הורדת הכל (ZIP)', 'Download this slide (PNG)': 'הורדת השקף הזה (PNG)',
+            'Move (V)': 'הזזה (V)', 'Rectangle (R)': 'מלבן (R)', 'Ellipse (O)': 'אליפסה (O)', 'Text (T)': 'טקסט (T)',
+            'Add image (I) — or drop an image on the canvas': 'הוספת תמונה (I), או גרירת תמונה לקנבס',
+            'Image': 'עם תמונה', 'No image': 'בלי תמונה', 'Undo (Ctrl+Z)': 'ביטול (Ctrl+Z)', 'Redo (Ctrl+Y)': 'חזרה (Ctrl+Y)',
+            'Download': 'הורדה', 'This slide (PNG)': 'השקף הזה (PNG)', 'All slides (ZIP)': 'כל השקפים (ZIP)',
+            'Move slide earlier': 'הזזת השקף אחורה', 'Move slide later': 'הזזת השקף קדימה', 'Duplicate slide': 'שכפול השקף', 'Delete slide': 'מחיקת השקף',
+            'Design': 'עיצוב',
+            'Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.': 'תארו את הקרוסלה שאתם רוצים, ו־KaruAI יבנה אותה כאן בעורך.',
+            'Prompt the AI...': 'מה ליצור או לשנות?', 'Select an element to edit properties.': 'בחרו אלמנט כדי לערוך אותו.', 'Multiple elements selected.': 'נבחרו כמה אלמנטים.',
+            'Forward': 'קדימה', 'Backward': 'אחורה', 'Delete': 'מחיקה', 'Transform': 'מיקום וגודל', 'Text': 'טקסט', 'Size': 'גודל',
+            'Light': 'דק', 'Regular': 'רגיל', 'Medium': 'בינוני', 'Semibold': 'חצי מודגש', 'Bold': 'מודגש', 'Extra Bold': 'מודגש מאוד', 'Black': 'שחור',
+            'Align Left': 'יישור לשמאל', 'Align Center': 'יישור למרכז', 'Align Right': 'יישור לימין', 'Line height': 'גובה שורה', 'Letter spacing': 'ריווח אותיות',
+            'Fill': 'מילוי', 'Gradient end color': 'צבע סיום המעבר', 'Gradient angle': 'זווית המעבר', 'Remove': 'הסרה', '+ Gradient': '+ מעבר צבע',
+            'Stroke': 'קו מתאר', 'Solid': 'רציף', 'Dashed': 'מקווקו', 'Dotted': 'מנוקד', 'Effects': 'אפקטים',
+            'No Shadow': 'בלי צל', 'Drop Shadow': 'צל חיצוני', 'Inner Shadow': 'צל פנימי', 'Blur': 'טשטוש', 'Spread': 'פיזור', 'Shadow Color': 'צבע הצל',
+            'Background': 'רקע', 'Hint': 'הנחיה', 'Rectangle': 'מלבן', 'Ellipse': 'אליפסה',
+        };
+        const tr = text => (LOCALE === 'he' && HE_UI[text]) || text;
+
+        function translatePage() {
+            document.documentElement.lang = LOCALE;
+            if (LOCALE !== 'he') return;
+            document.documentElement.dir = 'rtl';
+            ['workspace', 'slide-thumbnails'].forEach(id => document.getElementById(id).setAttribute('dir', 'ltr'));
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                acceptNode: node => (node.parentElement.closest('script, style, #workspace') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+            });
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                const text = node.nodeValue.trim();
+                if (HE_UI[text]) node.nodeValue = node.nodeValue.replace(text, HE_UI[text]);
+            }
+            document.querySelectorAll('[title], [placeholder], [aria-label]').forEach(el => {
+                ['title', 'placeholder', 'aria-label'].forEach(attr => {
+                    const value = el.getAttribute(attr);
+                    if (value && HE_UI[value]) el.setAttribute(attr, HE_UI[value]);
+                });
+            });
+        }
+        translatePage();
         lucide.createIcons();
 
         // State & History
@@ -466,7 +515,7 @@
             carouselVersion: 0, // a new number for every AI carousel, so late image results for an old one are dropped
             elements: [
                 baseElement({ id: 'bg-1', type: 'rect', name: 'Background', x: 0, y: 0, w: 1080, h: 1350, fillColor: '#F8FAFC' }),
-                baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: 'Describe your carousel in the KaruAI chat\nand it will appear here.', fontFamily: 'Heebo', fontSize: 44, fontWeight: '700', textAlign: 'center', lineHeight: 1.2, letterSpacing: 0 })
+                baseElement({ id: 'hint-1', type: 'text', name: 'Hint', x: 90, y: 600, w: 900, h: 'auto', fillColor: '#94A3B8', content: L('Describe your carousel in the KaruAI chat\nand it will appear here.', 'תארו את הקרוסלה בצ׳אט של KaruAI\nוהיא תופיע כאן.'), fontFamily: 'Heebo', fontSize: 44, fontWeight: '700', textAlign: 'center', lineHeight: 1.2, letterSpacing: 0 })
             ]
         };
 
@@ -923,7 +972,7 @@
             colors.forEach(([hex, uses]) => {
                 const item = document.createElement('label');
                 item.className = 'relative flex flex-col items-center gap-1 cursor-pointer group';
-                item.title = `${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`;
+                item.title = L(`${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`, `${hex} · בשימוש ${uses === 1 ? 'פעם אחת' : `${uses} פעמים`}. לחיצה משנה אותו בכל מקום.`);
                 const swatch = document.createElement('span');
                 swatch.className = 'w-10 h-10 rounded-full border border-gray-200 shadow-sm group-hover:ring-2 group-hover:ring-indigo-400 transition-all';
                 swatch.style.backgroundColor = hex;
@@ -951,12 +1000,12 @@
                 select.value = family;
                 select.addEventListener('change', () => replaceFont(family, select.value));
                 const usage = document.createElement('span');
-                usage.className = 'text-[10px] text-gray-400 w-12 text-right';
-                usage.textContent = `${uses} text${uses === 1 ? '' : 's'}`;
+                usage.className = 'text-[10px] text-gray-400 w-14 text-end';
+                usage.textContent = L(`${uses} text${uses === 1 ? '' : 's'}`, uses === 1 ? 'טקסט אחד' : `${uses} טקסטים`);
                 row.append(select, usage);
                 fontList.appendChild(row);
             });
-            if (!fonts.length) fontList.innerHTML = '<p class="text-xs text-gray-400">No text yet.</p>';
+            if (!fonts.length) fontList.innerHTML = `<p class="text-xs text-gray-400">${L('No text yet.', 'אין עדיין טקסט.')}</p>`;
         }
 
         // --- Gradient & uploaded images ---
@@ -983,7 +1032,7 @@
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+                reader.onerror = () => reject(reader.error ?? new Error(L('Could not read the file.', 'לא הצלחנו לקרוא את הקובץ.')));
                 reader.readAsDataURL(file);
             });
         }
@@ -991,7 +1040,7 @@
         // Adds an image from the user's computer to the slide on screen, centered and fitted to 640 px
         async function addImageFile(file) {
             if (!file?.type.startsWith('image/')) {
-                alert('Please choose an image file.');
+                alert(L('Choose an image file.', 'בחרו קובץ תמונה.'));
                 return;
             }
             try {
@@ -1026,7 +1075,7 @@
                 saveHistory();
                 renderAll();
             } catch (error) {
-                alert(error instanceof Error ? error.message : 'Could not add the image.');
+                alert(error instanceof Error ? error.message : L('Could not add the image.', 'לא הצלחנו להוסיף את התמונה.'));
             }
         }
 
@@ -1108,7 +1157,7 @@
             state.slideData.forEach((data, index) => {
                 const button = document.createElement('button');
                 button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 shadow-sm overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
-                button.title = `${state.slides[index].title || `Slide ${index + 1}`}${data.mode === 'with' ? ' (with image)' : ''}`;
+                button.title = `${state.slides[index].title || L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${data.mode === 'with' ? L(' (with image)', ' (עם תמונה)') : ''}`;
                 const preview = createArtboardNode(index === state.currentSlide ? state.elements : data.variants[data.mode]);
                 preview.style.position = 'absolute';
                 preview.style.left = '0';
@@ -1122,8 +1171,8 @@
             });
             const add = document.createElement('button');
             add.className = 'h-20 w-16 shrink-0 rounded-md border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition-all';
-            add.title = 'Add a blank slide after this one';
-            add.innerHTML = '<span class="text-2xl leading-none">+</span><span class="text-[9px] font-semibold">Slide</span>';
+            add.title = L('Add a blank slide after this one', 'הוספת שקף ריק אחרי השקף הזה');
+            add.innerHTML = `<span class="text-2xl leading-none">+</span><span class="text-[9px] font-semibold">${L('Slide', 'שקף')}</span>`;
             add.onclick = addSlide;
             footer.appendChild(add);
         }
@@ -1136,7 +1185,7 @@
             if (!data) return;
             const withButton = document.getElementById('variant-with');
             withButton.disabled = !hasSlotImage(data);
-            withButton.title = hasSlotImage(data) ? 'Show the version with the image' : 'Approve this slide\'s image prompt in the chat to get the image version';
+            withButton.title = hasSlotImage(data) ? L('Show the version with the image', 'הצגת הגרסה עם התמונה') : L('Approve this slide\'s image prompt in the chat to get the image version', 'אשרו בצ׳אט את הנחיית התמונה של השקף כדי לקבל גרסה עם תמונה');
             [[withButton, 'with'], [document.getElementById('variant-without'), 'without']].forEach(([button, mode]) => {
                 button.className = `px-2 py-1 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed ${data.mode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-slate-800'}`;
             });
@@ -1147,7 +1196,7 @@
             renderLayers();
             renderThumbnails();
             renderVariantToggle();
-            document.getElementById('slide-label').textContent = `Slide ${state.slides.length ? state.currentSlide + 1 : 1} of ${state.slides.length || 1}`;
+            document.getElementById('slide-label').textContent = L(`Slide ${state.slides.length ? state.currentSlide + 1 : 1} of ${state.slides.length || 1}`, `שקף ${state.slides.length ? state.currentSlide + 1 : 1} מתוך ${state.slides.length || 1}`);
             updateSelectionOverlay();
             updatePropertiesPanel();
             refreshPromptCards();
@@ -1176,7 +1225,7 @@
                 div.className = `px-5 py-3 text-sm flex items-center gap-3 cursor-pointer border-b border-gray-100 transition-colors layer-item ${state.selectedIds.includes(el.id) ? 'active' : 'hover:bg-gray-50 text-slate-600'}`;
                 
                 let iconStr = el.type === 'text' ? 'type' : el.type === 'ellipse' ? 'circle' : el.type === 'image' ? 'image' : 'square';
-                div.innerHTML = `<span class="${state.selectedIds.includes(el.id) ? 'text-indigo-600' : 'text-gray-400'}"><i data-lucide="${iconStr}" class="w-4 h-4"></i></span><span class="truncate">${el.name}</span>`;
+                div.innerHTML = `<span class="${state.selectedIds.includes(el.id) ? 'text-indigo-600' : 'text-gray-400'}"><i data-lucide="${iconStr}" class="w-4 h-4"></i></span><span class="truncate">${tr(el.name)}</span>`;
                 
                 div.onclick = (e) => {
                     if (e.shiftKey) {
@@ -1770,7 +1819,7 @@
 
             const thinkingMessage = document.createElement('div');
             thinkingMessage.className = 'flex w-full justify-start';
-            thinkingMessage.innerHTML = '<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span data-text>KaruAI is thinking</span><span class="thinking-dots shrink-0" aria-hidden="true"><span></span><span></span><span></span></span></div>';
+            thinkingMessage.innerHTML = `<div class="max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed text-slate-600 bg-white rounded-bl-sm flex items-center gap-2"><span data-text>${L('KaruAI is thinking', 'KaruAI חושב')}</span><span class="thinking-dots shrink-0" aria-hidden="true"><span></span><span></span><span></span></span></div>`;
             container.appendChild(thinkingMessage);
             container.scrollTop = container.scrollHeight;
 
@@ -1781,28 +1830,28 @@
                     body: JSON.stringify({ message: val, carouselId, carousel: carouselForAI() })
                 }, ({ attempt, of }) => {
                     thinkingMessage.querySelector('[data-text]').textContent =
-                        `We're experiencing high demand right now, so this may take a little longer. Retrying automatically (${attempt}/${of})…`;
+                        L(`We're experiencing high demand right now, so this may take a little longer. Retrying automatically (${attempt}/${of})…`, `יש עומס כרגע, אז זה עלול לקחת קצת יותר זמן. מנסים שוב אוטומטית (${attempt}/${of})…`);
                     container.scrollTop = container.scrollHeight;
                 });
                 const data = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(data?.retryable ? 'KaruAI is under heavy load right now. Please try again in a minute.' : data?.error || `Request failed with status ${response.status}`);
-                if (typeof data?.responseText !== 'string') throw new Error('The server returned no carousel data.');
+                if (!response.ok) throw new Error(data?.retryable ? L('KaruAI is under heavy load right now. Try again in a minute.', 'יש עומס גדול על KaruAI כרגע. נסו שוב בעוד דקה.') : data?.error || `Request failed with status ${response.status}`);
+                if (typeof data?.responseText !== 'string') throw new Error(L('The server returned no carousel data.', 'השרת לא החזיר נתוני קרוסלה.'));
                 let proposed;
                 try {
                     proposed = JSON.parse(data.responseText);
                 } catch {
-                    throw new Error('KaruAI returned invalid carousel data.');
+                    throw new Error(L('KaruAI returned invalid carousel data.', 'KaruAI החזיר נתוני קרוסלה לא תקינים.'));
                 }
-                if (!proposed || !Array.isArray(proposed.slides) || !proposed.slides.length) throw new Error('KaruAI returned no slides.');
+                if (!proposed || !Array.isArray(proposed.slides) || !proposed.slides.length) throw new Error(L('KaruAI returned no slides.', 'KaruAI לא החזיר שקפים.'));
 
                 await applyCarousel(proposed);
                 thinkingMessage.remove();
                 const count = state.slides.length;
-                addChatBubble(`Your carousel is ready with ${count} slide${count === 1 ? '' : 's'}. Every slide has a version with an image and one without. Approve the image prompts you like: those slides switch to their image version, the ones you skip stay without an image.`);
+                addChatBubble(L(`Your carousel is ready with ${count} slide${count === 1 ? '' : 's'}. Every slide has a version with an image and one without. Approve the image prompts you like: those slides switch to their image version, the ones you skip stay without an image.`, `הקרוסלה מוכנה, עם ${count === 1 ? 'שקף אחד' : `${count} שקפים`}. לכל שקף יש גרסה עם תמונה וגרסה בלי. אשרו את הנחיות התמונה שאתם אוהבים: השקפים האלה יעברו לגרסה עם התמונה, ואלה שתדלגו עליהם יישארו בלי.`));
                 renderImagePrompts();
             } catch (error) {
                 thinkingMessage.remove();
-                addChatBubble(`Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unable to reach KaruAI.'}`, 'error');
+                addChatBubble(L(`Something went wrong: ${error instanceof Error ? error.message : 'Unable to reach KaruAI.'}`, `משהו השתבש: ${error instanceof Error ? error.message : 'אין חיבור ל־KaruAI.'}`), 'error');
             } finally {
                 sendButton.disabled = false;
                 sendButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1868,11 +1917,11 @@
             card.className = 'w-full max-w-[95%] p-4 rounded-2xl shadow-sm text-sm text-slate-600 bg-white rounded-bl-sm';
             const heading = document.createElement('p');
             heading.className = 'font-semibold text-slate-800 mb-1';
-            heading.textContent = 'Image prompts';
+            heading.textContent = L('Image prompts', 'הנחיות לתמונות');
             const subheading = document.createElement('p');
             subheading.className = 'text-xs text-gray-500 mb-3';
-            subheading.textContent = 'Edit a prompt if you like, then approve it. Each image is generated in the shape of its spot on the slide.';
-            const approveAllButton = createChipButton('Approve all & generate', () => approveAll(), true);
+            subheading.textContent = L('Edit a prompt if you like, then approve it. Each image is generated in the shape of its spot on the slide.', 'אפשר לערוך הנחיה ואז לאשר אותה. כל תמונה נוצרת בצורה של המקום שלה בשקף.');
+            const approveAllButton = createChipButton(L('Approve all and generate', 'אישור הכל ויצירה'), () => approveAll(), true);
             approveAllButton.classList.add('w-full', 'mb-2');
             card.append(heading, subheading, approveAllButton);
 
@@ -1889,19 +1938,19 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ prompt: composeImagePrompt(row.prompt, size), width: size.width, height: size.height })
                     }, ({ attempt, of }) => {
-                        row.note = `High demand right now, retrying automatically (${attempt}/${of})…`;
+                        row.note = L(`High demand right now, retrying automatically (${attempt}/${of})…`, `יש עומס, מנסים שוב אוטומטית (${attempt}/${of})…`);
                         render();
                     });
                     // Success is the image itself; failures are JSON
                     if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) {
                         const data = await response.json().catch(() => null);
-                        if (data?.retryable) throw new Error('The image service is under heavy load. Please try again in a minute.');
+                        if (data?.retryable) throw new Error(L('The image service is under heavy load. Try again in a minute.', 'יש עומס על שירות התמונות. נסו שוב בעוד דקה.'));
                         throw new Error(data?.error || `Image request failed with status ${response.status}`);
                     }
                     const imageUrl = await blobToDataUrl(await response.blob());
                     if (!isStale() && row.index !== -1) applySlideImage(row.index, imageUrl);
                 } catch (error) {
-                    row.error = error instanceof Error ? error.message : 'Image generation failed.';
+                    row.error = error instanceof Error ? error.message : L('Image generation failed.', 'יצירת התמונה נכשלה.');
                 } finally {
                     row.busy = false;
                     render();
@@ -1958,7 +2007,7 @@
                     if (data) {
                         const size = imageRequestSize(index);
                         const slideTitle = state.slides[index].title;
-                        title.textContent = `Slide ${index + 1}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
+                        title.textContent = `${L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
                     }
                     actions.innerHTML = '';
                     const status = (text, color = 'text-gray-500') => {
@@ -1968,28 +2017,28 @@
                         actions.appendChild(span);
                     };
                     if (stale) {
-                        status('Replaced by a newer carousel.', 'text-gray-400');
+                        status(L('Replaced by a newer carousel.', 'הוחלף בקרוסלה חדשה יותר.'), 'text-gray-400');
                     } else if (!data) {
-                        status('This slide was deleted.', 'text-gray-400');
+                        status(L('This slide was deleted.', 'השקף הזה נמחק.'), 'text-gray-400');
                     } else if (row.busy) {
-                        status(row.note || 'Generating image…', 'text-indigo-600');
+                        status(row.note || L('Generating image…', 'יוצרים תמונה…'), 'text-indigo-600');
                     } else if (row.error) {
                         status(row.error, 'text-red-600 w-full');
-                        actions.append(createChipButton('Retry', () => generate(row), true), createChipButton('Skip', () => skip(row)));
+                        actions.append(createChipButton(L('Retry', 'ניסיון חוזר'), () => generate(row), true), createChipButton(L('Skip', 'דילוג'), () => skip(row)));
                     } else if (data.mode === 'with') {
                         status('✓ Using the image version', 'text-green-700');
-                        actions.append(createChipButton('Regenerate', () => generate(row)), createChipButton('Use without image', () => skip(row)));
+                        actions.append(createChipButton(L('Regenerate', 'יצירה מחדש'), () => generate(row)), createChipButton(L('Use without image', 'בלי תמונה'), () => skip(row)));
                     } else if (hasSlotImage(data)) {
-                        status('Using the version without image');
-                        actions.append(createChipButton('Use image', () => { data.skipped = false; setSlideModeAt(index, 'with'); }, true), createChipButton('Regenerate', () => generate(row)));
+                        status(L('Using the version without image', 'בשימוש: הגרסה בלי תמונה'));
+                        actions.append(createChipButton(L('Use image', 'עם תמונה'), () => { data.skipped = false; setSlideModeAt(index, 'with'); }, true), createChipButton(L('Regenerate', 'יצירה מחדש'), () => generate(row)));
                     } else if (data.skipped) {
-                        status('Skipped: the slide stays without an image');
-                        actions.append(createChipButton('Approve & generate', () => generate(row), true));
+                        status(L('Skipped: the slide stays without an image', 'דילגתם: השקף נשאר בלי תמונה'));
+                        actions.append(createChipButton(L('Approve and generate', 'אישור ויצירה'), () => generate(row), true));
                     } else {
-                        actions.append(createChipButton('Approve & generate', () => generate(row), true), createChipButton('Skip', () => skip(row)));
+                        actions.append(createChipButton(L('Approve and generate', 'אישור ויצירה'), () => generate(row), true), createChipButton(L('Skip', 'דילוג'), () => skip(row)));
                     }
                     actions.querySelectorAll('button').forEach(button => {
-                        if (button.textContent !== 'Skip' && button.textContent !== 'Use without image' && !hasPrompt) button.disabled = true;
+                        if (button.textContent !== L('Skip', 'דילוג') && button.textContent !== L('Use without image', 'בלי תמונה') && !hasPrompt) button.disabled = true;
                     });
                 });
             }
@@ -2145,7 +2194,7 @@
             try {
                 await task();
             } catch (error) {
-                alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                alert(L(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, `ההורדה נכשלה: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`));
             } finally {
                 isExporting = false;
                 document.body.style.cursor = '';
@@ -2161,7 +2210,7 @@
 
         function downloadFullCarousel() {
             return runExport(async () => {
-                if (typeof JSZip === 'undefined') throw new Error('The ZIP library did not load. Check your connection and reload.');
+                if (typeof JSZip === 'undefined') throw new Error(L('The ZIP library did not load. Check your connection and reload.', 'רכיב ה־ZIP לא נטען. בדקו את החיבור וטענו מחדש.'));
                 const zip = new JSZip();
                 const slides = slidesForExport();
                 for (const [index, elements] of slides.entries()) {
@@ -2233,10 +2282,10 @@
 
         function setSaveStatus(status) {
             const label = document.getElementById('save-status');
-            const text = { saving: 'Saving…', saved: 'Saved', error: 'Not saved' };
+            const text = { saving: L('Saving…', 'שומר…'), saved: L('Saved', 'נשמר'), error: L('Not saved', 'לא נשמר') };
             label.textContent = text[status] ?? '';
             label.className = `text-[11px] font-semibold ${status === 'error' ? 'text-red-500' : 'text-gray-400'}`;
-            label.title = status === 'error' ? 'Changes could not be saved. KaruAI keeps trying with every change.' : '';
+            label.title = status === 'error' ? L('Changes could not be saved. KaruAI keeps trying with every change.', 'השינויים לא נשמרו. KaruAI ממשיך לנסות עם כל שינוי.') : '';
         }
 
         // A small JPEG of the first slide, for the gallery
@@ -2360,7 +2409,7 @@
             container.innerHTML = '';
             const note = document.createElement('div');
             note.className = 'm-auto text-center text-sm text-gray-500 max-w-[80%]';
-            note.innerHTML = '<p class="mb-3"></p><button onclick="window.top.location.href=\'/dashboard\'" class="text-indigo-600 font-semibold hover:underline">Back to all carousels</button>';
+            note.innerHTML = `<p class="mb-3"></p><button onclick="window.top.location.href='/dashboard'" class="text-indigo-600 font-semibold underline">${L('Back to all carousels', 'חזרה לכל הקרוסלות')}</button>`;
             note.querySelector('p').textContent = message;
             container.appendChild(note);
         }
@@ -2381,8 +2430,8 @@
                 redirectToLogin();
                 return;
             }
-            if (response.status === 404) throw new Error('This carousel does not exist anymore.');
-            if (!response.ok) throw new Error(`Could not load the carousel (status ${response.status}).`);
+            if (response.status === 404) throw new Error(L('This carousel does not exist anymore.', 'הקרוסלה הזאת כבר לא קיימת.'));
+            if (!response.ok) throw new Error(L(`Could not load the carousel (status ${response.status}).`, `לא הצלחנו לטעון את הקרוסלה (סטטוס ${response.status}).`));
             const { meta, document: saved } = await response.json();
             const savedHistory = historyResponse.ok ? await historyResponse.json() : null;
             carouselTitle = meta.title || '';
@@ -2442,7 +2491,7 @@
         resetHistory();
         switchRightTab('chat');
         renderAll();
-        loadCarousel().catch(error => showLoadError(error instanceof Error ? error.message : 'Could not load the carousel.'));
+        loadCarousel().catch(error => showLoadError(error instanceof Error ? error.message : L('Could not load the carousel.', 'לא הצלחנו לטעון את הקרוסלה.')));
         loadExportPlan();
     </script>
 </body>
