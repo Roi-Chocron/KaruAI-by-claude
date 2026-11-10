@@ -29,3 +29,6 @@ out/
 .dev.vars
 worker/worker-configuration.d.ts
 worker-configuration.d.ts
+
+# Prebuilt editor styles (npm run build:editor-css)
+public/editor.css
