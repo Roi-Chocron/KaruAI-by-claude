@@ -15,7 +15,7 @@ export default function RefundPage() {
         <p>
           Upon cancellation:
         </p>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li>Automatic renewal charges will immediately cease for all subsequent cycles.</li>
           <li>You will retain full access to paid plan features until the end of your current active billing cycle.</li>
           <li>After the billing period ends, your account will downgrade to the free Starter plan, preserving all your previous carousels.</li>
@@ -27,7 +27,7 @@ export default function RefundPage() {
         <p>
           Because KaruAI provides instant computational resources and AI image generation upon signup:
         </p>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li>
             <strong>Monthly Plans:</strong> Monthly subscription fees are non-refundable once the billing period has commenced and generations have occurred.
           </li>
@@ -45,8 +45,8 @@ export default function RefundPage() {
         <p>
           To submit a cancellation or refund inquiry:
         </p>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
-          <li>Send an email to <strong>support@karuai.com</strong> with the subject "Refund Request".</li>
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
+          <li>Send an email to <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a> with the subject "Refund Request".</li>
           <li>Provide your registered account email and invoice or transaction ID.</li>
           <li>Our support team will review and reply within 1–2 business days.</li>
         </ul>

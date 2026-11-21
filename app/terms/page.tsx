@@ -26,7 +26,7 @@ export default function TermsPage() {
         <p>
           You agree to use KaruAI only for lawful purposes. You must not:
         </p>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li>Generate, upload, or share content that is abusive, defamatory, hateful, or pornographic.</li>
           <li>Attempt to reverse engineer, decompile, or compromise the platform's systems and API endpoints.</li>
           <li>Circumvent account limits, usage quotas, or create automated bot accounts to exploit free allowances.</li>
@@ -65,7 +65,7 @@ export default function TermsPage() {
       <section>
         <h2>8. Contact Information</h2>
         <p>
-          If you have any questions or feedback regarding these Terms, please contact us at <strong>support@karuai.com</strong>.
+          If you have any questions or feedback regarding these Terms, please contact us at <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a>.
         </p>
       </section>
     </LegalPage>

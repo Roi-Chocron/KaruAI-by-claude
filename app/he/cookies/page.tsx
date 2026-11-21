@@ -1,5 +1,4 @@
-import { LegalPage, legalMetadata } from '@/components/legal-page';
-import { LocaleRoot } from '@/components/locale-root';
+import { LegalPage, LegalTable, legalMetadata } from '@/components/legal-page';
 import { ShieldCheck, BarChart3, Sliders, AlertCircle } from 'lucide-react';
 import { CookieSettingsButton } from '@/components/cookie-banner';
 
@@ -7,7 +6,6 @@ export const metadata = legalMetadata('he', '/cookies', 'מדיניות עוגי
 
 export default function HebrewCookiesPage() {
   return (
-    <LocaleRoot locale="he" remember>
       <LegalPage locale="he" path="/cookies" title="מדיניות עוגיות ומעקב" updated="נובמבר 2026">
 
         <section>
@@ -23,124 +21,118 @@ export default function HebrewCookiesPage() {
             KaruAI משתמשת רק בכלים ההכרחיים ובכלי הביצועים הדרושים כדי להפעיל באופן אמין את שירות יצירת הקרוסלות באמצעות בינה מלאכותית:
           </p>
 
-          <div>
+          <div className="mt-6 space-y-4">
             {/* Category 1 */}
             <div className="p-5 rounded-xl border border-line bg-mist space-y-2">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-ink" />
+                <ShieldCheck className="w-5 h-5 shrink-0 text-ink" aria-hidden="true" />
                 <h3 className="font-bold text-ink">1. עוגיות הכרחיות ועוגיות התחברות</h3>
               </div>
               <p className="text-sm text-graphite leading-relaxed">
                 העוגיות האלה חיוניות כדי שתוכלו להתחבר, לנווט באפליקציה ולגשת בצורה מאובטחת לקרוסלות הפרטיות שלכם ולאזור החיוב. הפלטפורמה לא יכולה לפעול כראוי בלעדיהן.
               </p>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-start text-xs text-graphite border border-line rounded-lg overflow-hidden bg-paper">
+              <LegalTable label="עוגיות הכרחיות ועוגיות התחברות">
                   <thead className="bg-mist text-ink font-semibold border-b border-line">
                     <tr>
-                      <th className="p-2.5 text-start">שם / מזהה</th>
-                      <th className="p-2.5 text-start">ספק</th>
-                      <th className="p-2.5 text-start">מטרה</th>
-                      <th className="p-2.5 text-start">תוקף</th>
+                      <th scope="col">שם / מזהה</th>
+                      <th scope="col">ספק</th>
+                      <th scope="col">מטרה</th>
+                      <th scope="col">תוקף</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>karu_session</bdi></td>
-                      <td className="p-2.5">KaruAI (צד ראשון)</td>
-                      <td className="p-2.5">אסימון התחברות מאובטח מסוג HTTP-only, לאימות משתמשים מחוברים ולהגנה על הגישה לחשבון.</td>
-                      <td className="p-2.5">30 יום</td>
+                      <td className="font-mono"><bdi>karu_session</bdi></td>
+                      <td>KaruAI (צד ראשון)</td>
+                      <td>אסימון התחברות מאובטח מסוג HTTP-only, לאימות משתמשים מחוברים ולהגנה על הגישה לחשבון.</td>
+                      <td>30 יום</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>karu_signed_in</bdi></td>
-                      <td className="p-2.5">KaruAI (צד ראשון)</td>
-                      <td className="p-2.5">מסמנת לאתר שאתם מחוברים, כדי שדף הבית יוכל לפתוח את הקרוסלות שלכם. אינה מכילה מידע אישי.</td>
-                      <td className="p-2.5">30 יום</td>
+                      <td className="font-mono"><bdi>karu_signed_in</bdi></td>
+                      <td>KaruAI (צד ראשון)</td>
+                      <td>מסמנת לאתר שאתם מחוברים, כדי שדף הבית יוכל לפתוח את הקרוסלות שלכם. אינה מכילה מידע אישי.</td>
+                      <td>30 יום</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>karu_oauth</bdi></td>
-                      <td className="p-2.5">KaruAI (צד ראשון)</td>
-                      <td className="p-2.5">מגינה על ההתחברות עם Google מפני זיוף בזמן שאתם מתחברים.</td>
-                      <td className="p-2.5">10 דקות</td>
+                      <td className="font-mono"><bdi>karu_oauth</bdi></td>
+                      <td>KaruAI (צד ראשון)</td>
+                      <td>מגינה על ההתחברות עם Google מפני זיוף בזמן שאתם מתחברים.</td>
+                      <td>10 דקות</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>karu_consent</bdi></td>
-                      <td className="p-2.5">KaruAI (צד ראשון)</td>
-                      <td className="p-2.5">זוכרת את הבחירה שלכם לגבי עוגיות.</td>
-                      <td className="p-2.5">שנה</td>
+                      <td className="font-mono"><bdi>karu_consent</bdi></td>
+                      <td>KaruAI (צד ראשון)</td>
+                      <td>זוכרת את הבחירה שלכם לגבי עוגיות.</td>
+                      <td>שנה</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>karu_locale</bdi></td>
-                      <td className="p-2.5">KaruAI (צד ראשון)</td>
-                      <td className="p-2.5">זוכרת אם בחרתם באנגלית או בעברית. אינה מכילה מידע אישי.</td>
-                      <td className="p-2.5">שנה</td>
+                      <td className="font-mono"><bdi>karu_locale</bdi></td>
+                      <td>KaruAI (צד ראשון)</td>
+                      <td>זוכרת אם בחרתם באנגלית או בעברית. אינה מכילה מידע אישי.</td>
+                      <td>שנה</td>
                     </tr>
                   </tbody>
-                </table>
-              </div>
+                </LegalTable>
             </div>
 
             {/* Category 2 */}
             <div className="p-5 rounded-xl border border-line bg-mist space-y-2">
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
+                <BarChart3 className="w-5 h-5 shrink-0 text-ink" aria-hidden="true" />
                 <h3 className="font-bold text-ink">2. סטטיסטיקת מוצר וחוויית משתמש (PostHog)</h3>
               </div>
               <p className="text-sm text-graphite leading-relaxed">
                 אנחנו משתמשים ב־<strong>PostHog</strong> כדי להבין איך משתמשים פועלים באתר, למדוד את השימוש בתכונות יצירת הקרוסלות ולשפר את יעילות העבודה.
               </p>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-start text-xs text-graphite border border-line rounded-lg overflow-hidden bg-paper">
+              <LegalTable label="סטטיסטיקת מוצר וחוויית משתמש (PostHog)">
                   <thead className="bg-mist text-ink font-semibold border-b border-line">
                     <tr>
-                      <th className="p-2.5 text-start">כלי / עוגיות</th>
-                      <th className="p-2.5 text-start">ספק</th>
-                      <th className="p-2.5 text-start">מטרה והגנות פרטיות</th>
-                      <th className="p-2.5 text-start">תוקף</th>
+                      <th scope="col">כלי / עוגיות</th>
+                      <th scope="col">ספק</th>
+                      <th scope="col">מטרה והגנות פרטיות</th>
+                      <th scope="col">תוקף</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>ph_* / posthog-js</bdi></td>
-                      <td className="p-2.5">PostHog</td>
-                      <td className="p-2.5">
+                      <td className="font-mono"><bdi>ph_* / posthog-js</bdi></td>
+                      <td>PostHog</td>
+                      <td>
                         מתעד ניווט בין דפים ואירועי אינטראקציה. בסביבת הייצור, כשהקלטת הגלישה מופעלת, כל הטקסט וכל שדות הקלט מוסתרים לחלוטין, כדי להבטיח שתוכן רגיש של משתמשים לעולם לא ייקלט.
                       </td>
-                      <td className="p-2.5">עד שנה</td>
+                      <td>עד שנה</td>
                     </tr>
                   </tbody>
-                </table>
-              </div>
+                </LegalTable>
             </div>
 
             {/* Category 3 */}
             <div className="p-5 rounded-xl border border-line bg-mist space-y-2">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-ink" />
+                <AlertCircle className="w-5 h-5 shrink-0 text-ink" aria-hidden="true" />
                 <h3 className="font-bold text-ink">3. ניטור ביצועים ושגיאות (Sentry)</h3>
               </div>
               <p className="text-sm text-graphite leading-relaxed">
                 אנחנו משלבים את <strong>Sentry</strong> כדי לתעד בזמן אמת חריגות באפליקציה בצד הלקוח ובצד השרת, תקלות של חריגה מזמן ההמתנה ב־API וצווארי בקבוק בביצועים, וכך צוות הפיתוח שלנו יכול לזהות באגים ולתקן אותם במהירות.
               </p>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-start text-xs text-graphite border border-line rounded-lg overflow-hidden bg-paper">
+              <LegalTable label="ניטור ביצועים ושגיאות (Sentry)">
                   <thead className="bg-mist text-ink font-semibold border-b border-line">
                     <tr>
-                      <th className="p-2.5 text-start">כלי / שירות</th>
-                      <th className="p-2.5 text-start">ספק</th>
-                      <th className="p-2.5 text-start">מטרה</th>
-                      <th className="p-2.5 text-start">תוקף</th>
+                      <th scope="col">כלי / שירות</th>
+                      <th scope="col">ספק</th>
+                      <th scope="col">מטרה</th>
+                      <th scope="col">תוקף</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     <tr>
-                      <td className="p-2.5 font-mono"><bdi>@sentry/nextjs</bdi></td>
-                      <td className="p-2.5">Sentry (טלמטריה תפקודית)</td>
-                      <td className="p-2.5">מתעד את מחסנית הקריאות (Call Stack) של שגיאות ומטא־נתונים לאבחון, כשמתרחשות שגיאות לא צפויות בזמן ריצה בדפדפן או בנקודות קצה בשרת.</td>
-                      <td className="p-2.5">לפי הפעלה / אירוע</td>
+                      <td className="font-mono"><bdi>@sentry/nextjs</bdi></td>
+                      <td>Sentry (טלמטריה תפקודית)</td>
+                      <td>מתעד את מחסנית הקריאות (Call Stack) של שגיאות ומטא־נתונים לאבחון, כשמתרחשות שגיאות לא צפויות בזמן ריצה בדפדפן או בנקודות קצה בשרת.</td>
+                      <td>לפי הפעלה / אירוע</td>
                     </tr>
                   </tbody>
-                </table>
-              </div>
+                </LegalTable>
             </div>
           </div>
         </section>
@@ -153,10 +145,7 @@ export default function HebrewCookiesPage() {
         </section>
 
         <section>
-          <div className="flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-ink" />
-            <h2>4. איך אפשר לנהל עוגיות</h2>
-          </div>
+          <h2 className="flex items-center gap-3"><Sliders className="w-7 h-7 shrink-0" aria-hidden="true" />4. איך אפשר לנהל עוגיות</h2>
           <p>
             רוב הדפדפנים המודרניים מאפשרים לשלוט בהגדרות העוגיות דרך ההעדפות שלהם:
           </p>
@@ -166,19 +155,16 @@ export default function HebrewCookiesPage() {
             <li>אפשר למחוק בכל עת עוגיות קיימות ונתונים שמורים באחסון המקומי דרך הגדרות הדפדפן.</li>
             <li>שימו לב: חסימת עוגיות ההתחברות החיוניות תמנע מכם להתחבר וליצור קרוסלות ב־KaruAI.</li>
           </ul>
-          <CookieSettingsButton locale="he" />
+          <div className="pt-2 [&>button]:min-h-10"><CookieSettingsButton locale="he" /></div>
         </section>
 
         <section>
           <h2>5. צרו קשר</h2>
           <p>
             לכל שאלה או משוב בנוגע לשימוש שלנו בעוגיות או בטכנולוגיות מעקב, אתם מוזמנים לפנות אלינו בכתובת{' '}
-            <a href="mailto:privacy@karuai.com">
-              privacy@karuai.com
-            </a>.
+            <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
           </p>
         </section>
       </LegalPage>
-    </LocaleRoot>
   );
 }
