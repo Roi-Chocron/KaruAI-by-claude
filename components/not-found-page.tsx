@@ -21,8 +21,15 @@ export function NotFoundPage() {
   const locale: Locale = underHebrew ? 'he' : userLocale;
   const t = systemMessages[locale].notFound;
 
+  // The exported page's <title> is the English one, and Next writes it back after hydration, so keep ours on top
   useEffect(() => {
-    document.title = t.tabTitle;
+    const apply = () => {
+      if (document.title !== t.tabTitle) document.title = t.tabTitle;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => observer.disconnect();
   }, [t.tabTitle]);
 
   const home = signedIn ? '/dashboard' : localePath(locale, '/');
