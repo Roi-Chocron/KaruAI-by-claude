@@ -56,6 +56,10 @@ const en = {
     yourPlan: 'Your current plan',
     soon: 'Coming soon',
     loadFailed: "Couldn't load your plan.",
+    usedOf: (used: string, limit: string) => `${used} of ${limit} used`,
+    usedUnlimited: (used: string) => `${used} used, no limit`,
+    limitReached: (what: string) => `This month's limit is used up: ${what}.`,
+    seePlans: 'See the bigger plans',
   },
   account: {
     title: 'Account',
@@ -149,6 +153,10 @@ const he: AppMessages = {
     yourPlan: 'התוכנית הנוכחית שלכם',
     soon: 'בקרוב',
     loadFailed: 'לא הצלחנו לטעון את התוכנית שלכם.',
+    usedOf: (used, limit) => `נוצלו ${used} מתוך ${limit}`,
+    usedUnlimited: used => `נוצלו ${used}, ללא הגבלה`,
+    limitReached: what => `המכסה החודשית נוצלה: ${what}.`,
+    seePlans: 'לתוכניות הגדולות יותר',
   },
   account: {
     title: 'חשבון',
