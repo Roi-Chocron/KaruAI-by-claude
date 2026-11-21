@@ -9,10 +9,13 @@ import { MarkedText } from '@/components/brand/marked-text';
 import { ExampleCarousel } from '@/components/home/example-carousel';
 import { homeMessages } from '@/messages/home';
 import { localePath, type Locale } from '@/lib/i18n';
+import { useConsent } from '@/lib/consent';
 
 export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [yearly, setYearly] = useState(false);
+  // While the cookie banner is up, room below the footer so it never sits on the last links
+  const bannerShown = useConsent() === null;
   const t = homeMessages[locale];
   const Forward = locale === 'he' ? ArrowLeft : ArrowRight;
   const home = localePath(locale, '/');
@@ -33,25 +36,25 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   ];
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className={`min-h-screen bg-paper text-ink ${bannerShown ? 'pb-56 sm:pb-44' : ''}`}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-[60] btn-primary">{t.nav.skip}</a>
 
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-paper/90 backdrop-blur border-b border-line">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-          <Logo href={home} />
+          <Logo href={home} className="min-h-10" />
 
-          <div className="hidden md:flex items-center gap-8 text-[15px]">
+          <div className="hidden md:flex items-center gap-6 lg:gap-8 text-[15px]">
             {navLinks.map(link => (
-              <a key={link.href} href={link.href} className="text-graphite hover:text-ink transition-colors">{link.label}</a>
+              <a key={link.href} href={link.href} className="inline-flex items-center min-h-10 text-graphite hover:text-ink transition-colors">{link.label}</a>
             ))}
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            <Link href={otherLanguage} className="px-3 py-2 text-sm text-graphite hover:text-ink transition-colors" lang={locale === 'he' ? 'en' : 'he'}>
+            <Link href={otherLanguage} className="inline-flex items-center min-h-10 px-3 text-sm text-graphite hover:text-ink transition-colors" lang={locale === 'he' ? 'en' : 'he'}>
               {t.nav.otherLanguage}
             </Link>
-            <Link href="/login" className="px-3 py-2 text-[15px] font-medium text-ink hover:text-graphite transition-colors">{t.nav.login}</Link>
+            <Link href="/login" className="inline-flex items-center min-h-10 px-3 text-[15px] font-medium text-ink hover:text-graphite transition-colors">{t.nav.login}</Link>
             <Link href="/login" className="btn-primary !py-2.5">{t.nav.start}</Link>
           </div>
 
@@ -211,7 +214,7 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
       <footer className="border-t border-line">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
-            <Logo href={home} />
+            <Logo href={home} className="min-h-10" />
             <p className="mt-4 text-graphite max-w-xs">{t.footer.tagline}</p>
           </div>
           <div>
