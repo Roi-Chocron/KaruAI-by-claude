@@ -204,8 +204,9 @@ function CarouselGrid({ locale }: { locale: Locale }) {
                   <Thumbnail carousel={carousel} t={t} />
                 </Link>
                 <div className="flex items-start justify-between gap-1 mt-3">
+                  {/* dir="auto" gets a Hebrew title in an English page (and back) right; the alignment follows the page */}
                   <Link href={href} className="min-w-0 text-start rounded-md">
-                    <span className="block font-semibold truncate" dir="auto">{title}</span>
+                    <span className="block font-semibold truncate text-left rtl:text-right" dir="auto">{title}</span>
                     <span className="block text-sm text-graphite">
                       {/* On a narrow card it breaks at the dot, not inside "2 weeks ago" */}
                       <span className="whitespace-nowrap">{t.slides(carousel.slideCount)}</span>
