@@ -13,7 +13,6 @@ const COPY = {
     updated: 'Last updated',
     home: 'Home',
     otherLanguage: 'עברית',
-    otherLanguageLabel: 'Read this page in Hebrew',
     legalNav: 'Legal pages',
     pages: { '/terms': 'Terms of Service', '/privacy': 'Privacy Policy', '/cookies': 'Cookie Policy', '/refund': 'Refund Policy', '/accessibility': 'Accessibility Statement' },
   },
@@ -21,7 +20,6 @@ const COPY = {
     updated: 'עודכן לאחרונה',
     home: 'דף הבית',
     otherLanguage: 'English',
-    otherLanguageLabel: 'לקריאת הדף באנגלית',
     legalNav: 'מסמכים משפטיים',
     pages: { '/terms': 'תנאי שימוש', '/privacy': 'מדיניות פרטיות', '/cookies': 'מדיניות עוגיות', '/refund': 'מדיניות ביטולים', '/accessibility': 'הצהרת נגישות' },
     // The Hebrew text is a translation; the English one is the binding version
@@ -61,9 +59,9 @@ export function LegalPage({ locale = 'en', path, title, updated, translated = tr
       <div className="min-h-screen bg-paper text-ink" dir={dirOf(locale)} lang={locale}>
         <header className="border-b border-line">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-            <Logo href={localePath(locale, '/')} />
+            <Logo href={localePath(locale, '/')} className="min-h-10" />
             <nav className="flex items-center gap-1 sm:gap-3 -me-2 text-sm text-graphite">
-              <Link href={localePath(other, path)} lang={other} hrefLang={other} aria-label={t.otherLanguageLabel} className={navLink}>
+              <Link href={localePath(other, path)} lang={other} hrefLang={other} className={navLink}>
                 {t.otherLanguage}
               </Link>
               <Link href={localePath(locale, '/')} className={`${navLink} gap-1.5`}>
@@ -84,7 +82,7 @@ export function LegalPage({ locale = 'en', path, title, updated, translated = tr
           )}
           <h1 className="font-display font-bold text-5xl sm:text-6xl md:text-8xl leading-[0.9] break-words">{title}</h1>
           <p className="mt-4 text-sm text-graphite">{t.updated}: {updated}</p>
-          <div className="legal mt-12 space-y-10 border-t border-ink pt-10">{children}</div>
+          <div className="legal mt-12 space-y-10 border-t border-ink pt-10 [&_section>*+*]:mt-4">{children}</div>
         </main>
         <footer className="border-t border-line">
           <nav aria-label={t.legalNav} className="max-w-3xl mx-auto px-4 sm:px-6 py-6">

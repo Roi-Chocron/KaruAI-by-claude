@@ -155,7 +155,7 @@ export default function CookiesPage() {
           <li>You can clear existing cookies and cached local storage at any time via your browser settings.</li>
           <li>Please note: Blocking essential session cookies will prevent you from signing in and generating carousels on KaruAI.</li>
         </ul>
-        <CookieSettingsButton />
+        <div className="pt-2 [&>button]:min-h-10"><CookieSettingsButton /></div>
       </section>
 
       <section>

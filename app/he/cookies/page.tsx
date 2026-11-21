@@ -155,7 +155,7 @@ export default function HebrewCookiesPage() {
             <li>אפשר למחוק בכל עת עוגיות קיימות ונתונים שמורים באחסון המקומי דרך הגדרות הדפדפן.</li>
             <li>שימו לב: חסימת עוגיות ההתחברות החיוניות תמנע מכם להתחבר וליצור קרוסלות ב־KaruAI.</li>
           </ul>
-          <CookieSettingsButton locale="he" />
+          <div className="pt-2 [&>button]:min-h-10"><CookieSettingsButton locale="he" /></div>
         </section>
 
         <section>
