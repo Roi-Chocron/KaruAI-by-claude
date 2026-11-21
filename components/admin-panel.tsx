@@ -24,16 +24,28 @@ type Stats = {
 // Which settings hold secrets (shown masked, typed into a password field)
 const SECRET_SETTINGS = new Set(['gemini_api_key', 'pollinations_api_key']);
 
+const intlLocale = (locale: Locale) => (locale === 'he' ? 'he-IL' : 'en-GB');
 const formatDate = (iso: string | null, locale: Locale) =>
-  iso ? new Date(iso).toLocaleString(locale === 'he' ? 'he-IL' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  iso ? new Date(iso).toLocaleString(intlLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+// A day of the chart (YYYY-MM-DD, UTC) as "8 Nov" / "8 בנוב׳"
+const formatDay = (day: string, locale: Locale, options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString(intlLocale(locale), { ...options, timeZone: 'UTC' });
+const formatNumber = (n: number, locale: Locale) => n.toLocaleString(intlLocale(locale));
 
 const card = 'rounded-2xl border border-line p-6 sm:p-8';
 const sectionTitle = 'font-display font-bold text-4xl leading-none';
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
+// The API's own error messages are English, so in Hebrew a failed request is described by its status instead
+async function request<T>(locale: Locale, url: string, init?: RequestInit): Promise<T> {
+  const t = adminMessages[locale];
+  let res: Response;
+  try {
+    res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  } catch {
+    throw new Error(t.offline);
+  }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
+  if (!res.ok) throw new Error((locale === 'en' && data?.error) || t.requestFailed(res.status));
   return data as T;
 }
 
@@ -49,7 +61,7 @@ const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (
     setBusy(true);
     setError(null);
     try {
-      const data = await request<{ setting: Setting }>('/api/admin/settings', {
+      const data = await request<{ setting: Setting }>(locale, '/api/admin/settings', {
         method: 'PUT',
         body: JSON.stringify({ key: setting.key, value }),
       });
@@ -81,7 +93,7 @@ const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (
         </div>
         <form
           onSubmit={e => { e.preventDefault(); if (draft.trim()) save(draft.trim()); }}
-          className="flex items-center gap-2 shrink-0"
+          className="flex items-center gap-2 lg:shrink-0"
         >
           <input
             type={secret ? 'password' : 'text'}
@@ -91,13 +103,13 @@ const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (
             aria-label={`${meta.label}: ${secret ? t.newKey : t.newModel}`}
             autoComplete="off"
             dir="ltr"
-            className="w-full lg:w-64 border border-line rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:border-ink"
+            className="min-w-0 flex-1 lg:flex-none lg:w-64 border border-line rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:border-ink"
           />
           <button type="submit" disabled={busy || !draft.trim()} className="btn-primary !py-2.5 text-sm disabled:opacity-40">
             {t.save}
           </button>
           {setting.source === 'admin' && (
-            <button type="button" disabled={busy} onClick={() => save(null)} className="text-sm font-semibold text-graphite hover:text-red-700 px-2" title={t.clearTitle}>
+            <button type="button" disabled={busy} onClick={() => save(null)} className="min-h-10 text-sm font-semibold text-graphite hover:text-red-700 px-2" title={t.clearTitle}>
               {t.clear}
             </button>
           )}
@@ -108,27 +120,66 @@ const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (
   );
 };
 
-// AI requests per day over the last two weeks, as simple bars
+// AI requests per day over the last two weeks, as simple bars. Time runs in the reading direction, so in Hebrew the
+// newest day is on the left. Screen readers get the same numbers as a table.
 function DailyChart({ daily, locale }: { daily: Stats['daily']; locale: Locale }) {
   const t = adminMessages[locale];
   const days = Array.from({ length: 14 }, (_, i) => new Date(Date.now() - (13 - i) * 24 * 3600 * 1000).toISOString().slice(0, 10));
   const byDay = new Map(daily.map(row => [row.day, row]));
-  const max = Math.max(1, ...daily.map(row => row.messages + row.images));
+  const rows = days.map(day => {
+    const row = byDay.get(day);
+    return { day, messages: row?.messages ?? 0, images: row?.images ?? 0, tokens: row?.tokens ?? 0 };
+  });
+  const max = Math.max(1, ...rows.map(row => row.messages + row.images));
   return (
-    <div className="flex items-end gap-1.5 h-40" dir="ltr">
-      {days.map(day => {
-        const row = byDay.get(day);
-        const total = (row?.messages ?? 0) + (row?.images ?? 0);
-        return (
-          <div key={day} className="flex-1 h-full flex flex-col items-center gap-1" title={t.chartDay(day, row?.messages ?? 0, row?.images ?? 0, (row?.tokens ?? 0).toLocaleString())}>
-            <div className="flex-1 w-full flex items-end">
-              <div className="w-full bg-ink rounded-t-[3px]" style={{ height: `${(total / max) * 100}%`, minHeight: total ? 2 : 0 }} />
-            </div>
-            <span className="text-[11px] text-graphite tabular-nums">{day.slice(8)}</span>
+    <>
+      <div aria-hidden="true">
+        <div className="flex gap-2">
+          <div className="flex flex-col justify-between h-40 text-[11px] text-graphite tabular-nums text-end pb-5">
+            <span>{formatNumber(max, locale)}</span>
+            <span>0</span>
           </div>
-        );
-      })}
-    </div>
+          <div className="flex-1 min-w-0 flex items-end gap-1 sm:gap-1.5 h-40">
+            {rows.map(row => {
+              const total = row.messages + row.images;
+              return (
+                <div key={row.day} className="flex-1 min-w-0 h-full flex flex-col items-center gap-1" title={t.chartDay(formatDay(row.day, locale), row.messages, row.images, formatNumber(row.tokens, locale))}>
+                  <div className="flex-1 w-full flex items-end border-b border-line">
+                    <div className="w-full bg-ink rounded-t-[3px]" style={{ height: `${(total / max) * 100}%`, minHeight: total ? 2 : 0 }} />
+                  </div>
+                  <span className="h-4 text-[11px] text-graphite tabular-nums">{Number(row.day.slice(8))}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex justify-between gap-4 mt-2 ms-8 text-xs text-graphite">
+          <span>{formatDay(days[0], locale)}</span>
+          <span>{formatDay(days[13], locale)}</span>
+        </div>
+      </div>
+      <table className="sr-only">
+        <caption>{t.chart}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t.chartTable.day}</th>
+            <th scope="col">{t.chartTable.messages}</th>
+            <th scope="col">{t.chartTable.images}</th>
+            <th scope="col">{t.chartTable.tokens}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.day}>
+              <th scope="row">{formatDay(row.day, locale, { day: 'numeric', month: 'long' })}</th>
+              <td>{row.messages}</td>
+              <td>{row.images}</td>
+              <td>{formatNumber(row.tokens, locale)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -141,15 +192,15 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    request<{ settings: Setting[] }>('/api/admin/settings').then(data => setSettings(data.settings)).catch(err => setError(err.message));
-    request<{ users: AdminUser[] }>('/api/admin/users').then(data => setUsers(data.users)).catch(err => setError(err.message));
-    request<Stats>('/api/admin/stats').then(setStats).catch(err => setError(err.message));
-  }, []);
+    request<{ settings: Setting[] }>(locale, '/api/admin/settings').then(data => setSettings(data.settings)).catch(err => setError(err.message));
+    request<{ users: AdminUser[] }>(locale, '/api/admin/users').then(data => setUsers(data.users)).catch(err => setError(err.message));
+    request<Stats>(locale, '/api/admin/stats').then(setStats).catch(err => setError(err.message));
+  }, [locale]);
 
   // Applies { role } / { plan } / { suspended } to the user
   const updateUser = async (user: AdminUser, change: Record<string, unknown>) => {
     try {
-      const data = await request<{ user: User }>(`/api/admin/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(change) });
+      const data = await request<{ user: User }>(locale, `/api/admin/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(change) });
       setUsers(prev => prev?.map(item => (item.id === user.id ? { ...item, ...data.user } : item)) ?? null);
     } catch (err) {
       alert(err instanceof Error ? err.message : t.updateFailed);
@@ -165,7 +216,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
   const removeUser = async (user: AdminUser) => {
     if (!confirm(t.confirmDelete(user.email, user.carouselCount))) return;
     try {
-      await request(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+      await request(locale, `/api/admin/users/${user.id}`, { method: 'DELETE' });
       setUsers(prev => prev?.filter(item => item.id !== user.id) ?? null);
     } catch (err) {
       alert(err instanceof Error ? err.message : t.deleteFailed);
@@ -182,7 +233,58 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
     { label: t.tiles.tokens, value: stats?.month.tokens },
     { label: t.tiles.suspended, value: stats?.suspended },
   ];
-  const select = 'border border-line bg-paper rounded-lg px-2 py-1.5 text-sm font-medium disabled:opacity-60';
+  const select = 'min-h-10 border border-line bg-paper rounded-lg px-2 py-1.5 text-sm font-medium disabled:opacity-60';
+  const loadingRow = <div role="status" className="flex items-center gap-2 text-sm text-graphite py-4"><Loader2 size={16} className="animate-spin" /> {loading}</div>;
+
+  const roleSelect = (user: AdminUser, isMe: boolean) => (
+    <select
+      value={user.role}
+      disabled={isMe}
+      onChange={e => updateUser(user, { role: e.target.value })}
+      title={isMe ? t.ownRole : undefined}
+      aria-label={t.roleOf(user.email)}
+      className={`${select} ${user.role === 'admin' ? '!bg-lime !border-lime' : ''}`}
+    >
+      <option value="user">{t.roles.user}</option>
+      <option value="admin">{t.roles.admin}</option>
+    </select>
+  );
+  const planSelect = (user: AdminUser, isMe: boolean) => (
+    <select
+      value={user.plan}
+      disabled={isMe}
+      onChange={e => updateUser(user, { plan: e.target.value })}
+      title={isMe ? t.ownPlan : undefined}
+      aria-label={t.planOf(user.email)}
+      className={select}
+    >
+      {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
+    </select>
+  );
+  const month = (user: AdminUser) => (
+    <span className="whitespace-nowrap tabular-nums" dir="ltr" title={t.monthTitle}>{user.usage.carousels} / {user.usage.messages} / {user.usage.images}</span>
+  );
+  const actions = (user: AdminUser) => (
+    <>
+      <button
+        onClick={() => toggleSuspended(user)}
+        aria-label={user.suspendedAt ? t.unsuspendUser(user.email) : t.suspendUser(user.email)}
+        className="min-h-10 text-sm font-semibold px-3 rounded-lg hover:bg-mist"
+      >
+        {user.suspendedAt ? t.unsuspend : t.suspend}
+      </button>
+      <button onClick={() => removeUser(user)} title={t.deleteUser} aria-label={t.deleteUserNamed(user.email)} className="h-10 w-10 inline-grid place-items-center rounded-lg text-graphite hover:text-red-700 hover:bg-mist">
+        <Trash2 size={16} />
+      </button>
+    </>
+  );
+  const identity = (user: AdminUser, isMe: boolean) => (
+    <>
+      <p className="font-semibold break-words" dir="auto">{user.name || '—'}{isMe && <span className="ms-2 text-xs font-medium text-graphite">{t.you}</span>}</p>
+      <p className="text-graphite break-all" dir="ltr">{user.email}</p>
+      {user.suspendedAt && <p className="text-xs font-semibold text-red-700">{t.suspendedOn(formatDate(user.suspendedAt, locale))}</p>}
+    </>
+  );
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-4">
@@ -194,7 +296,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
         {tiles.map((tile, i) => (
           <div key={tile.label} className={`p-5 sm:p-6 border-line ${i % 2 ? 'border-s' : ''} md:border-s ${i % 4 === 0 ? 'md:border-s-0' : ''} ${i >= 2 ? 'border-t' : ''} ${i < 4 ? 'md:border-t-0' : 'md:border-t'}`}>
             <p className="text-sm text-graphite">{tile.label}</p>
-            <p className="font-display font-bold text-5xl leading-none mt-2 tabular-nums">{tile.value?.toLocaleString() ?? '—'}</p>
+            <p className="font-display font-bold text-5xl leading-none mt-2 tabular-nums">{tile.value === undefined ? '—' : formatNumber(tile.value, locale)}</p>
           </div>
         ))}
       </div>
@@ -203,10 +305,17 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
         <section className={card}>
           <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
             <h2 className={sectionTitle}>{t.chart}</h2>
-            <p className="text-sm text-graphite" dir="ltr">
-              {PLAN_IDS.map(id => `${PLANS[id].name}: ${stats.plans[id] ?? 0}`).join(' · ')}
-            </p>
+            <div className="text-sm text-graphite">
+              <h3 className="sr-only">{t.plansLegend}</h3>
+              <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                <li aria-hidden="true">{t.plansLegend}:</li>
+                {PLAN_IDS.map(id => (
+                  <li key={id}><span dir="ltr">{PLANS[id].name}</span> <span className="font-semibold text-ink tabular-nums">{formatNumber(stats.plans[id] ?? 0, locale)}</span></li>
+                ))}
+              </ul>
+            </div>
           </div>
+          <p className="text-sm text-graphite -mt-3 mb-5">{t.chartSub}</p>
           <DailyChart daily={stats.daily} locale={locale} />
         </section>
       )}
@@ -215,7 +324,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
         <h2 className={sectionTitle}>{t.keys}</h2>
         <p className="text-sm text-graphite mt-3 mb-2 max-w-2xl">{t.keysSub}</p>
         {!settings ? (
-          <div className="flex items-center gap-2 text-sm text-graphite py-4"><Loader2 size={16} className="animate-spin" /> {loading}</div>
+          loadingRow
         ) : (
           settings.map(setting => (
             <SettingRow key={setting.key} setting={setting} locale={locale} onSaved={next => setSettings(prev => prev?.map(item => (item.key === next.key ? next : item)) ?? null)} />
@@ -226,80 +335,73 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
       <section className={card}>
         <h2 className={`${sectionTitle} mb-6`}>{t.users}</h2>
         {!users ? (
-          <div className="flex items-center gap-2 text-sm text-graphite py-4"><Loader2 size={16} className="animate-spin" /> {loading}</div>
+          loadingRow
         ) : (
-          <div className="overflow-x-auto -mx-6 sm:-mx-8 px-6 sm:px-8">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-start text-graphite border-b border-ink">
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.user}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.role}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.plan}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.carousels}</th>
-                  <th className="py-3 pe-4 text-start font-medium" title={t.monthTitle}>{t.columns.month}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.tokens}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.joined}</th>
-                  <th className="py-3 pe-4 text-start font-medium">{t.columns.lastActive}</th>
-                  <th className="py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => {
-                  const isMe = user.id === me.id;
-                  return (
-                    <tr key={user.id} className={`border-b border-line last:border-0 ${user.suspendedAt ? 'bg-red-50' : ''}`}>
-                      <td className="py-3.5 pe-4">
-                        <p className="font-semibold" dir="auto">{user.name || '—'}{isMe && <span className="ms-2 text-xs font-medium text-graphite">{t.you}</span>}</p>
-                        <p className="text-graphite">{user.email}</p>
-                        {user.suspendedAt && <p className="text-xs font-semibold text-red-700">{t.suspendedOn(formatDate(user.suspendedAt, locale))}</p>}
-                      </td>
-                      <td className="py-3.5 pe-4">
-                        <select
-                          value={user.role}
-                          disabled={isMe}
-                          onChange={e => updateUser(user, { role: e.target.value })}
-                          title={isMe ? t.ownRole : undefined}
-                          aria-label={`${t.columns.role}: ${user.email}`}
-                          className={`${select} ${user.role === 'admin' ? '!bg-lime !border-lime' : ''}`}
-                        >
-                          <option value="user">{t.roles.user}</option>
-                          <option value="admin">{t.roles.admin}</option>
-                        </select>
-                      </td>
-                      <td className="py-3.5 pe-4">
-                        <select
-                          value={user.plan}
-                          disabled={isMe}
-                          onChange={e => updateUser(user, { plan: e.target.value })}
-                          aria-label={`${t.columns.plan}: ${user.email}`}
-                          className={select}
-                        >
-                          {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-3.5 pe-4 tabular-nums">{user.carouselCount}</td>
-                      <td className="py-3.5 pe-4 whitespace-nowrap tabular-nums" dir="ltr">{user.usage.carousels} / {user.usage.messages} / {user.usage.images}</td>
-                      <td className="py-3.5 pe-4 tabular-nums">{user.usage.tokens.toLocaleString()}</td>
-                      <td className="py-3.5 pe-4 text-graphite whitespace-nowrap">{formatDate(user.createdAt, locale)}</td>
-                      <td className="py-3.5 pe-4 text-graphite whitespace-nowrap">{formatDate(user.lastSeenAt, locale)}</td>
-                      <td className="py-3.5 text-end whitespace-nowrap">
-                        {!isMe && (
-                          <>
-                            <button onClick={() => toggleSuspended(user)} className="text-sm font-semibold px-2 py-1 rounded-lg hover:bg-mist">
-                              {user.suspendedAt ? t.unsuspend : t.suspend}
-                            </button>
-                            <button onClick={() => removeUser(user)} title={t.deleteUser} aria-label={`${t.deleteUser}: ${user.email}`} className="p-1.5 rounded-lg text-graphite hover:text-red-700 hover:bg-mist">
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Phones and tablets: one card per user */}
+            <ul className="lg:hidden divide-y divide-line border-t border-ink">
+              {users.map(user => {
+                const isMe = user.id === me.id;
+                return (
+                  <li key={user.id} className={`py-5 ${user.suspendedAt ? 'bg-red-50 -mx-6 sm:-mx-8 px-6 sm:px-8' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">{identity(user, isMe)}</div>
+                      {!isMe && <div className="flex items-center shrink-0 -me-2">{actions(user)}</div>}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {roleSelect(user, isMe)}
+                      {planSelect(user, isMe)}
+                    </div>
+                    <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 mt-4 text-sm">
+                      <div><dt className="text-graphite">{t.columns.carousels}</dt><dd className="tabular-nums">{user.carouselCount}</dd></div>
+                      <div><dt className="text-graphite">{t.monthShort}</dt><dd>{month(user)}</dd></div>
+                      <div><dt className="text-graphite">{t.columns.tokens}</dt><dd className="tabular-nums">{formatNumber(user.usage.tokens, locale)}</dd></div>
+                      <div><dt className="text-graphite">{t.columns.joined}</dt><dd>{formatDate(user.createdAt, locale)}</dd></div>
+                      <div><dt className="text-graphite">{t.columns.lastActive}</dt><dd>{formatDate(user.lastSeenAt, locale)}</dd></div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Wide screens: the table; it scrolls inside the card if it still doesn't fit */}
+            <div className="hidden lg:block overflow-x-auto -mx-8 px-8">
+              <table className="w-full text-sm">
+                <caption className="sr-only">{t.users}</caption>
+                <thead>
+                  <tr className="text-graphite border-b border-ink">
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.user}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.role}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.plan}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.carousels}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium whitespace-nowrap" title={t.monthTitle}>{t.columns.month}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.tokens}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium">{t.columns.joined}</th>
+                    <th scope="col" className="py-3 pe-4 text-start font-medium whitespace-nowrap">{t.columns.lastActive}</th>
+                    <th scope="col" className="py-3"><span className="sr-only">{t.columns.actions}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(user => {
+                    const isMe = user.id === me.id;
+                    return (
+                      <tr key={user.id} className={`border-b border-line last:border-0 ${user.suspendedAt ? 'bg-red-50' : ''}`}>
+                        <td className="py-3.5 pe-4 min-w-[12rem]">{identity(user, isMe)}</td>
+                        <td className="py-3.5 pe-4">{roleSelect(user, isMe)}</td>
+                        <td className="py-3.5 pe-4">{planSelect(user, isMe)}</td>
+                        <td className="py-3.5 pe-4 tabular-nums">{user.carouselCount}</td>
+                        <td className="py-3.5 pe-4">{month(user)}</td>
+                        <td className="py-3.5 pe-4 tabular-nums">{formatNumber(user.usage.tokens, locale)}</td>
+                        <td className="py-3.5 pe-4 text-graphite whitespace-nowrap">{formatDate(user.createdAt, locale)}</td>
+                        <td className="py-3.5 pe-4 text-graphite whitespace-nowrap">{formatDate(user.lastSeenAt, locale)}</td>
+                        <td className="py-3.5 text-end whitespace-nowrap">{!isMe && actions(user)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </main>
