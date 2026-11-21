@@ -25,13 +25,28 @@ function GoogleLogo() {
   );
 }
 
+// The sample slides on the right: smaller on a phone so all three fit
+const SLIDE = 'absolute w-28 sm:w-36 xl:w-52';
+
 const safeNext = (next: string | null) => (next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
 
+type AuthMessages = (typeof authMessages)['en'];
+
+// Which of our messages fits a refused dev login (the API's own text is English only)
+function devError(status: number | null, code: unknown): keyof AuthMessages['dev']['errors'] | 'rate' {
+  if (status === null) return 'network';
+  if (code === 'suspended' || status === 403) return 'suspended';
+  if (status === 400) return 'invalid';
+  if (status === 404) return 'refused';
+  if (status === 429) return 'rate';
+  return 'failed';
+}
+
 // Local development only (the API refuses it anywhere else): sign in with just an email
-function DevLogin({ next }: { next: string }) {
+function DevLogin({ next, t }: { next: string; t: AuthMessages }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReturnType<typeof devError> | null>(null);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -47,28 +62,38 @@ function DevLogin({ next }: { next: string }) {
       window.location.href = next;
       return;
     }
-    setError(data?.error || 'Could not sign in.');
+    setError(devError(res?.status ?? null, data?.code));
     setBusy(false);
   };
 
+  const message = error === 'rate' ? t.errors.rate : error ? t.dev.errors[error] : null;
+
   return (
-    <form onSubmit={submit} dir="ltr" lang="en" className="mt-10 p-4 rounded-xl border border-dashed border-graphite bg-mist">
-      <p className="text-xs font-semibold mb-2">Dev login (local development only)</p>
+    <form onSubmit={submit} aria-labelledby="dev-login-title" className="mt-10 p-4 rounded-xl border border-dashed border-graphite bg-mist">
+      <p id="dev-login-title" className="text-xs font-semibold mb-2">{t.dev.title}</p>
       <div className="flex gap-2">
         <input
           type="email"
           required
           value={email}
           onChange={e => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          aria-label="Email"
-          className="flex-1 min-w-0 border border-line rounded-lg px-3 py-2 text-sm bg-paper focus:outline-none focus:border-ink"
+          placeholder={t.dev.placeholder}
+          aria-label={t.dev.email}
+          aria-invalid={error === 'invalid' || undefined}
+          aria-describedby={message ? 'dev-login-error' : undefined}
+          autoComplete="email"
+          dir="ltr"
+          className="w-0 flex-1 min-w-0 border border-line rounded-lg px-3 py-2.5 text-sm bg-paper rtl:text-right focus:outline-none focus:border-ink"
         />
-        <button type="submit" disabled={busy} className="btn-primary !py-2 !px-4 text-sm disabled:opacity-60">
-          Sign in
+        <button type="submit" disabled={busy} aria-busy={busy} className="btn-primary !py-2.5 !px-4 text-sm disabled:opacity-60">
+          {busy ? t.dev.busy : t.dev.submit}
         </button>
       </div>
-      {error && <p className="text-xs text-red-700 mt-2">{error}</p>}
+      {message && (
+        <p id="dev-login-error" role="alert" className="text-xs text-red-700 mt-2">
+          {message}
+        </p>
+      )}
     </form>
   );
 }
@@ -89,20 +114,33 @@ function SignIn({ locale }: { locale: Locale }) {
       .catch(() => undefined);
   }, []);
 
+  // The static HTML carries the English title; this follows the visitor's language. Next can write its metadata
+  // title after hydration, over ours, so it is put back whenever the head changes.
+  useEffect(() => {
+    const title = `${t.tabTitle} - KaruAI`;
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [t.tabTitle]);
+
   const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
   const error = errorCode ? t.errors[errorCode] ?? t.errors.failed : null;
   const example = homeMessages[locale].example;
 
   return (
-    <div className="min-h-screen bg-paper text-ink grid lg:grid-cols-2">
-      <div className="flex flex-col px-6 sm:px-12 lg:px-16 py-8">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-paper text-ink grid grid-cols-1 lg:grid-cols-2">
+      <main className="min-h-svh lg:min-h-0 flex flex-col px-6 sm:px-12 lg:px-16 py-6 sm:py-8">
+        <div className="flex items-center justify-between gap-4">
           <Logo href={localePath(locale, '/')} />
-          <LanguageSwitch locale={locale} />
+          <LanguageSwitch locale={locale} className="min-h-10 px-2 -me-2" />
         </div>
 
-        <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto lg:mx-0 py-16">
-          <h1 className="font-display font-bold text-6xl sm:text-7xl leading-[0.9]">{t.title}</h1>
+        <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto lg:mx-0 py-12 sm:py-16">
+          <h1 className="font-display font-bold text-5xl min-[400px]:text-6xl sm:text-7xl leading-[0.9] [overflow-wrap:anywhere]">{t.title}</h1>
           <p className="mt-4 text-lg text-graphite">{t.sub}</p>
 
           {error && (
@@ -124,31 +162,32 @@ function SignIn({ locale }: { locale: Locale }) {
             {t.agree.after}
           </p>
 
-          {devLogin && <DevLogin next={next} />}
+          {devLogin && <DevLogin next={next} t={t} />}
         </div>
-      </div>
+      </main>
 
-      {/* The other half: what you get, as three slides of the landing page's sample carousel */}
-      <div className="hidden lg:flex flex-col bg-ink text-paper p-12 xl:p-16 overflow-hidden lg:sticky lg:top-0 lg:h-screen">
-        <h2 className="font-display font-bold text-6xl xl:text-7xl leading-[0.9]">
+      {/* The other half: what you get, as three slides of the landing page's sample carousel. On a phone it sits
+          under the form, smaller. */}
+      <aside className="flex flex-col bg-ink text-paper px-6 py-12 sm:p-12 xl:p-16 overflow-hidden lg:sticky lg:top-0 lg:h-screen">
+        <h2 className="font-display font-bold text-5xl sm:text-6xl xl:text-7xl leading-[0.9]">
           <MarkedText text={t.panelTitle} />
         </h2>
-        <div aria-hidden="true" className="relative flex-1 min-h-[16rem] my-10">
-          <Slide className="absolute w-44 xl:w-52 top-[12%] start-0 -rotate-6 bg-mist text-ink">
+        <div aria-hidden="true" className="relative h-52 sm:h-64 lg:h-auto lg:flex-1 lg:min-h-[16rem] my-10">
+          <Slide className={`${SLIDE} top-[12%] start-0 -rotate-6 rtl:rotate-6 bg-mist text-ink`}>
             <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">02</span>
-            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[1].title}</span>
+            <span className="mt-auto font-display font-bold text-[11cqw] leading-[0.92]">{example.items[1].title}</span>
           </Slide>
-          <Slide className="absolute w-44 xl:w-52 top-[6%] start-[9rem] xl:start-[10.5rem] rotate-2 bg-lime text-ink">
+          <Slide className={`${SLIDE} top-[6%] start-[5.75rem] sm:start-[7.5rem] lg:start-[7.5rem] xl:start-[10.5rem] rotate-2 rtl:-rotate-2 bg-lime text-ink`}>
             <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">01</span>
-            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[0].title}</span>
+            <span className="mt-auto font-display font-bold text-[11cqw] leading-[0.92]">{example.items[0].title}</span>
           </Slide>
-          <Slide className="absolute w-44 xl:w-52 top-0 start-[18rem] xl:start-[21rem] rotate-[8deg] bg-paper text-ink">
+          <Slide className={`${SLIDE} top-0 start-[11.5rem] sm:start-[15rem] lg:start-[15rem] xl:start-[21rem] rotate-[8deg] rtl:-rotate-[8deg] bg-paper text-ink`}>
             <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.9]">{example.cover}</span>
             <span className="mt-[7cqw] h-[1.4cqw] w-[16cqw] bg-ink" />
           </Slide>
         </div>
         <p className="text-paper/70">{t.panelNote}</p>
-      </div>
+      </aside>
     </div>
   );
 }
