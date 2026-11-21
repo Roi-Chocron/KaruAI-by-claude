@@ -8,7 +8,7 @@ const en = {
     title: 'KaruAI - Turn one sentence into an Instagram carousel',
     description: 'Tell KaruAI what you want to say. It writes the slides, designs them and leaves the final touches to you.',
   },
-  nav: { how: 'How it works', editor: 'Editor', pricing: 'Pricing', login: 'Log in', start: 'Try it free', menu: 'Menu', otherLanguage: 'עברית' },
+  nav: { how: 'How it works', editor: 'Editor', pricing: 'Pricing', login: 'Log in', start: 'Try it free', menu: 'Menu', otherLanguage: 'עברית', skip: 'Skip to content' },
   hero: {
     title: { before: "Got an idea?\nYou've got ", marked: 'a carousel.', after: '' } as Marked,
     sub: 'Tell KaruAI what you want to say. It writes the slides, designs them and leaves the final touches to you.',
@@ -54,6 +54,8 @@ const en = {
     sub: "Start on the free plan. Upgrade when a carousel a week isn't enough.",
     monthly: 'Monthly',
     yearly: 'Yearly',
+    period: 'Billing period',
+    saving: 'save 17%',
     perMonth: '/ month',
     billedYearly: (total: number) => `$${total} billed yearly`,
     choose: (plan: string) => `Get ${plan}`,
@@ -71,6 +73,7 @@ const en = {
     privacy: 'Privacy Policy',
     cookies: 'Cookie Policy',
     refund: 'Refund Policy',
+    accessibility: 'Accessibility Statement',
     rights: 'All rights reserved.',
   },
 };
@@ -82,7 +85,7 @@ const he: HomeMessages = {
     title: 'KaruAI - ממשפט אחד לקרוסלה באינסטגרם',
     description: 'ספרו ל־KaruAI מה אתם רוצים להגיד. הוא כותב את השקפים, מעצב אותם ומשאיר לכם את הליטוש האחרון.',
   },
-  nav: { how: 'איך זה עובד', editor: 'העורך', pricing: 'מחירים', login: 'התחברות', start: 'נסו בחינם', menu: 'תפריט', otherLanguage: 'English' },
+  nav: { how: 'איך זה עובד', editor: 'העורך', pricing: 'מחירים', login: 'התחברות', start: 'נסו בחינם', menu: 'תפריט', otherLanguage: 'English', skip: 'דילוג לתוכן' },
   hero: {
     title: { before: 'יש לכם רעיון?\nיש לכם ', marked: 'קרוסלה.', after: '' },
     sub: 'ספרו ל־KaruAI מה אתם רוצים להגיד. הוא כותב את השקפים, מעצב אותם ומשאיר לכם את הליטוש האחרון.',
@@ -128,6 +131,8 @@ const he: HomeMessages = {
     sub: 'מתחילים בתוכנית החינמית. משדרגים כשקרוסלה בשבוע כבר לא מספיקה.',
     monthly: 'חודשי',
     yearly: 'שנתי',
+    period: 'תקופת חיוב',
+    saving: 'חיסכון של 17%',
     perMonth: '/ חודש',
     billedYearly: total => `$${total} בחיוב שנתי`,
     choose: plan => `שדרוג ל־${plan}`,
@@ -145,6 +150,7 @@ const he: HomeMessages = {
     privacy: 'מדיניות פרטיות',
     cookies: 'מדיניות עוגיות',
     refund: 'מדיניות החזרים',
+    accessibility: 'הצהרת נגישות',
     rights: 'כל הזכויות שמורות.',
   },
 };
