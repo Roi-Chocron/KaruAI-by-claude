@@ -7,6 +7,7 @@ import { appMessages } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/locale';
 import { RequireAuth } from '@/lib/session';
+import { useTabTitle } from '@/lib/tab-title';
 import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
 import type { Plan } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser } from '@/types';
@@ -159,20 +160,7 @@ function BillingPage({ locale }: { locale: Locale }) {
 // The page as the /billing route shows it: only for signed-in users
 export function ProtectedBillingPage() {
   const locale = useLocale();
-  // The tab title in the visitor's language. Next writes the static (English) one into <head> after a client-side
-  // navigation, sometimes after this runs (as on the redirect from sign-in), so keep it right while the page is open.
-  useEffect(() => {
-    const title = `${appMessages[locale].billing.title} - KaruAI`;
-    const apply = () => {
-      if (document.title !== title) document.title = title;
-      document.querySelectorAll('head title').forEach(el => {
-        if (el.textContent !== title) el.textContent = title;
-      });
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
-    return () => observer.disconnect();
-  }, [locale]);
+  // Named before sign-in is confirmed too, not only once the page heading renders
+  useTabTitle(`${appMessages[locale].billing.title} - KaruAI`);
   return <RequireAuth>{user => <AppShell user={user} active="billing">{locale => <BillingPage locale={locale} />}</AppShell>}</RequireAuth>;
 }

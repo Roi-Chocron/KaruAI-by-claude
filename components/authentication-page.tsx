@@ -10,6 +10,7 @@ import { UserLocaleRoot } from '@/components/locale-root';
 import { authMessages } from '@/messages/auth';
 import { homeMessages } from '@/messages/home';
 import { localePath, type Locale } from '@/lib/i18n';
+import { useTabTitle } from '@/lib/tab-title';
 
 // Sign-in is with Google only: the button sends the browser to the API, which takes it through Google's
 // consent screen and back to `next` with a session
@@ -114,18 +115,7 @@ function SignIn({ locale }: { locale: Locale }) {
       .catch(() => undefined);
   }, []);
 
-  // The static HTML carries the English title; this follows the visitor's language. Next can write its metadata
-  // title after hydration, over ours, so it is put back whenever the head changes.
-  useEffect(() => {
-    const title = `${t.tabTitle} - KaruAI`;
-    const apply = () => {
-      if (document.title !== title) document.title = title;
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
-    return () => observer.disconnect();
-  }, [t.tabTitle]);
+  useTabTitle(`${t.tabTitle} - KaruAI`);
 
   const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
   const error = errorCode ? t.errors[errorCode] ?? t.errors.failed : null;

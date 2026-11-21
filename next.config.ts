@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   output: 'export',
   images: { unoptimized: true },
   ...(isDev && {
+    // AI answers can take longer than the dev proxy's default 30 seconds
+    experimental: { proxyTimeout: 120_000 },
     rewrites: async () => [{ source: '/api/:path*', destination: `http://127.0.0.1:${process.env.API_DEV_PORT || 8787}/api/:path*` }],
   }),
 };

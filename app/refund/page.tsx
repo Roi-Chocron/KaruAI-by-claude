@@ -10,7 +10,7 @@ export default function RefundPage() {
       <section>
         <h2>1. Subscription Cancellation</h2>
         <p>
-          You can cancel your recurring monthly or annual subscription at any time directly through your <Link href="/billing">Billing & Subscription</Link> dashboard or by contacting customer support.
+          You can cancel your recurring monthly or annual subscription at any time directly through your <Link href="/billing">Plan and billing</Link> page or by contacting customer support.
         </p>
         <p>
           Upon cancellation:

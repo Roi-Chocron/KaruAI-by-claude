@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/brand/logo';
 import { MarkedText } from '@/components/brand/marked-text';
@@ -8,6 +8,7 @@ import { LocaleRoot } from '@/components/locale-root';
 import { localePath, type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/locale';
 import { looksSignedIn } from '@/lib/session';
+import { useTabTitle } from '@/lib/tab-title';
 import { systemMessages } from '@/messages/system';
 
 const noSubscribe = () => () => {};
@@ -21,16 +22,7 @@ export function NotFoundPage() {
   const locale: Locale = underHebrew ? 'he' : userLocale;
   const t = systemMessages[locale].notFound;
 
-  // The exported page's <title> is the English one, and Next writes it back after hydration, so keep ours on top
-  useEffect(() => {
-    const apply = () => {
-      if (document.title !== t.tabTitle) document.title = t.tabTitle;
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
-    return () => observer.disconnect();
-  }, [t.tabTitle]);
+  useTabTitle(t.tabTitle);
 
   const home = signedIn ? '/dashboard' : localePath(locale, '/');
   return (

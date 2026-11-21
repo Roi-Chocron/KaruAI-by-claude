@@ -7,8 +7,9 @@ import { Logo } from '@/components/brand/logo';
 import { LanguageSwitch } from '@/components/language-switch';
 import { UserLocaleRoot } from '@/components/locale-root';
 import { logOut } from '@/lib/session';
+import { useTabTitle } from '@/lib/tab-title';
 import { appMessages } from '@/messages/app';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 import type { PublicUser } from '@/types';
 
 export type AppSection = 'carousels' | 'billing' | 'account' | 'admin';
@@ -127,24 +128,23 @@ function Frame({ user, active, locale, children }: { user: PublicUser; active: A
         )}
       </header>
       {children}
+      {/* The accessibility statement has to be reachable from every page (IS 5568) */}
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-8 border-t border-line">
+        <nav aria-label={t.footer} className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-graphite">
+          {(['accessibility', 'terms', 'privacy'] as const).map(page => (
+            <Link key={page} href={localePath(locale, `/${page}`)} className="inline-flex items-center min-h-10 hover:text-ink">
+              {t[page]}
+            </Link>
+          ))}
+        </nav>
+      </footer>
     </div>
   );
 }
 
 // The title row every signed-in page starts with; it also names the browser tab
 export function PageHeading({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
-  useEffect(() => {
-    // Next writes the route's metadata title after a client-side navigation, which can land after this effect,
-    // so the title is put back whenever <head> changes
-    const wanted = `${title} - KaruAI`;
-    const apply = () => {
-      if (document.title !== wanted) document.title = wanted;
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
-    return () => observer.disconnect();
-  }, [title]);
+  useTabTitle(`${title} - KaruAI`);
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
       <div>

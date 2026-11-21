@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { identifyUser, resetUser } from '@/lib/analytics';
+import { useLocale } from '@/lib/locale';
+import { appMessages } from '@/messages/app';
 import type { PublicUser } from '@/types';
 
 // The pages are static files, so they learn who is signed in from the API (the session cookie is HttpOnly).
@@ -27,7 +29,8 @@ export async function logOut() {
 // `admin`) away. The API checks every request again, so this only decides what the page shows.
 export function RequireAuth({ children, admin = false }: { children: (user: PublicUser) => ReactNode; admin?: boolean }) {
   const [user, setUser] = useState<PublicUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<'loadFailed' | 'suspended' | null>(null);
+  const t = appMessages[useLocale()].shell;
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -37,7 +40,10 @@ export function RequireAuth({ children, admin = false }: { children: (user: Publ
           return;
         }
         const data = await res.json().catch(() => null);
-        if (data?.code === 'suspended') throw new Error(data.error);
+        if (data?.code === 'suspended') {
+          setError('suspended');
+          return;
+        }
         if (!res.ok || !data?.user) throw new Error(data?.error || `Request failed with status ${res.status}`);
         if (admin && data.user.role !== 'admin') {
           window.location.replace('/dashboard');
@@ -46,13 +52,23 @@ export function RequireAuth({ children, admin = false }: { children: (user: Publ
         identifyUser(data.user.id, { email: data.user.email, name: data.user.name });
         setUser(data.user);
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Could not reach the server.'));
+      .catch(err => {
+        console.error('Checking the sign-in failed:', err);
+        setError('loadFailed');
+      });
   }, [admin]);
 
   if (user) return <>{children(user)}</>;
   return (
     <div className="min-h-screen flex items-center justify-center bg-paper text-sm text-graphite px-6 text-center">
-      {error ?? <Loader2 className="animate-spin text-ink" size={28} />}
+      {error ? (
+        <p role="alert">{t[error]}</p>
+      ) : (
+        <span role="status">
+          <Loader2 className="animate-spin text-ink" size={28} aria-hidden="true" />
+          <span className="sr-only">{t.loading}</span>
+        </span>
+      )}
     </div>
   );
 }
