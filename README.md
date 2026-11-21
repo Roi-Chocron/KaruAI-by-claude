@@ -21,6 +21,11 @@ Sign-in is with Google only. Static page requests don't run the Worker and don't
 4. `npm run dev` — applies the D1 migrations locally, then starts the Worker on :8787 and Next.js on
    http://localhost:3000 (which forwards `/api/*` to the Worker). Local D1/R2 data lives in `.wrangler/`.
 
+The editor (`public/advanced_dashboard_editor.html`) is a standalone page. Its Tailwind styles are prebuilt into
+`public/editor.css` (gitignored) by `npm run build:editor-css` from `editor/tailwind.config.js`, which scans only that
+page; `npm run dev` rebuilds it on every change and `npm run build` before the site build. Its scripts (Lucide,
+JSZip, jsPDF) are pinned with integrity hashes: after changing a version, update its hash too.
+
 Without a Google OAuth client you can still sign in locally: with `DEV_LOGIN=true` in `.dev.vars` the login page
 shows a "Dev login" form that takes just an email. The API refuses it unless `APP_URL` is localhost.
 

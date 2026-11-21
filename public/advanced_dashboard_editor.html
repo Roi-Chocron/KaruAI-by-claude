@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" style="overflow: auto">
+<html lang="en" dir="ltr" style="overflow: auto; height: 100%">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -133,7 +133,7 @@
     </style>
 </head>
 <!-- Built for a computer screen: below 1024 x 600 the page keeps that size and scrolls (the site shows a notice first) -->
-<body class="flex flex-col h-screen min-h-[600px] min-w-[1024px] overflow-hidden bg-white text-slate-800 font-sans">
+<body class="flex flex-col h-full min-h-[600px] min-w-[1024px] overflow-hidden bg-white text-slate-800 font-sans">
 
     <!-- TOP BAR -->
     <header class="h-16 shrink-0 border-b border-gray-200 bg-white flex items-center gap-4 px-4 z-20">
@@ -519,6 +519,8 @@
 
         // Keeps a left-to-right run (a color code, an aspect ratio) in one piece inside Hebrew text
         const ltr = text => (LOCALE === 'he' ? `\u2066${text}\u2069` : text);
+        // Keeps text in either language (a slide title) from reordering the text around it
+        const isolate = text => (text ? `\u2068${text}\u2069` : '');
 
         // The API's error messages are in English: the ones people can run into get Hebrew wording here
         const HE_API_ERRORS = [
@@ -1241,7 +1243,7 @@
             state.slideData.forEach((data, index) => {
                 const button = document.createElement('button');
                 button.className = `relative h-20 w-16 shrink-0 rounded-md border-2 overflow-hidden transition-all ${index === state.currentSlide ? 'border-indigo-600 scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'}`;
-                button.title = `${state.slides[index].title || L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${data.mode === 'with' ? L(' (with image)', ' (עם תמונה)') : ''}`;
+                button.title = `${isolate(state.slides[index].title) || L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${data.mode === 'with' ? L(' (with image)', ' (עם תמונה)') : ''}`;
                 const preview = createArtboardNode(index === state.currentSlide ? state.elements : data.variants[data.mode]);
                 preview.style.position = 'absolute';
                 preview.style.left = '0';
@@ -1911,6 +1913,7 @@
             wrap.className = `flex w-full ${tone === 'user' ? 'justify-end' : 'justify-start'}`;
             const bubble = document.createElement('div');
             bubble.className = `max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${tones[tone]}`;
+            bubble.dir = 'auto'; // messages are in whatever language they were written
             bubble.textContent = text;
             wrap.appendChild(bubble);
             container.appendChild(wrap);
@@ -2126,7 +2129,7 @@
                     if (data) {
                         const size = imageRequestSize(index);
                         const slideTitle = state.slides[index].title;
-                        title.textContent = `${L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${slideTitle ? ` · ${slideTitle}` : ''} · ${ltr(aspectRatioLabel(size.width, size.height))}`;
+                        title.textContent = `${L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${slideTitle ? ` · ${isolate(slideTitle)}` : ''} · ${ltr(aspectRatioLabel(size.width, size.height))}`;
                     }
                     actions.innerHTML = '';
                     const status = (text, color = 'text-gray-500') => {
