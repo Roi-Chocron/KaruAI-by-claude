@@ -8,6 +8,7 @@ import { AppShell, Avatar, PageHeading } from '@/components/app-shell';
 import { fetchAccount, UsageMeter, type AccountSummary } from '@/components/billing';
 import { appMessages } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
+import { RequireAuth } from '@/lib/session';
 import type { PublicUser } from '@/types';
 
 const card = 'rounded-2xl border border-line p-6 sm:p-8';
@@ -17,8 +18,15 @@ const field = 'w-full border border-line rounded-[10px] px-3.5 py-3 bg-paper foc
 // The worker answers in English; the messages it can send this page are shown in the visitor's language
 type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin';
 const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin'];
+type ErrorMessage = ServerMessage | 'saveFailed' | 'deleteFailed';
 
-class RequestError extends Error {}
+class RequestError extends Error {
+  constructor(readonly key: ServerMessage) {
+    super(key);
+  }
+}
+
+const errorOf = (err: unknown, fallback: ErrorMessage): ErrorMessage => (err instanceof RequestError ? err.key : fallback);
 
 function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
   const t = appMessages[locale].account;
@@ -27,10 +35,10 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
   const [error, setError] = useState(false);
   const [name, setName] = useState('');
   const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
-  const [nameError, setNameError] = useState('');
+  const [nameError, setNameError] = useState<ErrorMessage>('saveFailed');
   const [confirmEmail, setConfirmEmail] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
+  const [deleteError, setDeleteError] = useState<ErrorMessage | null>(null);
 
   useEffect(() => {
     fetchAccount()
@@ -43,12 +51,10 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (!res.ok) {
       const known = serverMessages.find(key => appMessages.en.account[key] === data?.error);
-      throw known ? new RequestError(t[known]) : new Error();
+      throw known ? new RequestError(known) : new Error();
     }
     return data;
   };
-
-  const messageOf = (err: unknown, fallback: string) => (err instanceof RequestError ? err.message : fallback);
 
   const saveName = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -58,7 +64,7 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
       setNameStatus('saved');
     } catch (err) {
       setNameStatus('failed');
-      setNameError(messageOf(err, t.saveFailed));
+      setNameError(errorOf(err, 'saveFailed'));
     }
   };
 
@@ -73,14 +79,14 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
     event.preventDefault();
     if (!confirm(t.confirmDelete)) return;
     setDeleting(true);
-    setDeleteError('');
+    setDeleteError(null);
     try {
       await send('/api/account', { method: 'DELETE', body: JSON.stringify({ confirmEmail }) });
       resetUser();
       window.location.href = '/';
     } catch (err) {
       setDeleting(false);
-      setDeleteError(messageOf(err, t.deleteFailed));
+      setDeleteError(errorOf(err, 'deleteFailed'));
     }
   };
 
@@ -120,7 +126,7 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
               </button>
             </form>
             <p id="name-status" role="status" className={`text-sm empty:hidden mt-3 ${nameStatus === 'failed' ? 'text-red-700' : 'text-graphite'}`}>
-              {nameStatus === 'saved' ? t.nameSaved : nameStatus === 'failed' ? nameError : ''}
+              {nameStatus === 'saved' ? t.nameSaved : nameStatus === 'failed' ? t[nameError] : ''}
             </p>
           </section>
 
@@ -155,7 +161,7 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
             <form onSubmit={deleteAccount} className="flex flex-col sm:flex-row gap-2">
               <input
                 value={confirmEmail}
-                onChange={e => { setConfirmEmail(e.target.value); setDeleteError(''); }}
+                onChange={e => { setConfirmEmail(e.target.value); setDeleteError(null); }}
                 placeholder={t.confirmPlaceholder(account.user.email)}
                 aria-label={t.confirmLabel(account.user.email)}
                 aria-invalid={deleteError ? true : undefined}
@@ -175,7 +181,7 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
                 {deleting ? t.deleting : t.deleteButton}
               </button>
             </form>
-            <p id="delete-error" role="alert" className="text-sm text-red-700 mt-3 empty:hidden">{deleteError}</p>
+            <p id="delete-error" role="alert" className="text-sm text-red-700 mt-3 empty:hidden">{deleteError && t[deleteError]}</p>
           </section>
         </div>
       )}
@@ -183,6 +189,10 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
   );
 }
 
-export default function Account({ user }: { user: PublicUser }) {
-  return <AppShell user={user} active="account">{locale => <AccountPage user={user} locale={locale} />}</AppShell>;
+export function ProtectedAccountPage() {
+  return (
+    <RequireAuth>
+      {user => <AppShell user={user} active="account">{locale => <AccountPage user={user} locale={locale} />}</AppShell>}
+    </RequireAuth>
+  );
 }

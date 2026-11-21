@@ -1,8 +1,8 @@
-'use client';
+import { ProtectedAccountPage } from '@/components/account';
 
-import AccountPage from '@/components/account';
-import { RequireAuth } from '@/lib/session';
+// The static page carries the English title; the page renames the tab in the visitor's language once it loads
+export const metadata = { title: 'Account - KaruAI' };
 
 export default function AccountRoute() {
-  return <RequireAuth>{user => <AccountPage user={user} />}</RequireAuth>;
+  return <ProtectedAccountPage />;
 }
