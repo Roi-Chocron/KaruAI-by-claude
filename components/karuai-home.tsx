@@ -3,11 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Zap, Palette, Folder, Sparkles, Image as ImageIcon, Layout, CheckCircle, ChevronRight, Menu, X } from 'lucide-react';
-import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
+import { PricingCards } from '@/components/pricing-cards';
 
 export default function KaruAIHome() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [yearly, setYearly] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir="ltr">
@@ -223,15 +222,10 @@ export default function KaruAIHome() {
             </p>
           </div>
 
-          <div className="flex justify-center mb-12">
-            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} />
-          </div>
-
           <PricingCards
-            yearly={yearly}
             action={plan => (
               <Link
-                href="/login"
+                href={plan.monthlyPrice === 0 ? '/login' : `/login?next=${encodeURIComponent(`/billing?plan=${plan.id}`)}`}
                 className={`w-full block text-center py-3 px-4 rounded-xl font-semibold transition-colors ${
                   plan.highlighted
                     ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25'

@@ -14,6 +14,18 @@ GEMINI_API_KEY=
 GEMINI_MODEL=
 POLLINATIONS_API_KEY=
 
+# Polar payments, against the sandbox (https://sandbox.polar.sh, test card 4242 4242 4242 4242).
+# Settings -> Developers: create an Organization Access Token (scopes checkouts:write, customer_sessions:write).
+# Settings -> Webhooks: add <public address>/api/billing/webhook (e.g. a `cloudflared tunnel` to localhost:3000),
+# format Raw, events subscription.*, and paste its secret here.
+POLAR_SERVER=sandbox
+POLAR_ACCESS_TOKEN=
+POLAR_WEBHOOK_SECRET=
+# The ids of the sandbox products (each product's page -> Copy ID)
+POLAR_PRODUCT_BASIC=
+POLAR_PRODUCT_PRO=
+POLAR_PRODUCT_VIP=
+
 # Optional: Sentry DSN for errors in the API Worker
 SENTRY_DSN=
 

@@ -19,7 +19,14 @@
   "vars": {
     // The public address of the app, used for the Google sign-in redirect and the Origin check.
     // .dev.vars overrides it with http://localhost:3000 for local development.
-    "APP_URL": "https://karuai.example.workers.dev"
+    "APP_URL": "https://karuai.example.workers.dev",
+    // Polar payments: "production" or "sandbox" (api.polar.sh or sandbox-api.polar.sh), and the Polar product of
+    // each paid plan. .dev.vars overrides them with the sandbox products. The access token and webhook secret
+    // are secrets: `wrangler secret put POLAR_ACCESS_TOKEN` and `wrangler secret put POLAR_WEBHOOK_SECRET`.
+    "POLAR_SERVER": "production",
+    "POLAR_PRODUCT_BASIC": "74e826e5-5645-4c6c-a5fd-a4be89c4d2ba",
+    "POLAR_PRODUCT_PRO": "ee7d6624-49e6-4b16-a48e-b7ba84122e28",
+    "POLAR_PRODUCT_VIP": "2e25cee7-426f-4e14-9ec9-e63de3ddd7ee"
   },
 
   "d1_databases": [

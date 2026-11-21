@@ -33,8 +33,27 @@ shows a "Dev login" form that takes just an email. The API refuses it unless `AP
 
 ## Plans
 
-Prices, limits and features live in `shared/plans.ts` (placeholder values for now). The API enforces the monthly
-limits; an admin sets each user's plan on the Admin page until payments are connected.
+Prices, limits and features live in `shared/plans.ts`; the API enforces the monthly limits. The paid plans (Basic,
+Pro, VIP) are Polar products, sold through Polar's hosted checkout (`worker/src/routes/billing.ts`):
+
+- `POST /api/billing/checkout` opens a checkout for a plan; `POST /api/billing/portal` opens Polar's customer portal
+  (change plan, card, cancel, invoices).
+- Polar's webhook `POST /api/billing/webhook` keeps the `subscriptions` table up to date, and each user's plan is the
+  best plan among their active subscriptions (free without one). An admin can still set a plan by hand on the Admin
+  page; the next webhook for that user overrides it.
+- `POLAR_SERVER` and the `POLAR_PRODUCT_*` ids are in `wrangler.jsonc` (production) and `.dev.vars` (sandbox).
+
+Setting up Polar for production: in the Polar dashboard, Settings → Developers → New token (scopes
+`checkouts:write`, `customer_sessions:write`), and Settings → Webhooks → Add endpoint
+`<APP_URL>/api/billing/webhook`, format Raw, all `subscription.*` events. Then:
+
+```bash
+npx wrangler secret put POLAR_ACCESS_TOKEN
+npx wrangler secret put POLAR_WEBHOOK_SECRET
+```
+
+If the site is behind Cloudflare's Bot Fight Mode, turn it off for `/api/billing/webhook`, or Polar's calls get a 403.
+Keep the prices in `shared/plans.ts` equal to the Polar prices: the site shows them, Polar charges its own.
 
 ## Deploying (first time)
 

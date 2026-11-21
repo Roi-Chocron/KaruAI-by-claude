@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CreditCard, Loader2, Receipt } from 'lucide-react';
 import { RequireAuth } from '@/lib/session';
-import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
-import type { Plan } from '@/shared/plans';
+import { PricingCards } from '@/components/pricing-cards';
+import { formatPrice, isPaidPlanId, PLANS, type PaidPlanId, type Plan } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser } from '@/types';
 
 export type AccountSummary = { user: PublicUser; plan: Plan; usage: MonthlyUsage; carouselCount: number };
@@ -39,18 +39,92 @@ export function UsageMeter({ label, used, limit }: { label: string; used: number
   );
 }
 
+export type BillingSummary = {
+  enabled: boolean;
+  subscription: { plan: PaidPlanId; status: string; active: boolean; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
+};
+
+async function postForUrl(path: string, body?: unknown): Promise<string> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.url) throw new Error(data?.error || `Request failed with status ${res.status}`);
+  return data.url;
+}
+
+const longDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { dateStyle: 'long' });
+
+// After Polar's checkout the webhook may land a few seconds after the user does, so the page asks again a few times
+const ACTIVATION_POLLS = 15;
+const ACTIVATION_POLL_MS = 2000;
+
 function BillingPage() {
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [yearly, setYearly] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
+  const autoCheckout = useRef(false);
+
+  const load = useCallback(async () => {
+    const [nextAccount, res] = await Promise.all([fetchAccount(), fetch('/api/billing')]);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
+    setAccount(nextAccount);
+    setBilling(data);
+    return { account: nextAccount, billing: data as BillingSummary };
+  }, []);
+
+  const go = useCallback(async (key: string, request: () => Promise<string>) => {
+    setBusy(key);
+    setError(null);
+    try {
+      window.location.href = await request();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setBusy(null);
+    }
+  }, []);
+  const checkout = useCallback((plan: PaidPlanId) => go(plan, () => postForUrl('/api/billing/checkout', { plan })), [go]);
+  const openPortal = useCallback(() => go('portal', () => postForUrl('/api/billing/portal')), [go]);
 
   useEffect(() => {
-    fetchAccount().then(setAccount).catch(err => setError(err instanceof Error ? err.message : 'Could not load your plan.'));
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    const returning = params.get('checkout') === 'success';
+    const wanted = params.get('plan');
+    if (returning || wanted) window.history.replaceState(null, '', '/billing');
+
+    let cancelled = false;
+    (async () => {
+      let state = await load();
+      if (returning && !state.billing.subscription?.active) {
+        setActivating(true);
+        for (let i = 0; i < ACTIVATION_POLLS && !cancelled && !state.billing.subscription?.active; i++) {
+          await new Promise(resolve => setTimeout(resolve, ACTIVATION_POLL_MS));
+          state = await load();
+        }
+        if (!cancelled) setActivating(false);
+      }
+      // Coming from "Choose <plan>" on the landing page: straight on to the checkout
+      if (!cancelled && isPaidPlanId(wanted) && state.billing.enabled && !state.billing.subscription?.active && !autoCheckout.current) {
+        autoCheckout.current = true;
+        checkout(wanted);
+      }
+    })().catch(err => setError(err instanceof Error ? err.message : 'Could not load your plan.'));
+    return () => {
+      cancelled = true;
+    };
+  }, [load, checkout]);
+
+  const subscription = billing?.subscription ?? null;
+  const subscribed = !!subscription?.active;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 py-10 px-4 sm:px-6 lg:px-8 font-sans" dir="ltr">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         <div>
           <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors mb-2">
             <ArrowLeft className="w-4 h-4" />
@@ -61,8 +135,18 @@ function BillingPage() {
         </div>
 
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">{error}</p>}
+        {activating && (
+          <p className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <Loader2 size={16} className="animate-spin" /> Payment received. Activating your plan…
+          </p>
+        )}
+        {subscription && !subscription.active && subscription.status === 'past_due' && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl p-4">
+            Your last payment did not go through, so your plan is paused. Update your card in &quot;Manage subscription&quot;.
+          </p>
+        )}
 
-        {!account ? (
+        {!account || !billing ? (
           !error && <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -73,7 +157,7 @@ function BillingPage() {
                   <p className="text-slate-500 text-sm mt-1">Limits reset on {resetDate()}.</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-slate-900">${account.plan.monthlyPrice}</div>
+                  <div className="text-3xl font-bold text-slate-900">{formatPrice(account.plan.monthlyPrice)}</div>
                   <div className="text-sm text-slate-500">per month</div>
                 </div>
               </div>
@@ -86,35 +170,73 @@ function BillingPage() {
 
             <div className="space-y-8">
               <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <h2 className="flex items-center gap-2 font-semibold text-slate-900 mb-2"><CreditCard size={18} /> Payment method</h2>
-                <p className="text-sm text-slate-500">Online payments are coming soon. Until then, contact us to change your plan.</p>
+                <h2 className="flex items-center gap-2 font-semibold text-slate-900 mb-2"><CreditCard size={18} /> Subscription</h2>
+                {!billing.enabled ? (
+                  <p className="text-sm text-slate-500">Online payments are coming soon. Until then, contact us to change your plan.</p>
+                ) : subscription ? (
+                  <>
+                    <p className="text-sm text-slate-500 mb-4">
+                      {subscription.active && subscription.currentPeriodEnd
+                        ? subscription.cancelAtPeriodEnd
+                          ? `Canceled: your ${PLANS[subscription.plan].name} plan stays until ${longDate(subscription.currentPeriodEnd)}.`
+                          : `${PLANS[subscription.plan].name} renews on ${longDate(subscription.currentPeriodEnd)}.`
+                        : 'Change your plan, card or cancel at any time.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openPortal}
+                      disabled={busy !== null}
+                      className="w-full inline-flex justify-center items-center gap-2 py-2.5 px-4 rounded-xl font-semibold border-2 border-slate-200 text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {busy === 'portal' && <Loader2 size={16} className="animate-spin" />} Manage subscription
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">You are on the free plan. Pick a plan below to upgrade; payments are handled securely by Polar.</p>
+                )}
               </section>
               <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h2 className="flex items-center gap-2 font-semibold text-slate-900 mb-2"><Receipt size={18} /> Invoices</h2>
-                <p className="text-sm text-slate-500">No invoices yet.</p>
+                <p className="text-sm text-slate-500">
+                  {billing.enabled && subscription ? 'Your invoices are in "Manage subscription".' : 'No invoices yet.'}
+                </p>
               </section>
             </div>
           </div>
         )}
 
         <section className="pt-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
-            <h2 className="text-2xl font-bold text-slate-900">Plans</h2>
-            <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} />
-          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-10">Plans</h2>
           <PricingCards
-            yearly={yearly}
-            action={plan => (
-              <button
-                type="button"
-                disabled
-                className={`w-full py-3 px-4 rounded-xl font-semibold border-2 ${
-                  plan.id === account?.plan.id ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-400 bg-white'
-                }`}
-              >
-                {plan.id === account?.plan.id ? 'Your current plan' : 'Coming soon'}
-              </button>
-            )}
+            action={plan => {
+              const current = plan.id === account?.plan.id;
+              const label = current
+                ? 'Your current plan'
+                : !billing?.enabled
+                  ? 'Coming soon'
+                  : subscribed
+                    ? plan.id === 'free' ? 'Cancel in Manage subscription' : `Switch to ${plan.name}`
+                    : plan.id === 'free' ? 'Included' : `Upgrade to ${plan.name}`;
+              const disabled = current || !billing?.enabled || busy !== null || (!subscribed && plan.id === 'free');
+              return (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => (subscribed ? openPortal() : isPaidPlanId(plan.id) && checkout(plan.id))}
+                  className={`w-full inline-flex justify-center items-center gap-2 py-3 px-4 rounded-xl font-semibold border-2 transition-colors ${
+                    current
+                      ? 'border-blue-600 text-blue-700 bg-blue-50'
+                      : disabled
+                        ? 'border-slate-200 text-slate-400 bg-white'
+                        : plan.highlighted
+                          ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+                          : 'border-slate-300 text-slate-800 bg-white hover:bg-slate-100'
+                  }`}
+                >
+                  {busy === plan.id && <Loader2 size={16} className="animate-spin" />} {label}
+                </button>
+              );
+            }}
           />
         </section>
       </div>

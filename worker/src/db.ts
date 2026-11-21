@@ -1,5 +1,5 @@
 import type { CarouselRow, MonthlyUsage, PublicUser, Role, SettingKey, User } from '../../types';
-import type { PlanId } from '../../shared/plans';
+import { PAID_PLAN_IDS, type PaidPlanId, type PlanId } from '../../shared/plans';
 
 // D1 queries for users, sessions, carousel ownership, settings, rate limits and usage.
 // Carousel contents (slides, images, histories) live in R2 (see storage.ts).
@@ -133,6 +133,68 @@ export async function deleteUser(db: D1Database, id: string): Promise<string[]> 
     const { results } = await db.prepare('SELECT id FROM carousels WHERE owner_id = ?').bind(id).all<{ id: string }>();
     await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
     return results.map(row => row.id);
+}
+
+// --- Subscriptions (Polar, see routes/billing.ts) ---
+
+export interface SubscriptionRow {
+    id: string;
+    userId: string;
+    productId: string;
+    plan: PaidPlanId;
+    status: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    modifiedAt: string;
+}
+
+const toSubscription = (row: any): SubscriptionRow => ({
+    id: row.id,
+    userId: row.user_id,
+    productId: row.product_id,
+    plan: row.plan,
+    status: row.status,
+    currentPeriodEnd: row.current_period_end ?? null,
+    cancelAtPeriodEnd: !!row.cancel_at_period_end,
+    modifiedAt: row.modified_at,
+});
+
+// Stores the subscription unless the stored version is newer (webhooks can arrive out of order); then sets the
+// user's plan to the best plan among their subscriptions with one of `accessStatuses`, or free without one
+export async function saveSubscription(db: D1Database, subscription: SubscriptionRow, accessStatuses: string[]) {
+    const statuses = accessStatuses.map(() => '?').join(', ');
+    const ranks = PAID_PLAN_IDS.map((id, index) => `WHEN '${id}' THEN ${index + 1}`).join(' ');
+    await db.batch([
+        db.prepare(`INSERT INTO subscriptions (id, user_id, product_id, plan, status, current_period_end, cancel_at_period_end, modified_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET product_id = excluded.product_id, plan = excluded.plan, status = excluded.status,
+                current_period_end = excluded.current_period_end, cancel_at_period_end = excluded.cancel_at_period_end,
+                modified_at = excluded.modified_at
+            WHERE excluded.modified_at >= subscriptions.modified_at`)
+            .bind(subscription.id, subscription.userId, subscription.productId, subscription.plan, subscription.status,
+                subscription.currentPeriodEnd, subscription.cancelAtPeriodEnd ? 1 : 0, subscription.modifiedAt, now()),
+        db.prepare(`UPDATE users SET plan = COALESCE((SELECT plan FROM subscriptions WHERE user_id = users.id AND status IN (${statuses})
+            ORDER BY CASE plan ${ranks} ELSE 0 END DESC LIMIT 1), 'free') WHERE id = ?`)
+            .bind(...accessStatuses, subscription.userId),
+    ]);
+}
+
+// The user's subscription that gives them their plan, else their latest one
+export async function getCurrentSubscription(db: D1Database, userId: string, accessStatuses: string[]): Promise<SubscriptionRow | null> {
+    const statuses = accessStatuses.map(() => '?').join(', ');
+    const row = await db.prepare(`SELECT * FROM subscriptions WHERE user_id = ?
+        ORDER BY status IN (${statuses}) DESC, modified_at DESC LIMIT 1`).bind(userId, ...accessStatuses).first();
+    return row ? toSubscription(row) : null;
+}
+
+// Records a webhook delivery; false when it was already handled
+export async function markWebhookEvent(db: D1Database, id: string): Promise<boolean> {
+    const result = await db.prepare('INSERT INTO webhook_events (id, received_at) VALUES (?, ?) ON CONFLICT(id) DO NOTHING').bind(id, now()).run();
+    return result.meta.changes > 0;
+}
+
+export async function unmarkWebhookEvent(db: D1Database, id: string) {
+    await db.prepare('DELETE FROM webhook_events WHERE id = ?').bind(id).run();
 }
 
 // --- Sessions ---
@@ -340,12 +402,13 @@ export async function addTokens(db: D1Database, userId: string, tokens: number) 
         .bind(userId, today(), tokens).run();
 }
 
-// The daily cron job: drops expired sessions, finished rate-limit windows and usage older than a year
+// The daily cron job: drops expired sessions, finished rate-limit windows, usage older than a year and old webhook ids
 export async function cleanUp(db: D1Database) {
     const yearAgo = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     await db.batch([
         db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now()),
         db.prepare('DELETE FROM rate_limits WHERE window_start < ?').bind(Date.now() - 2 * 24 * 3600 * 1000),
         db.prepare('DELETE FROM usage_daily WHERE day < ?').bind(yearAgo),
+        db.prepare('DELETE FROM webhook_events WHERE received_at < ?').bind(new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()),
     ]);
 }

@@ -80,7 +80,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside space-y-1.5 text-slate-600 pl-2">
               <li>To provide the AI carousel generator: designing slides from your prompts and generating images.</li>
               <li>To manage your account and sessions and protect the service against abuse.</li>
-              <li>To apply the limits of your plan and, once payments are available, to manage your subscription.</li>
+              <li>To apply the limits of your plan and to manage your subscription.</li>
               <li>To answer support requests.</li>
               <li>With your consent, to understand how KaruAI is used and improve it.</li>
             </ul>
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
               <li><strong>Pollinations.ai</strong> receives the image descriptions (not your account details) to generate slide images.</li>
               <li><strong>Sentry</strong> receives error reports so we can fix problems.</li>
               <li><strong>PostHog, Google Analytics and Microsoft Clarity</strong> receive usage analytics, only if you accept analytics cookies.</li>
-              <li>A payment provider will process payments once paid plans open; we will never store full card numbers.</li>
+              <li>Polar (polar.sh) processes payments for paid plans; we never see or store card numbers.</li>
             </ul>
           </section>
 

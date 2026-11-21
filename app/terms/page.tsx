@@ -80,7 +80,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-slate-900">5. Subscriptions & Payments</h2>
             <p className="leading-relaxed text-slate-600">
-              We provide free and premium subscription plans (Pro, Agency). Subscriptions are billed in advance on a recurring monthly or annual basis. For cancellation conditions and refund eligibility, please review our <Link href="/refund" className="text-blue-600 hover:underline">Refund & Cancellation Policy</Link>.
+              We provide a free plan and paid subscription plans (Basic, Pro, VIP). Paid plans are billed in advance every month through our payment provider, Polar, until you cancel. For cancellation conditions and refund eligibility, please review our <Link href="/refund" className="text-blue-600 hover:underline">Refund & Cancellation Policy</Link>.
             </p>
           </section>
 

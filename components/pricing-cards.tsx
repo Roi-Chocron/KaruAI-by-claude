@@ -2,38 +2,19 @@
 
 import type { ReactNode } from 'react';
 import { CheckCircle } from 'lucide-react';
-import { PLANS, PLAN_IDS, type Plan } from '@/shared/plans';
-
-export function MonthlyYearlyToggle({ yearly, onChange }: { yearly: boolean; onChange: (yearly: boolean) => void }) {
-  const option = (value: boolean, label: ReactNode) => (
-    <button
-      type="button"
-      onClick={() => onChange(value)}
-      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${yearly === value ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}
-    >
-      {label}
-    </button>
-  );
-  return (
-    <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 border border-slate-200">
-      {option(false, 'Monthly')}
-      {option(true, <>Yearly <span className="text-green-600">−17%</span></>)}
-    </div>
-  );
-}
+import { formatPrice, PLANS, PLAN_IDS, type Plan } from '@/shared/plans';
 
 // The plan cards of the landing page and the billing page; `action` renders each card's button
-export function PricingCards({ yearly, action }: { yearly: boolean; action: (plan: Plan) => ReactNode }) {
+export function PricingCards({ action }: { action: (plan: Plan) => ReactNode }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-stretch">
       {PLAN_IDS.map(id => {
         const plan = PLANS[id];
-        const price = yearly ? plan.yearlyMonthlyPrice : plan.monthlyPrice;
         return (
           <div
             key={id}
             className={`rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 relative ${
-              plan.highlighted ? 'border-2 border-blue-600 bg-white shadow-xl md:scale-105' : 'border border-slate-200 bg-slate-50/50 hover:shadow-lg'
+              plan.highlighted ? 'border-2 border-blue-600 bg-white shadow-xl xl:scale-105' : 'border border-slate-200 bg-slate-50/50 hover:shadow-lg'
             }`}
           >
             {plan.highlighted && (
@@ -50,9 +31,8 @@ export function PricingCards({ yearly, action }: { yearly: boolean; action: (pla
               </div>
               <p className="text-sm text-slate-500 mb-6 min-h-[40px]">{plan.description}</p>
               <div className="mb-6">
-                <span className="text-4xl font-extrabold text-slate-900">${price}</span>
+                <span className="text-4xl font-extrabold text-slate-900">{formatPrice(plan.monthlyPrice)}</span>
                 <span className="text-slate-500 text-sm"> / month</span>
-                {yearly && price > 0 && <p className="text-xs text-slate-500 mt-1">${price * 12} billed yearly</p>}
               </div>
               <ul className="space-y-3 mb-8 text-sm text-slate-700">
                 {plan.features.map(feature => (

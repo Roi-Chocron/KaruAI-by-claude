@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, BarChart3, KeyRound, Loader2, Shield, Trash2, Users } from 'lucide-react';
-import { PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
+import { PAID_PLAN_IDS, PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser, User } from '@/types';
 
 type Setting = { key: string; value: string; source: 'admin' | 'env' | 'none'; envName: string; updatedAt: string | null };
@@ -165,7 +165,7 @@ export default function AdminPanel({ me }: { me: PublicUser }) {
     { label: 'Users', value: stats?.users },
     { label: 'Active in the last 7 days', value: stats?.activeLast7Days },
     { label: 'Carousels', value: stats?.carousels },
-    { label: 'Paying plans', value: stats ? (stats.plans.pro ?? 0) + (stats.plans.agency ?? 0) : undefined },
+    { label: 'Paying plans', value: stats ? PAID_PLAN_IDS.reduce((sum, id) => sum + (stats.plans[id] ?? 0), 0) : undefined },
     { label: 'AI messages this month', value: stats?.month.messages },
     { label: 'AI images this month', value: stats?.month.images },
     { label: 'Tokens this month', value: stats?.month.tokens },
