@@ -64,7 +64,9 @@ const en = {
     name: 'Name',
     save: 'Save',
     saved: 'Saved',
+    nameSaved: 'Your name is saved.',
     saveFailed: "Couldn't save the name.",
+    nameInvalid: 'The name must be 1 to 100 characters.',
     plan: (name: string) => `Plan: ${name}`,
     managePlan: 'Plan and billing',
     thisMonth: (label: string) => `${label} this month`,
@@ -75,9 +77,15 @@ const en = {
     downloadNote: (n: number) => `A JSON file with your account, usage and every carousel (${n}).`,
     deleteTitle: 'Delete account',
     deleteBody: (n: number) =>
-      `Deletes your account, ${n === 1 ? 'your carousel and its images' : `all ${n} carousels and their images`}. This can't be undone.`,
-    confirmPlaceholder: (email: string) => `Type ${email} to confirm`,
+      n === 0
+        ? "Deletes your account. This can't be undone."
+        : `Deletes your account, ${n === 1 ? 'your carousel and its images' : `all ${n} carousels and their images`}. This can't be undone.`,
+    // The email is wrapped in left-to-right isolation marks so it reads correctly inside right-to-left text
+    confirmPlaceholder: (email: string) => `Type \u2066${email}\u2069 to confirm`,
+    confirmLabel: (email: string) => `Type \u2066${email}\u2069 to confirm deleting your account`,
     confirmDelete: 'Delete your account and all your carousels for good? This can’t be undone.',
+    confirmMismatch: 'Type your email address to confirm.',
+    onlyAdmin: 'You are the only admin. Make someone else an admin before deleting your account.',
     deleting: 'Deleting…',
     deleteButton: 'Delete account',
     deleteFailed: "Couldn't delete the account.",
@@ -149,7 +157,9 @@ const he: AppMessages = {
     name: 'שם',
     save: 'שמירה',
     saved: 'נשמר',
+    nameSaved: 'השם נשמר.',
     saveFailed: 'לא הצלחנו לשמור את השם.',
+    nameInvalid: 'השם צריך להיות באורך של 1 עד 100 תווים.',
     plan: name => `תוכנית: ${name}`,
     managePlan: 'תוכנית ותשלום',
     thisMonth: label => `${label} החודש`,
@@ -159,9 +169,15 @@ const he: AppMessages = {
     confirmLogOutAll: 'להתנתק מכל המכשירים, כולל המכשיר הזה?',
     downloadNote: n => `קובץ JSON עם החשבון, השימוש וכל הקרוסלות שלכם (${n}).`,
     deleteTitle: 'מחיקת החשבון',
-    deleteBody: n => `מוחק את החשבון, ${n === 1 ? 'את הקרוסלה ואת התמונות שלה' : `את כל ${n} הקרוסלות ואת התמונות שלהן`}. אי אפשר לבטל את זה.`,
-    confirmPlaceholder: email => `הקלידו ${email} לאישור`,
+    deleteBody: n =>
+      n === 0
+        ? 'החשבון שלכם יימחק. אי אפשר לבטל את זה.'
+        : `החשבון שלכם יימחק, ${n === 1 ? 'יחד עם הקרוסלה והתמונות שלה' : `יחד עם כל ${n} הקרוסלות והתמונות שלהן`}. אי אפשר לבטל את זה.`,
+    confirmPlaceholder: email => `הקלידו \u2066${email}\u2069 לאישור`,
+    confirmLabel: email => `הקלידו \u2066${email}\u2069 כדי לאשר את מחיקת החשבון`,
     confirmDelete: 'למחוק לצמיתות את החשבון ואת כל הקרוסלות? אי אפשר לבטל את זה.',
+    confirmMismatch: 'הקלידו את כתובת האימייל שלכם לאישור.',
+    onlyAdmin: 'אתם המנהלים היחידים. הפכו מישהו אחר למנהל לפני שתמחקו את החשבון.',
     deleting: 'מוחק…',
     deleteButton: 'מחיקת החשבון',
     deleteFailed: 'לא הצלחנו למחוק את החשבון.',

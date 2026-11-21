@@ -14,28 +14,41 @@ const card = 'rounded-2xl border border-line p-6 sm:p-8';
 const heading = 'font-display font-bold text-4xl leading-none mb-6';
 const field = 'w-full border border-line rounded-[10px] px-3.5 py-3 bg-paper focus:outline-none focus:border-ink';
 
+// The worker answers in English; the messages it can send this page are shown in the visitor's language
+type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin';
+const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin'];
+
+class RequestError extends Error {}
+
 function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
   const t = appMessages[locale].account;
   const tb = appMessages[locale].billing;
   const [account, setAccount] = useState<AccountSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [name, setName] = useState('');
-  const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [nameError, setNameError] = useState('');
   const [confirmEmail, setConfirmEmail] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     fetchAccount()
       .then(data => { setAccount(data); setName(data.user.name); })
-      .catch(err => setError(err instanceof Error ? err.message : t.loadFailed));
-  }, [t.loadFailed]);
+      .catch(() => setError(true));
+  }, []);
 
   const send = async (url: string, init: RequestInit) => {
     const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json' } });
     const data = res.status === 204 ? null : await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
+    if (!res.ok) {
+      const known = serverMessages.find(key => appMessages.en.account[key] === data?.error);
+      throw known ? new RequestError(t[known]) : new Error();
+    }
     return data;
   };
+
+  const messageOf = (err: unknown, fallback: string) => (err instanceof RequestError ? err.message : fallback);
 
   const saveName = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -44,8 +57,8 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
       await send('/api/account', { method: 'PATCH', body: JSON.stringify({ name }) });
       setNameStatus('saved');
     } catch (err) {
-      setNameStatus('idle');
-      alert(err instanceof Error ? err.message : t.saveFailed);
+      setNameStatus('failed');
+      setNameError(messageOf(err, t.saveFailed));
     }
   };
 
@@ -60,13 +73,14 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
     event.preventDefault();
     if (!confirm(t.confirmDelete)) return;
     setDeleting(true);
+    setDeleteError('');
     try {
       await send('/api/account', { method: 'DELETE', body: JSON.stringify({ confirmEmail }) });
       resetUser();
       window.location.href = '/';
     } catch (err) {
       setDeleting(false);
-      alert(err instanceof Error ? err.message : t.deleteFailed);
+      setDeleteError(messageOf(err, t.deleteFailed));
     }
   };
 
@@ -74,9 +88,9 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
     <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <PageHeading title={t.title} />
 
-      {error && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.loadFailed}</p>}
       {!account ? (
-        !error && <div className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+        !error && <div role="status" className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
       ) : (
         <div className="space-y-4">
           <section className={card}>
@@ -85,30 +99,35 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
               <Avatar user={user} size={56} />
               <div className="min-w-0">
                 <p className="text-sm text-graphite">{t.signedInAs}</p>
-                <p className="font-medium truncate">{account.user.email}</p>
+                <p className="font-medium truncate"><bdi dir="ltr">{account.user.email}</bdi></p>
               </div>
             </div>
             <form onSubmit={saveName} className="flex gap-2 items-end">
-              <label className="flex-1">
+              <label className="flex-1 min-w-0">
                 <span className="block text-sm font-medium mb-2">{t.name}</span>
                 <input
                   value={name}
                   onChange={e => { setName(e.target.value); setNameStatus('idle'); }}
                   maxLength={100}
+                  aria-invalid={nameStatus === 'failed' || undefined}
+                  aria-describedby="name-status"
                   dir="auto"
                   className={field}
                 />
               </label>
               <button type="submit" disabled={!name.trim() || nameStatus === 'saving'} className="btn-primary disabled:opacity-50">
-                {nameStatus === 'saved' ? <><Check size={16} /> {t.saved}</> : t.save}
+                {nameStatus === 'saved' ? <><Check size={16} aria-hidden /> {t.saved}</> : t.save}
               </button>
             </form>
+            <p id="name-status" role="status" className={`text-sm empty:hidden mt-3 ${nameStatus === 'failed' ? 'text-red-700' : 'text-graphite'}`}>
+              {nameStatus === 'saved' ? t.nameSaved : nameStatus === 'failed' ? nameError : ''}
+            </p>
           </section>
 
           <section className={card}>
             <div className="flex justify-between items-start gap-4 mb-6">
-              <h2 className={`${heading} !mb-0`}>{t.plan(account.plan.name)}</h2>
-              <Link href="/billing" className="text-sm font-semibold underline underline-offset-4 whitespace-nowrap">{t.managePlan}</Link>
+              <h2 className={`${heading} !mb-0 min-w-0 break-words`}>{t.plan(account.plan.name)}</h2>
+              <Link href="/billing" className="inline-flex items-center min-h-10 -my-2 text-sm font-semibold underline underline-offset-4 whitespace-nowrap">{t.managePlan}</Link>
             </div>
             <div className="space-y-5">
               <UsageMeter label={t.thisMonth(tb.carousels)} used={account.usage.carousels} limit={account.plan.limits.carouselsPerMonth} unlimited={tb.unlimited} />
@@ -121,10 +140,10 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
             <h2 className={heading}>{t.data}</h2>
             <div className="flex flex-wrap gap-3">
               <a href="/api/account/export" className="btn-secondary text-sm">
-                <Download size={16} /> {t.download}
+                <Download size={16} aria-hidden /> {t.download}
               </a>
               <button onClick={logOutEverywhere} className="btn-secondary text-sm">
-                <LogOut size={16} className="rtl:-scale-x-100" /> {t.logOutAll}
+                <LogOut size={16} aria-hidden className="rtl:-scale-x-100" /> {t.logOutAll}
               </button>
             </div>
             <p className="text-sm text-graphite mt-4">{t.downloadNote(account.carouselCount)}</p>
@@ -136,10 +155,16 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
             <form onSubmit={deleteAccount} className="flex flex-col sm:flex-row gap-2">
               <input
                 value={confirmEmail}
-                onChange={e => setConfirmEmail(e.target.value)}
+                onChange={e => { setConfirmEmail(e.target.value); setDeleteError(''); }}
                 placeholder={t.confirmPlaceholder(account.user.email)}
-                aria-label={t.confirmPlaceholder(account.user.email)}
-                dir="auto"
+                aria-label={t.confirmLabel(account.user.email)}
+                aria-invalid={deleteError ? true : undefined}
+                aria-describedby="delete-error"
+                type="email"
+                autoComplete="off"
+                spellCheck={false}
+                // An email is typed left to right; while empty the field follows the page so the placeholder reads right
+                dir={confirmEmail ? 'ltr' : undefined}
                 className={`${field} flex-1 text-sm focus:!border-red-700`}
               />
               <button
@@ -150,6 +175,7 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
                 {deleting ? t.deleting : t.deleteButton}
               </button>
             </form>
+            <p id="delete-error" role="alert" className="text-sm text-red-700 mt-3 empty:hidden">{deleteError}</p>
           </section>
         </div>
       )}
