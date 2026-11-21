@@ -211,10 +211,10 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
           <div>
             <h3 className="text-sm font-semibold mb-4">{t.footer.legal}</h3>
             <ul className="space-y-2.5 text-graphite">
-              <li><Link href="/terms" className="hover:text-ink transition-colors">{t.footer.terms}</Link></li>
-              <li><Link href="/privacy" className="hover:text-ink transition-colors">{t.footer.privacy}</Link></li>
-              <li><Link href="/cookies" className="hover:text-ink transition-colors">{t.footer.cookies}</Link></li>
-              <li><Link href="/refund" className="hover:text-ink transition-colors">{t.footer.refund}</Link></li>
+              <li><Link href={localePath(locale, '/terms')} className="hover:text-ink transition-colors">{t.footer.terms}</Link></li>
+              <li><Link href={localePath(locale, '/privacy')} className="hover:text-ink transition-colors">{t.footer.privacy}</Link></li>
+              <li><Link href={localePath(locale, '/cookies')} className="hover:text-ink transition-colors">{t.footer.cookies}</Link></li>
+              <li><Link href={localePath(locale, '/refund')} className="hover:text-ink transition-colors">{t.footer.refund}</Link></li>
             </ul>
           </div>
         </div>

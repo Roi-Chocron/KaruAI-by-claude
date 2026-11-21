@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { setConsent, useConsent } from '@/lib/consent';
 import { useLocale } from '@/lib/locale';
+import { localePath, type Locale } from '@/lib/i18n';
 
 const COPY = {
   en: {
@@ -12,6 +13,7 @@ const COPY = {
     essential: 'Essential only',
     all: 'Accept all',
     label: 'Cookie consent',
+    change: 'Change cookie settings',
   },
   he: {
     text: 'אנחנו משתמשים בעוגיות חיוניות כדי שתישארו מחוברים. בהסכמתכם נשתמש גם בעוגיות סטטיסטיקה כדי להבין איך משתמשים ב־KaruAI ולשפר אותו.',
@@ -19,15 +21,18 @@ const COPY = {
     essential: 'רק חיוניות',
     all: 'אישור הכל',
     label: 'הסכמה לעוגיות',
+    change: 'שינוי הגדרות העוגיות',
   },
 };
 
+const FIXED_ENGLISH = new Set(['/', '/terms', '/privacy', '/cookies', '/refund']);
+
 export function CookieBanner() {
   const consent = useConsent();
-  // The landing pages have a fixed language; the others follow the visitor's choice
+  // The landing and legal pages have a fixed language; the others follow the visitor's choice
   const pathname = usePathname() ?? '';
   const userLocale = useLocale();
-  const locale = /^\/he(\/|$)/.test(pathname) ? 'he' : pathname === '/' ? 'en' : userLocale;
+  const locale: Locale = /^\/he(\/|$)/.test(pathname) ? 'he' : FIXED_ENGLISH.has(pathname) ? 'en' : userLocale;
   if (consent !== null) return null;
   const t = COPY[locale];
   return (
@@ -39,7 +44,7 @@ export function CookieBanner() {
       aria-label={t.label}
     >
       <p className="mb-4 leading-relaxed">
-        {t.text} <Link href="/cookies" className="font-semibold underline underline-offset-2">{t.policy}</Link>
+        {t.text} <Link href={localePath(locale, '/cookies')} className="font-semibold underline underline-offset-2">{t.policy}</Link>
       </p>
       <div className="flex gap-2 justify-end">
         <button onClick={() => setConsent('essential')} className="btn-secondary !py-2 !px-4 text-sm">{t.essential}</button>
@@ -50,10 +55,10 @@ export function CookieBanner() {
 }
 
 // Lets visitors change their mind (on the Cookie Policy page)
-export function CookieSettingsButton() {
+export function CookieSettingsButton({ locale = 'en' }: { locale?: Locale }) {
   return (
     <button onClick={() => setConsent(null)} className="btn-secondary !py-2 !px-4 text-sm">
-      Change cookie settings
+      {COPY[locale].change}
     </button>
   );
 }

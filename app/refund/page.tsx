@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { LegalPage } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
 
-export const metadata = {
-  title: 'Refund & Cancellation Policy - KaruAI',
-  description: 'Cancellation and refund terms for subscriptions and purchases on KaruAI.',
-};
+export const metadata = legalMetadata('en', '/refund', 'Refund & Cancellation Policy - KaruAI', 'Cancellation and refund terms for subscriptions and purchases on KaruAI.');
 
 export default function RefundPage() {
   return (
-    <LegalPage title="Cancellation & Refund Policy" updated="November 2026">
+    <LegalPage path="/refund" title="Cancellation & Refund Policy" updated="November 2026">
 
       <section>
         <h2>1. Subscription Cancellation</h2>

@@ -118,9 +118,9 @@ function SignIn({ locale }: { locale: Locale }) {
 
           <p className="mt-6 text-sm text-graphite leading-relaxed">
             {t.agree.before}
-            <Link href="/terms" className="text-ink underline underline-offset-2">{t.agree.terms}</Link>
+            <Link href={localePath(locale, '/terms')} className="text-ink underline underline-offset-2">{t.agree.terms}</Link>
             {t.agree.and}
-            <Link href="/privacy" className="text-ink underline underline-offset-2">{t.agree.privacy}</Link>
+            <Link href={localePath(locale, '/privacy')} className="text-ink underline underline-offset-2">{t.agree.privacy}</Link>
             {t.agree.after}
           </p>
 
