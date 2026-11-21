@@ -114,7 +114,7 @@ function BillingPage({ locale }: { locale: Locale }) {
               {reached.length > 0 && (
                 <p className="text-sm text-red-700">
                   {t.limitReached(reached.map(meter => meter.label).join(', '))}{' '}
-                  <a href="#plans" className="font-semibold underline underline-offset-4">{t.seePlans}</a>
+                  <a href="#plans" className="inline-block py-2.5 -my-2.5 font-semibold underline underline-offset-4">{t.seePlans}</a>
                 </p>
               )}
             </div>
@@ -159,8 +159,20 @@ function BillingPage({ locale }: { locale: Locale }) {
 // The page as the /billing route shows it: only for signed-in users
 export function ProtectedBillingPage() {
   const locale = useLocale();
+  // The tab title in the visitor's language. Next writes the static (English) one into <head> after a client-side
+  // navigation, sometimes after this runs (as on the redirect from sign-in), so keep it right while the page is open.
   useEffect(() => {
-    document.title = `${appMessages[locale].billing.title} - KaruAI`;
+    const title = `${appMessages[locale].billing.title} - KaruAI`;
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+      document.querySelectorAll('head title').forEach(el => {
+        if (el.textContent !== title) el.textContent = title;
+      });
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
   }, [locale]);
   return <RequireAuth>{user => <AppShell user={user} active="billing">{locale => <BillingPage locale={locale} />}</AppShell>}</RequireAuth>;
 }
