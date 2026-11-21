@@ -1,50 +1,58 @@
 'use client';
 
+import { useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/brand/logo';
-import { MarkedText, type Marked } from '@/components/brand/marked-text';
-import { UserLocaleRoot } from '@/components/locale-root';
-import { localePath } from '@/lib/i18n';
+import { MarkedText } from '@/components/brand/marked-text';
+import { LocaleRoot } from '@/components/locale-root';
+import { localePath, type Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/locale';
+import { looksSignedIn } from '@/lib/session';
+import { systemMessages } from '@/messages/system';
 
-const COPY: Record<'en' | 'he', { title: Marked; body: string; home: string; carousels: string }> = {
-  en: {
-    title: { before: "This slide\ndoesn't ", marked: 'exist.', after: '' },
-    body: 'The link may be broken, or the page has moved.',
-    home: 'Home',
-    carousels: 'My carousels',
-  },
-  he: {
-    title: { before: 'השקף הזה\nלא ', marked: 'קיים.', after: '' },
-    body: 'אולי הקישור שבור, ואולי הדף עבר למקום אחר.',
-    home: 'לדף הבית',
-    carousels: 'הקרוסלות שלי',
-  },
-};
+const noSubscribe = () => () => {};
 
+// In production this is the static out/404.html, served at whatever address was missing, so it reads the
+// address and the sign-in hint in the browser. The static HTML is the English, signed-out version.
 export function NotFoundPage() {
+  const userLocale = useLocale();
+  const underHebrew = useSyncExternalStore(noSubscribe, () => /^\/he(\/|$)/.test(window.location.pathname), () => false);
+  const signedIn = useSyncExternalStore(noSubscribe, looksSignedIn, () => false);
+  const locale: Locale = underHebrew ? 'he' : userLocale;
+  const t = systemMessages[locale].notFound;
+
+  useEffect(() => {
+    document.title = t.tabTitle;
+  }, [t.tabTitle]);
+
+  const home = signedIn ? '/dashboard' : localePath(locale, '/');
   return (
-    <UserLocaleRoot>
-      {locale => {
-        const t = COPY[locale];
-        return (
-          <div className="min-h-screen bg-paper text-ink flex flex-col">
-            <header className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-              <Logo href={localePath(locale, '/')} />
-            </header>
-            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 flex flex-col justify-center">
-              <p className="font-display font-bold text-2xl text-graphite" dir="ltr">404</p>
-              <h1 className="mt-2 font-display font-bold text-[clamp(4rem,11vw,10rem)] leading-[0.88]">
-                <MarkedText text={t.title} />
-              </h1>
-              <p className="mt-6 text-lg text-graphite max-w-md">{t.body}</p>
-              <div className="mt-10 flex flex-wrap gap-3">
+    <LocaleRoot locale={locale} remember={underHebrew}>
+      <div className="min-h-screen bg-paper text-ink flex flex-col">
+        <header className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+          <Logo href={home} />
+        </header>
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 flex flex-col justify-center">
+          <p className="font-display font-bold text-xl sm:text-2xl text-graphite">{t.code}</p>
+          <h1 className="mt-2 font-display font-bold text-[clamp(3.25rem,11vw,10rem)] leading-[0.92] break-words">
+            <MarkedText text={t.title} />
+          </h1>
+          <p className="mt-6 text-lg text-graphite max-w-md">{t.body}</p>
+          <div className="mt-10 flex flex-col sm:flex-row sm:flex-wrap gap-3">
+            {signedIn ? (
+              <>
                 <Link href="/dashboard" className="btn-primary">{t.carousels}</Link>
-                <Link href={localePath(locale, '/')} className="btn-secondary">{t.home}</Link>
-              </div>
-            </main>
+                <Link href="/account" className="btn-secondary">{t.account}</Link>
+              </>
+            ) : (
+              <>
+                <Link href={localePath(locale, '/')} className="btn-primary">{t.home}</Link>
+                <Link href="/login" className="btn-secondary">{t.logIn}</Link>
+              </>
+            )}
           </div>
-        );
-      }}
-    </UserLocaleRoot>
+        </main>
+      </div>
+    </LocaleRoot>
   );
 }
