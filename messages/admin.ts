@@ -14,7 +14,10 @@ const en = {
     suspended: 'Suspended',
   },
   chart: 'AI requests, last 14 days',
+  chartSub: 'Each bar is one day: AI messages plus AI images.',
   chartDay: (day: string, messages: number, images: number, tokens: string) => `${day}: ${messages} messages, ${images} images, ${tokens} tokens`,
+  chartTable: { day: 'Day', messages: 'AI messages', images: 'AI images', tokens: 'Tokens' },
+  plansLegend: 'Users per plan',
   keys: 'API keys',
   keysSub: 'Keys saved here take effect right away and override the Worker secrets. Saved keys are never shown again in full.',
   settings: {
@@ -33,8 +36,12 @@ const en = {
   clearTitle: 'Remove it and fall back to the Worker secret',
   saveFailed: "Couldn't save.",
   users: 'Users',
-  columns: { user: 'User', role: 'Role', plan: 'Plan', carousels: 'Carousels', month: 'This month', tokens: 'Tokens', joined: 'Joined', lastActive: 'Last active' },
+  columns: { user: 'User', role: 'Role', plan: 'Plan', carousels: 'Carousels', month: 'This month', tokens: 'Tokens', joined: 'Joined', lastActive: 'Last active', actions: 'Actions' },
   monthTitle: 'New carousels / AI messages / AI images this month',
+  monthShort: 'This month (carousels / messages / images)',
+  roleOf: (email: string) => `Role of ${email}`,
+  planOf: (email: string) => `Plan of ${email}`,
+  ownPlan: "You can't change your own plan here",
   you: '(you)',
   roles: { user: 'User', admin: 'Admin' },
   ownRole: "You can't change your own role",
@@ -42,10 +49,15 @@ const en = {
   suspend: 'Suspend',
   unsuspend: 'Unsuspend',
   deleteUser: 'Delete user',
+  deleteUserNamed: (email: string) => `Delete ${email}`,
+  suspendUser: (email: string) => `Suspend ${email}`,
+  unsuspendUser: (email: string) => `Unsuspend ${email}`,
   confirmSuspend: (email: string) => `Suspend ${email}? They're signed out and can't sign in until you unsuspend them.`,
   confirmDelete: (email: string, n: number) => `Delete ${email} and their ${n} carousel${n === 1 ? '' : 's'}? This can't be undone.`,
   updateFailed: "Couldn't update the user.",
   deleteFailed: "Couldn't delete the user.",
+  offline: "Couldn't reach the server. Check the connection and try again.",
+  requestFailed: (status: number) => `The request failed (status ${status}).`,
 };
 
 const he: typeof en = {
@@ -62,7 +74,10 @@ const he: typeof en = {
     suspended: 'מושעים',
   },
   chart: 'בקשות AI ב־14 הימים האחרונים',
+  chartSub: 'כל עמודה היא יום אחד: הודעות AI ועוד תמונות AI.',
   chartDay: (day, messages, images, tokens) => `${day}: ${messages} הודעות, ${images} תמונות, ${tokens} טוקנים`,
+  chartTable: { day: 'יום', messages: 'הודעות AI', images: 'תמונות AI', tokens: 'טוקנים' },
+  plansLegend: 'משתמשים לפי תוכנית',
   keys: 'מפתחות API',
   keysSub: 'מפתחות שנשמרים כאן נכנסים לתוקף מיד וגוברים על הסודות של ה־Worker. מפתח שמור לא מוצג שוב במלואו.',
   settings: {
@@ -81,8 +96,12 @@ const he: typeof en = {
   clearTitle: 'הסרה וחזרה לסוד של ה־Worker',
   saveFailed: 'השמירה לא הצליחה.',
   users: 'משתמשים',
-  columns: { user: 'משתמש', role: 'תפקיד', plan: 'תוכנית', carousels: 'קרוסלות', month: 'החודש', tokens: 'טוקנים', joined: 'הצטרפות', lastActive: 'פעילות אחרונה' },
+  columns: { user: 'משתמש', role: 'תפקיד', plan: 'תוכנית', carousels: 'קרוסלות', month: 'החודש', tokens: 'טוקנים', joined: 'הצטרפות', lastActive: 'פעילות אחרונה', actions: 'פעולות' },
   monthTitle: 'קרוסלות חדשות / הודעות AI / תמונות AI החודש',
+  monthShort: 'החודש (קרוסלות / הודעות / תמונות)',
+  roleOf: email => `התפקיד של ${email}`,
+  planOf: email => `התוכנית של ${email}`,
+  ownPlan: 'אי אפשר לשנות כאן את התוכנית של עצמכם',
   you: '(החשבון שלכם)',
   roles: { user: 'משתמש', admin: 'מנהל' },
   ownRole: 'אי אפשר לשנות את התפקיד של עצמכם',
@@ -90,10 +109,20 @@ const he: typeof en = {
   suspend: 'השעיה',
   unsuspend: 'ביטול השעיה',
   deleteUser: 'מחיקת המשתמש',
+  deleteUserNamed: email => `מחיקת ${email}`,
+  suspendUser: email => `השעיית ${email}`,
+  unsuspendUser: email => `ביטול ההשעיה של ${email}`,
   confirmSuspend: email => `להשעות את ${email}? המשתמש ינותק ולא יוכל להתחבר עד שתבטלו את ההשעיה.`,
   confirmDelete: (email, n) => `למחוק את ${email} ואת ${n === 1 ? 'הקרוסלה שלו' : `${n} הקרוסלות שלו`}? אי אפשר לבטל את זה.`,
   updateFailed: 'לא הצלחנו לעדכן את המשתמש.',
   deleteFailed: 'לא הצלחנו למחוק את המשתמש.',
+  offline: 'אין חיבור לשרת. בדקו את החיבור ונסו שוב.',
+  requestFailed: status =>
+    status === 401 ? 'צריך להתחבר מחדש.'
+    : status === 403 ? 'אין לחשבון הזה הרשאת ניהול.'
+    : status === 404 ? 'המשתמש לא נמצא.'
+    : status === 400 ? 'הבקשה לא תקינה.'
+    : `הבקשה נכשלה (קוד ${status}).`,
 };
 
 export const adminMessages: Messages<typeof en> = { en, he };
