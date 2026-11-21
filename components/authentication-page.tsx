@@ -83,7 +83,7 @@ function DevLogin({ next, t }: { next: string; t: AuthMessages }) {
           aria-describedby={message ? 'dev-login-error' : undefined}
           autoComplete="email"
           dir="ltr"
-          className="flex-1 min-w-0 border border-line rounded-lg px-3 py-2.5 text-sm bg-paper rtl:text-right focus:outline-none focus:border-ink"
+          className="w-0 flex-1 min-w-0 border border-line rounded-lg px-3 py-2.5 text-sm bg-paper rtl:text-right focus:outline-none focus:border-ink"
         />
         <button type="submit" disabled={busy} aria-busy={busy} className="btn-primary !py-2.5 !px-4 text-sm disabled:opacity-60">
           {busy ? t.dev.busy : t.dev.submit}
@@ -114,9 +114,17 @@ function SignIn({ locale }: { locale: Locale }) {
       .catch(() => undefined);
   }, []);
 
-  // The static HTML carries the English title; this follows the visitor's language
+  // The static HTML carries the English title; this follows the visitor's language. Next can write its metadata
+  // title after hydration, over ours, so it is put back whenever the head changes.
   useEffect(() => {
-    document.title = `${t.tabTitle} - KaruAI`;
+    const title = `${t.tabTitle} - KaruAI`;
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
   }, [t.tabTitle]);
 
   const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
@@ -124,7 +132,7 @@ function SignIn({ locale }: { locale: Locale }) {
   const example = homeMessages[locale].example;
 
   return (
-    <div className="min-h-screen bg-paper text-ink grid lg:grid-cols-2">
+    <div className="min-h-screen bg-paper text-ink grid grid-cols-1 lg:grid-cols-2">
       <main className="min-h-svh lg:min-h-0 flex flex-col px-6 sm:px-12 lg:px-16 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-4">
           <Logo href={localePath(locale, '/')} />
@@ -167,11 +175,11 @@ function SignIn({ locale }: { locale: Locale }) {
         <div aria-hidden="true" className="relative h-52 sm:h-64 lg:h-auto lg:flex-1 lg:min-h-[16rem] my-10">
           <Slide className={`${SLIDE} top-[12%] start-0 -rotate-6 rtl:rotate-6 bg-mist text-ink`}>
             <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">02</span>
-            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[1].title}</span>
+            <span className="mt-auto font-display font-bold text-[11cqw] leading-[0.92]">{example.items[1].title}</span>
           </Slide>
           <Slide className={`${SLIDE} top-[6%] start-[5.75rem] sm:start-[7.5rem] lg:start-[7.5rem] xl:start-[10.5rem] rotate-2 rtl:-rotate-2 bg-lime text-ink`}>
             <span className="font-display font-bold text-[22cqw] leading-none" dir="ltr">01</span>
-            <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.92]">{example.items[0].title}</span>
+            <span className="mt-auto font-display font-bold text-[11cqw] leading-[0.92]">{example.items[0].title}</span>
           </Slide>
           <Slide className={`${SLIDE} top-0 start-[11.5rem] sm:start-[15rem] lg:start-[15rem] xl:start-[21rem] rotate-[8deg] rtl:-rotate-[8deg] bg-paper text-ink`}>
             <span className="mt-auto font-display font-bold text-[13cqw] leading-[0.9]">{example.cover}</span>
