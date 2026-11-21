@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" style="overflow: auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -46,18 +46,22 @@
         /* Workspace & Canvas */
         .workspace-wrapper {
             flex: 1;
+            min-height: 0;
             background: #e5e5e5;
             position: relative;
             overflow: auto;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 24px;
             user-select: none; /* Prevent text selection while dragging */
         }
 
+        /* Takes up the slide's size at the current zoom, so a zoomed-in slide can be scrolled to every edge */
+        .canvas-sizer { position: relative; margin: auto; flex-shrink: 0; }
+
         .canvas-container {
-            position: relative;
-            transform-origin: center center;
+            position: absolute;
+            top: 0; left: 0;
+            transform-origin: top left;
             box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);
             background: #ffffff;
             transition: transform 0.1s ease-out;
@@ -128,7 +132,8 @@
         @keyframes thinking { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
     </style>
 </head>
-<body class="flex flex-col h-screen w-screen overflow-hidden bg-white text-slate-800 font-sans">
+<!-- Built for a computer screen: below 1024 x 600 the page keeps that size and scrolls (the site shows a notice first) -->
+<body class="flex flex-col h-screen min-h-[600px] min-w-[1024px] overflow-hidden bg-white text-slate-800 font-sans">
 
     <!-- TOP BAR -->
     <header class="h-16 shrink-0 border-b border-gray-200 bg-white flex items-center gap-4 px-4 z-20">
@@ -141,20 +146,20 @@
             <input id="carousel-title" type="text" dir="auto" maxlength="200" placeholder="Untitled carousel" title="Rename the carousel"
                 class="min-w-0 w-full max-w-sm px-2 py-1.5 rounded-lg text-[15px] font-semibold text-slate-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-colors"
                 onchange="renameCarousel(this.value)" onkeydown="if (event.key === 'Enter') this.blur()">
-            <span id="save-status" class="text-xs font-medium text-gray-400 shrink-0"></span>
+            <span id="save-status" role="status" aria-live="polite" class="text-xs font-medium text-gray-400 shrink-0"></span>
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-            <button onclick="undo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4"></i></button>
-            <button onclick="redo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
+            <button onclick="undo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Undo (Ctrl+Z)"><i data-lucide="undo-2" class="w-4 h-4 rtl:-scale-x-100"></i></button>
+            <button onclick="redo()" class="p-2 text-gray-500 hover:bg-gray-100 hover:text-slate-800 rounded-lg transition-all" title="Redo (Ctrl+Y)"><i data-lucide="redo-2" class="w-4 h-4 rtl:-scale-x-100"></i></button>
             <div class="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 text-xs font-semibold text-gray-500" dir="ltr">
-                <button onclick="changeZoom(-0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom out">−</button>
-                <span id="zoom-label" class="w-10 text-center tabular-nums">45%</span>
-                <button onclick="changeZoom(0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom in">+</button>
+                <button onclick="changeZoom(-0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom out" title="Zoom out">−</button>
+                <button id="zoom-label" onclick="fitZoom()" class="w-11 h-7 rounded-md text-center tabular-nums hover:bg-gray-100 hover:text-slate-800 transition-all" title="Fit to screen">45%</button>
+                <button onclick="changeZoom(0.1)" class="w-7 h-7 rounded-md hover:bg-gray-100 hover:text-slate-800 transition-all" aria-label="Zoom in" title="Zoom in">+</button>
             </div>
 
             <div id="download-wrap" class="relative ms-2">
-                <button onclick="toggleDownloadMenu()" aria-haspopup="menu" class="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold ps-4 pe-3 py-2.5 rounded-[10px] hover:bg-gray-600 transition-colors">
+                <button id="download-button" onclick="toggleDownloadMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="download-menu" class="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold ps-4 pe-3 py-2.5 rounded-[10px] hover:bg-gray-600 transition-colors">
                     <i data-lucide="share" class="w-4 h-4"></i><span>Export</span><i data-lucide="chevron-down" class="w-4 h-4 opacity-70"></i>
                 </button>
                 <div id="download-menu" role="menu" class="hidden absolute end-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-1.5 z-50 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.25)]">
@@ -189,17 +194,17 @@
 
     <!-- LEFT COLUMN -->
     <aside class="w-64 xl:w-72 h-full flex flex-col border-e border-gray-200 bg-white shrink-0 z-10">
-        <div class="flex h-12 border-b border-gray-200 shrink-0">
-            <button onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
+        <div role="tablist" class="flex h-12 border-b border-gray-200 shrink-0">
+            <button role="tab" onclick="switchLeftTab('brand')" id="tab-brand" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="palette" class="w-4 h-4"></i> Brand
             </button>
-            <button onclick="switchLeftTab('layers')" id="tab-layers" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
+            <button role="tab" onclick="switchLeftTab('layers')" id="tab-layers" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="layers" class="w-4 h-4"></i> Layers
             </button>
         </div>
 
         <div class="flex-1 overflow-y-auto relative">
-            <div id="panel-brand" class="hidden p-5">
+            <div id="panel-brand" role="tabpanel" aria-labelledby="tab-brand" class="hidden p-5">
                 <h2 class="font-display font-bold text-3xl leading-none mb-2 text-slate-800">Brand</h2>
                 <p class="text-xs text-gray-500 mb-6 leading-relaxed">Everything the carousel uses. Change one to update it on every slide.</p>
                 <div class="mb-6">
@@ -211,20 +216,20 @@
                     <div id="brand-fonts" class="space-y-2"></div>
                 </div>
             </div>
-            <div id="panel-layers" class="flex flex-col pb-4"></div>
+            <div id="panel-layers" role="tabpanel" aria-labelledby="tab-layers" class="flex flex-col pb-4"></div>
         </div>
     </aside>
 
     <!-- MIDDLE COLUMN -->
     <main class="flex-1 min-w-0 h-full flex flex-col relative">
         <div class="h-12 border-b border-gray-200 px-3 flex items-center justify-between gap-2 bg-white shrink-0 z-10 whitespace-nowrap">
-            <div class="flex gap-0.5 border border-gray-200 p-0.5 rounded-lg">
-                <button onclick="setTool('V')" id="tool-V" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
-                <button onclick="setTool('R')" id="tool-R" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
-                <button onclick="setTool('O')" id="tool-O" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Ellipse (O)"><i data-lucide="circle" class="w-4 h-4"></i></button>
-                <button onclick="setTool('T')" id="tool-T" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Text (T)"><i data-lucide="type" class="w-4 h-4"></i></button>
+            <div role="toolbar" aria-label="Tools" class="flex gap-0.5 border border-gray-200 p-0.5 rounded-lg">
+                <button onclick="setTool('V')" id="tool-V" aria-pressed="true" class="tool-btn active p-1.5 rounded-md transition-all" title="Move (V)"><i data-lucide="mouse-pointer-2" class="w-4 h-4"></i></button>
+                <button onclick="setTool('R')" id="tool-R" aria-pressed="false" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Rectangle (R)"><i data-lucide="square" class="w-4 h-4"></i></button>
+                <button onclick="setTool('O')" id="tool-O" aria-pressed="false" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Ellipse (O)"><i data-lucide="circle" class="w-4 h-4"></i></button>
+                <button onclick="setTool('T')" id="tool-T" aria-pressed="false" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Text (T)"><i data-lucide="type" class="w-4 h-4"></i></button>
                 <button onclick="pickImageFile()" class="tool-btn p-1.5 rounded-md transition-all hover:text-slate-800" title="Add image (I) — or drop an image on the canvas"><i data-lucide="image-plus" class="w-4 h-4"></i></button>
-                <input id="image-file-input" type="file" accept="image/*" class="hidden" onchange="handleImageFile(event)">
+                <input id="image-file-input" type="file" accept="image/*" class="hidden" tabindex="-1" aria-hidden="true" onchange="handleImageFile(event)">
             </div>
 
             <span id="slide-label" class="text-xs font-semibold text-gray-500">Slide 1 of 1</span>
@@ -236,6 +241,7 @@
         </div>
 
         <div class="workspace-wrapper" id="workspace" onmousedown="handleWorkspaceDown(event)">
+            <div class="canvas-sizer" id="canvas-sizer" style="width: 486px; height: 607.5px;">
             <div class="canvas-container" id="canvas-container" style="width: 1080px; height: 1350px; transform: scale(0.45);">
                 <div class="canvas-artboard" id="artboard">
                     <!-- Elements injected via JS -->
@@ -252,10 +258,11 @@
                     <div id="guide-h" class="snap-guide-h"></div>
                 </div>
             </div>
+            </div>
         </div>
 
-        <footer class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 ps-5 pe-3 shrink-0 z-10">
-            <div id="slide-thumbnails" class="flex-1 min-w-0 h-full flex items-center gap-4 overflow-x-auto px-1"></div>
+        <footer id="slide-footer" class="h-28 border-t border-gray-200 bg-white flex items-center gap-3 ps-5 pe-3 shrink-0 z-10">
+            <div id="slide-thumbnails" role="group" aria-label="Slides" class="flex-1 min-w-0 h-full flex items-center gap-4 overflow-x-auto px-1"></div>
             <div id="slide-actions" class="hidden grid-cols-2 gap-1 shrink-0 ps-3 border-s border-gray-200">
                 <button id="slide-move-earlier" onclick="moveSlide(-1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide earlier"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
                 <button id="slide-move-later" onclick="moveSlide(1)" class="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent" title="Move slide later"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
@@ -267,19 +274,19 @@
 
     <!-- RIGHT COLUMN -->
     <aside class="w-80 xl:w-96 h-full flex flex-col border-s border-gray-200 bg-white shrink-0 z-10">
-        <div class="flex h-12 border-b border-gray-200 shrink-0">
-            <button onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
+        <div role="tablist" class="flex h-12 border-b border-gray-200 shrink-0">
+            <button role="tab" onclick="switchRightTab('chat')" id="tab-chat" class="tab-btn flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="message-square" class="w-4 h-4"></i> KaruAI
             </button>
-            <button onclick="switchRightTab('design')" id="tab-design" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
+            <button role="tab" onclick="switchRightTab('design')" id="tab-design" class="tab-btn active flex-1 flex items-center justify-center gap-2 font-semibold text-sm transition-colors">
                 <i data-lucide="pen-line" class="w-4 h-4"></i> Design
             </button>
         </div>
 
         <div class="flex-1 min-h-0 overflow-y-auto relative bg-white">
 
-            <div id="panel-chat" class="hidden h-full flex flex-col bg-gray-50">
-                <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4" id="chat-messages">
+            <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" class="hidden h-full flex flex-col bg-gray-50">
+                <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4" id="chat-messages" role="log" aria-live="polite" aria-label="Chat with KaruAI">
                     <div id="chat-empty" class="m-auto text-center max-w-[85%]">
                         <p class="font-display font-bold text-4xl leading-[0.9] text-slate-800">Start with <span class="bg-lime px-1 rounded">one sentence.</span></p>
                         <p class="mt-3 text-sm text-gray-500 leading-relaxed">Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.</p>
@@ -287,15 +294,15 @@
                 </div>
                 <div class="p-3 border-t border-gray-200 bg-white shrink-0">
                     <div class="flex items-end gap-2 bg-white rounded-xl border border-gray-300 focus-within:border-indigo-600 p-1.5 transition-colors">
-                        <input type="text" id="chat-input" dir="auto" placeholder="Prompt the AI..." class="flex-1 min-w-0 bg-transparent px-2.5 py-2 focus:outline-none text-sm text-slate-800" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
-                        <button id="chat-send" onclick="sendChat()" aria-label="Send" class="shrink-0 w-9 h-9 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
+                        <input type="text" id="chat-input" dir="auto" maxlength="2000" aria-label="Message to KaruAI" placeholder="Prompt the AI..." class="flex-1 min-w-0 bg-transparent px-2.5 py-2 focus:outline-none text-sm text-slate-800" onkeypress="if(event.key === 'Enter') { event.preventDefault(); sendChat(); }">
+                        <button id="chat-send" onclick="sendChat()" aria-label="Send" title="Send" class="shrink-0 w-9 h-9 flex items-center justify-center bg-lime text-indigo-600 rounded-lg hover:bg-lime-deep transition-colors">
                             <i data-lucide="arrow-up" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div id="panel-design" class="pb-10">
+            <div id="panel-design" role="tabpanel" aria-labelledby="tab-design" class="pb-10">
                 <div id="empty-state" class="flex flex-col items-center justify-center h-40 text-gray-400 text-sm gap-4 mt-10">
                     <i data-lucide="mouse-pointer-2" class="w-8 h-8 opacity-50"></i>
                     <p>Select an element to edit properties.</p>
@@ -308,9 +315,9 @@
 
                 <div id="props-content" class="hidden">
                     <div class="p-4 border-b border-gray-200 flex gap-2">
-                        <button onclick="reorderLayer(1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Ctrl + ]">Forward</button>
-                        <button onclick="reorderLayer(-1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Ctrl + [">Backward</button>
-                        <button onclick="deleteSelected()" class="flex-1 py-2 text-xs font-semibold text-red-700 border border-gray-200 rounded-lg hover:border-red-700 flex items-center justify-center" title="Delete">
+                        <button onclick="reorderLayer(1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Bring forward (Ctrl + ])">Forward</button>
+                        <button onclick="reorderLayer(-1)" class="flex-1 py-2 text-xs font-semibold text-slate-800 border border-gray-200 rounded-lg hover:bg-gray-100" title="Send backward (Ctrl + [)">Backward</button>
+                        <button onclick="deleteSelected()" class="flex-1 py-2 text-xs font-semibold text-red-700 border border-gray-200 rounded-lg hover:border-red-700 flex items-center justify-center" title="Delete" aria-label="Delete">
                             <i data-lucide="trash-2" class="w-3 h-3"></i>
                         </button>
                     </div>
@@ -320,45 +327,45 @@
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">X</span>
-                                <input type="number" id="propX" data-prop="x" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propX" aria-label="X position" title="X position" data-prop="x" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">Y</span>
-                                <input type="number" id="propY" data-prop="y" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propY" aria-label="Y position" title="Y position" data-prop="y" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">W</span>
-                                <input type="number" id="propW" data-prop="w" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propW" aria-label="Width" title="Width" data-prop="w" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">H</span>
-                                <input type="number" id="propH" data-prop="h" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propH" aria-label="Height" title="Height" data-prop="h" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">°</span>
-                                <input type="number" id="propRot" data-prop="rotation" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propRot" aria-label="Rotation" title="Rotation" data-prop="rotation" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400 w-3">R</span>
-                                <input type="number" id="propRad" data-prop="radius" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propRad" aria-label="Corner radius" title="Corner radius" data-prop="radius" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                     </div>
 
                     <div id="section-text" class="p-5 border-b border-gray-200">
                         <h4 class="font-display font-bold text-2xl leading-none mb-4">Text</h4>
-                        <textarea id="propContent" dir="auto" data-prop="content" class="w-full bg-white border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-600 outline-none resize-none h-24 text-slate-800"></textarea>
-                        <select id="propFontFamily" data-prop="fontFamily" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-600 text-xs text-slate-700"></select>
+                        <textarea id="propContent" aria-label="Text content" dir="auto" data-prop="content" class="w-full bg-white border border-gray-200 rounded-lg p-2.5 mb-3 text-sm focus:border-indigo-600 outline-none resize-none h-24 text-slate-800"></textarea>
+                        <select id="propFontFamily" aria-label="Font" data-prop="fontFamily" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 mb-3 outline-none focus:border-indigo-600 text-xs text-slate-700"></select>
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                 <span class="text-[11px] font-semibold text-gray-400">Size</span>
-                                <input type="number" id="propFontSize" data-prop="fontSize" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propFontSize" aria-label="Font size" data-prop="fontSize" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
-                            <select id="propFontWeight" data-prop="fontWeight" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
+                            <select id="propFontWeight" aria-label="Font weight" data-prop="fontWeight" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                                 <option value="300">Light</option>
                                 <option value="400">Regular</option>
                                 <option value="500">Medium</option>
@@ -368,7 +375,7 @@
                                 <option value="900">Black</option>
                             </select>
                         </div>
-                        <select id="propTextAlign" data-prop="textAlign" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
+                        <select id="propTextAlign" aria-label="Text alignment" data-prop="textAlign" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                             <option value="left">Align Left</option>
                             <option value="center">Align Center</option>
                             <option value="right">Align Right</option>
@@ -376,11 +383,11 @@
                         <div class="grid grid-cols-2 gap-3 mt-3">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all" title="Line height">
                                 <span class="text-[11px] font-semibold text-gray-400">LH</span>
-                                <input type="number" step="0.05" id="propLineHeight" data-prop="lineHeight" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" step="0.05" id="propLineHeight" aria-label="Line height" data-prop="lineHeight" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all" title="Letter spacing">
                                 <span class="text-[11px] font-semibold text-gray-400">LS</span>
-                                <input type="number" id="propLetterSpacing" data-prop="letterSpacing" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propLetterSpacing" aria-label="Letter spacing" data-prop="letterSpacing" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                         </div>
                     </div>
@@ -388,18 +395,18 @@
                     <div class="p-5 border-b border-gray-200">
                         <h4 class="font-display font-bold text-2xl leading-none mb-4">Fill</h4>
                         <div class="flex items-center gap-3">
-                            <input type="color" id="propFillColor" data-prop="fillColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
-                            <input type="text" id="propFillColorHex" dir="ltr" class="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
-                            <div class="flex items-center gap-1 w-20 shrink-0">
-                                <input type="number" id="propFillOpacity" data-prop="fillOpacity" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
+                            <input type="color" id="propFillColor" aria-label="Fill color" data-prop="fillColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
+                            <input type="text" id="propFillColorHex" aria-label="Fill color code" dir="ltr" class="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 outline-none font-mono text-xs uppercase text-slate-700" readonly>
+                            <div class="flex items-center gap-1 w-20 shrink-0" dir="ltr">
+                                <input type="number" id="propFillOpacity" aria-label="Opacity" data-prop="fillOpacity" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" min="0" max="100">
                                 <span class="text-gray-400 text-xs font-bold">%</span>
                             </div>
                         </div>
                         <div id="gradient-controls" class="flex items-center gap-3 mt-3">
-                            <input type="color" id="propGradientTo" data-prop="gradientTo" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0" title="Gradient end color">
+                            <input type="color" id="propGradientTo" aria-label="Gradient end color" data-prop="gradientTo" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0" title="Gradient end color">
                             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 flex-1" title="Gradient angle">
                                 <span class="text-[11px] font-semibold text-gray-400">°</span>
-                                <input type="number" id="propGradientAngle" data-prop="gradientAngle" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                <input type="number" id="propGradientAngle" aria-label="Gradient angle" data-prop="gradientAngle" class="w-full bg-transparent outline-none text-xs text-slate-700">
                             </div>
                             <button onclick="toggleGradient(false)" class="text-xs font-semibold text-gray-500 hover:text-red-600">Remove</button>
                         </div>
@@ -409,9 +416,9 @@
                     <div id="section-stroke" class="p-5 border-b border-gray-200">
                         <h4 class="font-display font-bold text-2xl leading-none mb-4">Stroke</h4>
                         <div class="flex items-center gap-3">
-                            <input type="color" id="propStrokeColor" data-prop="strokeColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
-                            <input type="number" id="propStrokeWidth" data-prop="strokeWidth" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" placeholder="W">
-                            <select id="propStrokeStyle" data-prop="strokeStyle" class="flex-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
+                            <input type="color" id="propStrokeColor" aria-label="Stroke color" data-prop="strokeColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
+                            <input type="number" id="propStrokeWidth" aria-label="Stroke width" data-prop="strokeWidth" class="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none text-xs text-slate-700" placeholder="W">
+                            <select id="propStrokeStyle" aria-label="Stroke style" data-prop="strokeStyle" class="flex-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-600 text-xs text-slate-700">
                                 <option value="solid">Solid</option>
                                 <option value="dashed">Dashed</option>
                                 <option value="dotted">Dotted</option>
@@ -421,7 +428,7 @@
 
                     <div class="p-5">
                         <h4 class="font-display font-bold text-2xl leading-none mb-4">Effects</h4>
-                        <select id="propShadowType" data-prop="shadowType" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 mb-4 outline-none focus:border-indigo-600 text-xs text-slate-700">
+                        <select id="propShadowType" aria-label="Shadow" data-prop="shadowType" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 mb-4 outline-none focus:border-indigo-600 text-xs text-slate-700">
                             <option value="none">No Shadow</option>
                             <option value="drop-shadow">Drop Shadow</option>
                             <option id="opt-inner-shadow" value="inner-shadow">Inner Shadow</option>
@@ -431,25 +438,25 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                     <span class="text-[11px] font-semibold text-gray-400 w-3">X</span>
-                                    <input type="number" id="propShadowX" data-prop="shadowX" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                    <input type="number" id="propShadowX" aria-label="Shadow X offset" title="Shadow X offset" data-prop="shadowX" class="w-full bg-transparent outline-none text-xs text-slate-700">
                                 </div>
                                 <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                     <span class="text-[11px] font-semibold text-gray-400 w-3">Y</span>
-                                    <input type="number" id="propShadowY" data-prop="shadowY" class="w-full bg-transparent outline-none text-xs text-slate-700">
+                                    <input type="number" id="propShadowY" aria-label="Shadow Y offset" title="Shadow Y offset" data-prop="shadowY" class="w-full bg-transparent outline-none text-xs text-slate-700">
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                     <span class="text-[11px] font-semibold text-gray-400 w-3">B</span>
-                                    <input type="number" id="propShadowBlur" data-prop="shadowBlur" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Blur">
+                                    <input type="number" id="propShadowBlur" aria-label="Blur" data-prop="shadowBlur" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Blur">
                                 </div>
                                 <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-indigo-600 transition-all">
                                     <span class="text-[11px] font-semibold text-gray-400 w-3">S</span>
-                                    <input type="number" id="propShadowSpread" data-prop="shadowSpread" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Spread">
+                                    <input type="number" id="propShadowSpread" aria-label="Spread" data-prop="shadowSpread" class="w-full bg-transparent outline-none text-xs text-slate-700" title="Spread">
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <input type="color" id="propShadowColor" data-prop="shadowColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
+                                <input type="color" id="propShadowColor" aria-label="Shadow Color" data-prop="shadowColor" class="w-8 h-8 rounded-md cursor-pointer border border-gray-200 p-0">
                                 <span class="text-xs text-gray-500 font-medium">Shadow Color</span>
                             </div>
                         </div>
@@ -463,7 +470,8 @@
 
     <script>
         // The interface language follows the site's choice (the karu_locale cookie), else the browser's.
-        // Hebrew mirrors the panels; the canvas and the slide strip stay left-to-right like the exported images.
+        // Hebrew mirrors the panels; the canvas and the slide strip (with its buttons) stay left-to-right like the
+        // carousel itself.
         const LOCALE = document.cookie.match(/(?:^|; )karu_locale=(en|he)/)?.[1]
             ?? (navigator.language.toLowerCase().startsWith('he') ? 'he' : 'en');
         const L = (en, he) => (LOCALE === 'he' ? he : en);
@@ -472,35 +480,78 @@
         const HE_UI = {
             'All carousels': 'כל הקרוסלות', 'Untitled carousel': 'קרוסלה ללא שם', 'Rename the carousel': 'שינוי שם הקרוסלה',
             'Brand': 'מותג', 'Layers': 'שכבות', 'Everything the carousel uses. Change one to update it on every slide.': 'כל מה שהקרוסלה משתמשת בו. שינוי כאן מתעדכן בכל השקפים.',
-            'Colors': 'צבעים', 'Fonts': 'גופנים', 'Download all (ZIP)': 'הורדת הכל (ZIP)', 'Download this slide (PNG)': 'הורדת השקף הזה (PNG)',
+            'Colors': 'צבעים', 'Fonts': 'גופנים',
             'Move (V)': 'הזזה (V)', 'Rectangle (R)': 'מלבן (R)', 'Ellipse (O)': 'אליפסה (O)', 'Text (T)': 'טקסט (T)',
             'Add image (I) — or drop an image on the canvas': 'הוספת תמונה (I), או גרירת תמונה לקנבס',
-            'Image': 'עם תמונה', 'No image': 'בלי תמונה', 'Undo (Ctrl+Z)': 'ביטול (Ctrl+Z)', 'Redo (Ctrl+Y)': 'חזרה (Ctrl+Y)',
-            'Download': 'הורדה', 'This slide (PNG)': 'השקף הזה (PNG)', 'All slides (ZIP)': 'כל השקפים (ZIP)',
+            'Image': 'עם תמונה', 'No image': 'בלי תמונה', 'Undo (Ctrl+Z)': 'ביטול (\u2066Ctrl+Z\u2069)', 'Redo (Ctrl+Y)': 'חזרה (\u2066Ctrl+Y\u2069)',
             'Move slide earlier': 'הזזת השקף אחורה', 'Move slide later': 'הזזת השקף קדימה', 'Duplicate slide': 'שכפול השקף', 'Delete slide': 'מחיקת השקף',
             'Design': 'עיצוב',
             'Describe the carousel you want to create, and KaruAI will build it directly in the advanced editor.': 'תארו את הקרוסלה שאתם רוצים, ו־KaruAI יבנה אותה כאן בעורך.',
             'Prompt the AI...': 'מה ליצור או לשנות?', 'Select an element to edit properties.': 'בחרו אלמנט כדי לערוך אותו.', 'Multiple elements selected.': 'נבחרו כמה אלמנטים.',
-            'Forward': 'קדימה', 'Backward': 'אחורה', 'Delete': 'מחיקה', 'Transform': 'מיקום וגודל', 'Text': 'טקסט', 'Size': 'גודל',
+            'Forward': 'קדימה', 'Backward': 'אחורה', 'Bring forward (Ctrl + ])': 'הבאה קדימה (\u2066Ctrl + ]\u2069)', 'Send backward (Ctrl + [)': 'שליחה אחורה (\u2066Ctrl + [\u2069)', 'Delete': 'מחיקה', 'Transform': 'מיקום וגודל', 'Text': 'טקסט', 'Size': 'גודל',
             'Light': 'דק', 'Regular': 'רגיל', 'Medium': 'בינוני', 'Semibold': 'חצי מודגש', 'Bold': 'מודגש', 'Extra Bold': 'מודגש מאוד', 'Black': 'שחור',
             'Align Left': 'יישור לשמאל', 'Align Center': 'יישור למרכז', 'Align Right': 'יישור לימין', 'Line height': 'גובה שורה', 'Letter spacing': 'ריווח אותיות',
             'Fill': 'מילוי', 'Gradient end color': 'צבע סיום המעבר', 'Gradient angle': 'זווית המעבר', 'Remove': 'הסרה', '+ Gradient': '+ מעבר צבע',
             'Stroke': 'קו מתאר', 'Solid': 'רציף', 'Dashed': 'מקווקו', 'Dotted': 'מנוקד', 'Effects': 'אפקטים',
             'No Shadow': 'בלי צל', 'Drop Shadow': 'צל חיצוני', 'Inner Shadow': 'צל פנימי', 'Blur': 'טשטוש', 'Spread': 'פיזור', 'Shadow Color': 'צבע הצל',
-            'Background': 'רקע', 'Hint': 'הנחיה', 'Rectangle': 'מלבן', 'Ellipse': 'אליפסה',
             'Export': 'ייצוא', 'This slide': 'השקף הזה', 'PNG, 1080×1350': 'PNG בגודל \u20661080×1350\u2069', 'All slides, PNG': 'כל השקפים, PNG',
             'A ZIP with one PNG per slide': 'ZIP עם קובץ PNG לכל שקף', 'All slides, JPG': 'כל השקפים, JPG', 'Smaller files, in a ZIP': 'קבצים קטנים יותר, ב־ZIP',
             'PDF document': 'מסמך PDF', 'One page per slide, for LinkedIn': 'עמוד לכל שקף, ללינקדאין', 'Post to Instagram': 'פרסום באינסטגרם',
             'Publish straight to your account': 'פרסום ישיר לחשבון שלכם', 'Soon': 'בקרוב', 'Publishing straight to Instagram is on the way': 'פרסום ישיר לאינסטגרם בדרך',
-            'Zoom out': 'הקטנה', 'Zoom in': 'הגדלה', 'Send': 'שליחה', 'Start with': 'מתחילים', 'one sentence.': 'במשפט אחד.',
+            'Zoom out': 'הקטנה', 'Zoom in': 'הגדלה', 'Fit to screen': 'התאמה למסך', 'Send': 'שליחה', 'Start with': 'מתחילים', 'one sentence.': 'במשפט אחד.',
+            'Tools': 'כלים', 'Slides': 'שקפים', 'Chat with KaruAI': 'צ׳אט עם KaruAI', 'Message to KaruAI': 'הודעה ל־KaruAI',
+            'X position': 'מיקום X', 'Y position': 'מיקום Y', 'Width': 'רוחב', 'Height': 'גובה', 'Rotation': 'סיבוב', 'Corner radius': 'רדיוס פינות',
+            'Text content': 'תוכן הטקסט', 'Font': 'גופן', 'Font size': 'גודל גופן', 'Font weight': 'עובי הגופן', 'Text alignment': 'יישור הטקסט',
+            'Fill color': 'צבע המילוי', 'Fill color code': 'קוד צבע המילוי', 'Opacity': 'אטימות',
+            'Stroke color': 'צבע קו המתאר', 'Stroke width': 'עובי קו המתאר', 'Stroke style': 'סגנון קו המתאר',
+            'Shadow': 'צל', 'Shadow X offset': 'היסט הצל ב־X', 'Shadow Y offset': 'היסט הצל ב־Y',
         };
         const tr = text => (LOCALE === 'he' && HE_UI[text]) || text;
+
+        // The default names of layers (the AI names its own elements, in the carousel's language)
+        const HE_LAYER_NAMES = {
+            Background: 'רקע', Hint: 'הנחיה', Rectangle: 'מלבן', Ellipse: 'אליפסה', Text: 'טקסט', Image: 'תמונה',
+            rect: 'מלבן', ellipse: 'אליפסה', text: 'טקסט', image: 'תמונה',
+        };
+        const layerName = name => (LOCALE === 'he' && HE_LAYER_NAMES[name]) || name;
+
+        // Keeps a left-to-right run (a color code, an aspect ratio) in one piece inside Hebrew text
+        const ltr = text => (LOCALE === 'he' ? `\u2066${text}\u2069` : text);
+
+        // The API's error messages are in English: the ones people can run into get Hebrew wording here
+        const HE_API_ERRORS = [
+            ['KaruAI is still answering the previous message.', 'KaruAI עדיין עונה על ההודעה הקודמת.'],
+            ['No Gemini API key is set.', 'לא הוגדר מפתח Gemini API. מנהל יכול להוסיף אותו בעמוד הניהול.'],
+            ['The daily Gemini quota', 'המכסה היומית של מפתח ה־Gemini נוצלה. נסו שוב מחר, או העבירו את המפתח לתוכנית בתשלום ב־Google AI Studio.'],
+            ['Gemini rate limit reached.', 'הגעתם למגבלת הקצב של Gemini. נסו שוב בעוד רגע.'],
+            ['Gemini is overloaded right now.', 'Gemini בעומס כרגע. נסו שוב בעוד רגע.'],
+            ['Gemini API error', 'שגיאה מ־Gemini. נסו שוב.'],
+            ['Pollinations.ai', 'שירות התמונות לא הצליח ליצור את התמונה. נסו שוב.'],
+            ['Too many requests', 'יותר מדי בקשות. נסו שוב בעוד כמה דקות.'],
+            ['The current carousel is too large to send.', 'הקרוסלה גדולה מדי לשליחה.'],
+            ['Carousel not found.', 'הקרוסלה לא נמצאה.'],
+            ['Please sign in.', 'צריך להתחבר מחדש.'],
+            ['Unexpected server error.', 'שגיאה לא צפויה בשרת.'],
+        ];
+        function apiErrorMessage(data, status) {
+            const message = typeof data?.error === 'string' ? data.error : '';
+            if (LOCALE !== 'he') return message || `Request failed with status ${status}.`;
+            if (data?.code === 'quota_exceeded') {
+                const what = { messages: 'הודעות ה־AI', images: 'תמונות ה־AI', carousels: 'הקרוסלות החדשות' }[data.kind] ?? 'השימושים';
+                return `ניצלתם את כל ${what} של התוכנית החודש (${data.limit}). שדרגו את התוכנית או חכו לחודש הבא.`;
+            }
+            return HE_API_ERRORS.find(([start]) => message.startsWith(start))?.[1] || `הבקשה נכשלה (סטטוס ${status}).`;
+        }
+        // fetch() rejects with a TypeError ("Failed to fetch") when the server can't be reached
+        const errorText = (error, fallback) => (error instanceof TypeError
+            ? L('Unable to reach KaruAI. Check your connection and try again.', 'אין חיבור ל־KaruAI. בדקו את החיבור ונסו שוב.')
+            : error instanceof Error ? error.message : fallback);
 
         function translatePage() {
             document.documentElement.lang = LOCALE;
             if (LOCALE !== 'he') return;
             document.documentElement.dir = 'rtl';
-            ['workspace', 'slide-thumbnails'].forEach(id => document.getElementById(id).setAttribute('dir', 'ltr'));
+            ['workspace', 'slide-footer'].forEach(id => document.getElementById(id).setAttribute('dir', 'ltr'));
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
                 acceptNode: node => (node.parentElement.closest('script, style, #workspace') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
             });
@@ -1001,7 +1052,7 @@
             colors.forEach(([hex, uses]) => {
                 const item = document.createElement('label');
                 item.className = 'relative flex flex-col items-center gap-1 cursor-pointer group';
-                item.title = L(`${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`, `${hex} · בשימוש ${uses === 1 ? 'פעם אחת' : `${uses} פעמים`}. לחיצה משנה אותו בכל מקום.`);
+                item.title = L(`${hex} · used ${uses} time${uses === 1 ? '' : 's'}. Click to change it everywhere.`, `${ltr(hex)} · בשימוש ${uses === 1 ? 'פעם אחת' : `${uses} פעמים`}. לחיצה משנה אותו בכל מקום.`);
                 const swatch = document.createElement('span');
                 swatch.className = 'w-10 h-10 rounded-full border border-gray-200 group-hover:ring-2 group-hover:ring-indigo-600 group-hover:ring-offset-2 transition-all';
                 swatch.style.backgroundColor = hex;
@@ -1010,6 +1061,7 @@
                 label.textContent = hex;
                 const picker = document.createElement('input');
                 picker.type = 'color';
+                picker.setAttribute('aria-label', item.title);
                 picker.value = hex;
                 picker.className = 'absolute top-0 w-10 h-10 opacity-0 cursor-pointer';
                 picker.addEventListener('change', () => replaceColor(hex, picker.value.toUpperCase()));
@@ -1025,6 +1077,7 @@
                 const select = document.createElement('select');
                 select.className = 'flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-indigo-500 text-sm text-slate-700';
                 select.style.fontFamily = fontStack(family);
+                select.setAttribute('aria-label', L(`Replace the font ${family} everywhere`, `החלפת הגופן ${family} בכל מקום`));
                 select.innerHTML = document.getElementById('propFontFamily').innerHTML;
                 select.value = family;
                 select.addEventListener('change', () => replaceFont(family, select.value));
@@ -1104,7 +1157,7 @@
                 saveHistory();
                 renderAll();
             } catch (error) {
-                alert(error instanceof Error ? error.message : L('Could not add the image.', 'לא הצלחנו להוסיף את התמונה.'));
+                alert(errorText(error, L('Could not add the image.', 'לא הצלחנו להוסיף את התמונה.')));
             }
         }
 
@@ -1254,7 +1307,8 @@
                 div.className = `px-5 py-3 text-sm flex items-center gap-3 cursor-pointer border-b border-gray-100 transition-colors layer-item ${state.selectedIds.includes(el.id) ? 'active' : 'hover:bg-gray-50 text-slate-600'}`;
                 
                 let iconStr = el.type === 'text' ? 'type' : el.type === 'ellipse' ? 'circle' : el.type === 'image' ? 'image' : 'square';
-                div.innerHTML = `<span class="${state.selectedIds.includes(el.id) ? 'text-indigo-600' : 'text-gray-400'}"><i data-lucide="${iconStr}" class="w-4 h-4"></i></span><span class="truncate">${tr(el.name)}</span>`;
+                div.innerHTML = `<span class="${state.selectedIds.includes(el.id) ? 'text-indigo-600' : 'text-gray-400'}"><i data-lucide="${iconStr}" class="w-4 h-4"></i></span><span class="truncate"></span>`;
+                div.querySelector('.truncate').textContent = layerName(el.name); // names come from the AI and file names
                 
                 div.onclick = (e) => {
                     if (e.shiftKey) {
@@ -1352,32 +1406,60 @@
         }
 
         // Tool Selection
+        function setTabActive(id, active) {
+            const button = document.getElementById(id);
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', String(active));
+        }
+
         function switchLeftTab(tab) {
-            document.getElementById('tab-brand').classList.toggle('active', tab === 'brand');
-            document.getElementById('tab-layers').classList.toggle('active', tab === 'layers');
+            setTabActive('tab-brand', tab === 'brand');
+            setTabActive('tab-layers', tab === 'layers');
             document.getElementById('panel-brand').style.display = tab === 'brand' ? 'block' : 'none';
             document.getElementById('panel-layers').style.display = tab === 'layers' ? 'block' : 'none';
             if (tab === 'brand') renderBrandPanel();
         }
 
         function switchRightTab(tab) {
-            document.getElementById('tab-chat').classList.toggle('active', tab === 'chat');
-            document.getElementById('tab-design').classList.toggle('active', tab === 'design');
+            setTabActive('tab-chat', tab === 'chat');
+            setTabActive('tab-design', tab === 'design');
             document.getElementById('panel-chat').style.display = tab === 'chat' ? 'flex' : 'none';
             document.getElementById('panel-design').style.display = tab === 'design' ? 'block' : 'none';
         }
 
         function setTool(t) {
             state.tool = t;
-            ['V','R','O','T'].forEach(id => document.getElementById('tool-'+id).classList.toggle('active', id === t));
+            ['V','R','O','T'].forEach(id => {
+                const button = document.getElementById('tool-' + id);
+                button.classList.toggle('active', id === t);
+                button.setAttribute('aria-pressed', String(id === t));
+            });
             document.getElementById('workspace').style.cursor = t === 'V' ? 'default' : 'crosshair';
         }
 
-        function changeZoom(amount) {
-            state.zoom = Math.max(0.1, Math.min(2, state.zoom + amount));
+        let zoomChosen = false; // until the user zooms, the slide follows the window's size
+        function setZoom(zoom) {
+            state.zoom = Math.max(0.1, Math.min(2, Math.round(zoom * 100) / 100));
             document.getElementById('zoom-label').innerText = Math.round(state.zoom * 100) + '%';
             canvasContainer.style.transform = `scale(${state.zoom})`;
+            const sizer = document.getElementById('canvas-sizer');
+            sizer.style.width = `${CANVAS_W * state.zoom}px`;
+            sizer.style.height = `${CANVAS_H * state.zoom}px`;
         }
+
+        function changeZoom(amount) {
+            zoomChosen = true;
+            setZoom(state.zoom + amount);
+        }
+
+        // The whole slide in view (never larger than 100%), in steps of 5%
+        function fitZoom() {
+            zoomChosen = false;
+            const workspace = document.getElementById('workspace');
+            const fit = Math.min((workspace.clientWidth - 48) / CANVAS_W, (workspace.clientHeight - 48) / CANVAS_H, 1);
+            setZoom(Math.max(0.1, Math.floor(fit * 20) / 20));
+        }
+        window.addEventListener('resize', () => { if (!zoomChosen) fitZoom(); });
 
         // Workspace Interactions
         function handleWorkspaceDown(e) {
@@ -1662,7 +1744,8 @@
         }
 
         window.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+            if (!document.getElementById('download-menu').classList.contains('hidden')) return;
             
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             const cmdKey = isMac ? e.metaKey : e.ctrlKey;
@@ -1706,7 +1789,7 @@
             const background = isBackground
                 ? { ...cloneElements([bottom])[0], id: 'bg', name: 'Background' }
                 : baseElement({ id: 'bg', type: 'rect', name: 'Background', x: 0, y: 0, w: CANVAS_W, h: CANVAS_H, fillColor: '#FFFFFF' });
-            state.slides.splice(at, 0, { id: nextSlideId(), title: `Slide ${at + 1}`, imagePrompt: '' });
+            state.slides.splice(at, 0, { id: nextSlideId(), title: '', imagePrompt: '' }); // shown as "Slide n" wherever it is
             state.slideData.splice(at, 0, newSlideData([background]));
             loadSlide(at);
             saveHistory();
@@ -1760,6 +1843,9 @@
         function showTitle() {
             const input = document.getElementById('carousel-title');
             if (document.activeElement !== input) input.value = carouselTitle;
+            // The browser tab shows the carousel's name (this page runs in a frame of the site's /carousel page)
+            document.title = `${carouselTitle || L('Editor', 'עורך')} - KaruAI`;
+            try { if (window.top !== window) window.top.document.title = document.title; } catch {}
         }
 
         function renameCarousel(value) {
@@ -1781,7 +1867,7 @@
                 x: Math.round(x), y: Math.round(y), w: 1, h: type === 'text' ? 'auto' : 1,
                 radius: type === 'ellipse' ? 9999 : 0,
                 fillColor: type === 'text' ? '#0F172A' : '#CBD5E1',
-                ...(type === 'text' ? { content: 'New Text', fontFamily: DEFAULT_FONT, fontSize: 64, fontWeight: '700', textAlign: 'right', lineHeight: 1.2, letterSpacing: 0 } : {})
+                ...(type === 'text' ? { content: L('New Text', 'טקסט חדש'), fontFamily: DEFAULT_FONT, fontSize: 64, fontWeight: '700', textAlign: 'right', lineHeight: 1.2, letterSpacing: 0 } : {})
             });
             state.elements.push(element);
             state.selectedIds = [element.id];
@@ -1863,7 +1949,7 @@
                     container.scrollTop = container.scrollHeight;
                 });
                 const data = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(data?.retryable ? L('KaruAI is under heavy load right now. Try again in a minute.', 'יש עומס גדול על KaruAI כרגע. נסו שוב בעוד דקה.') : data?.error || `Request failed with status ${response.status}`);
+                if (!response.ok) throw new Error(data?.retryable ? L('KaruAI is under heavy load right now. Try again in a minute.', 'יש עומס גדול על KaruAI כרגע. נסו שוב בעוד דקה.') : apiErrorMessage(data, response.status));
                 if (typeof data?.responseText !== 'string') throw new Error(L('The server returned no carousel data.', 'השרת לא החזיר נתוני קרוסלה.'));
                 let proposed;
                 try {
@@ -1880,7 +1966,7 @@
                 renderImagePrompts();
             } catch (error) {
                 thinkingMessage.remove();
-                addChatBubble(L(`Something went wrong: ${error instanceof Error ? error.message : 'Unable to reach KaruAI.'}`, `משהו השתבש: ${error instanceof Error ? error.message : 'אין חיבור ל־KaruAI.'}`), 'error');
+                addChatBubble(L('Something went wrong: ', 'משהו השתבש: ') + errorText(error, L('Unable to reach KaruAI.', 'אין חיבור ל־KaruAI.')), 'error');
             } finally {
                 sendButton.disabled = false;
                 sendButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1974,12 +2060,12 @@
                     if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) {
                         const data = await response.json().catch(() => null);
                         if (data?.retryable) throw new Error(L('The image service is under heavy load. Try again in a minute.', 'יש עומס על שירות התמונות. נסו שוב בעוד דקה.'));
-                        throw new Error(data?.error || `Image request failed with status ${response.status}`);
+                        throw new Error(apiErrorMessage(data, response.status));
                     }
                     const imageUrl = await blobToDataUrl(await response.blob());
                     if (!isStale() && row.index !== -1) applySlideImage(row.index, imageUrl);
                 } catch (error) {
-                    row.error = error instanceof Error ? error.message : L('Image generation failed.', 'יצירת התמונה נכשלה.');
+                    row.error = errorText(error, L('Image generation failed.', 'יצירת התמונה נכשלה.'));
                 } finally {
                     row.busy = false;
                     render();
@@ -2014,6 +2100,8 @@
                 title.className = 'block text-xs font-semibold text-slate-800 hover:text-indigo-600 mb-1.5';
                 title.onclick = () => { if (!isStale() && row.index !== -1) selectSlide(row.index); };
                 const textarea = document.createElement('textarea');
+                textarea.dir = 'auto';
+                textarea.setAttribute('aria-label', L('Image prompt', 'הנחיית התמונה'));
                 textarea.className = 'w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs text-slate-700 focus:border-indigo-500 outline-none resize-y h-20 mb-2';
                 textarea.value = row.prompt;
                 textarea.oninput = () => { row.prompt = textarea.value; render(); };
@@ -2036,7 +2124,7 @@
                     if (data) {
                         const size = imageRequestSize(index);
                         const slideTitle = state.slides[index].title;
-                        title.textContent = `${L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${slideTitle ? ` · ${slideTitle}` : ''} · ${aspectRatioLabel(size.width, size.height)}`;
+                        title.textContent = `${L(`Slide ${index + 1}`, `שקף ${index + 1}`)}${slideTitle ? ` · ${slideTitle}` : ''} · ${ltr(aspectRatioLabel(size.width, size.height))}`;
                     }
                     actions.innerHTML = '';
                     const status = (text, color = 'text-gray-500') => {
@@ -2055,7 +2143,7 @@
                         status(row.error, 'text-red-600 w-full');
                         actions.append(createChipButton(L('Retry', 'ניסיון חוזר'), () => generate(row), true), createChipButton(L('Skip', 'דילוג'), () => skip(row)));
                     } else if (data.mode === 'with') {
-                        status('✓ Using the image version', 'text-green-700');
+                        status(L('✓ Using the image version', '✓ בשימוש: הגרסה עם התמונה'), 'text-green-700');
                         actions.append(createChipButton(L('Regenerate', 'יצירה מחדש'), () => generate(row)), createChipButton(L('Use without image', 'בלי תמונה'), () => skip(row)));
                     } else if (hasSlotImage(data)) {
                         status(L('Using the version without image', 'בשימוש: הגרסה בלי תמונה'));
@@ -2092,7 +2180,7 @@
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error ?? new Error('Could not read a font file.'));
+                reader.onerror = () => reject(reader.error ?? new Error(L('Could not read a file.', 'לא הצלחנו לקרוא קובץ.')));
                 reader.readAsDataURL(blob);
             });
         }
@@ -2104,12 +2192,12 @@
             if (!embeddedFonts.has(family)) {
                 const task = (async () => {
                     const response = await fetch(fontCssUrl(family));
-                    if (!response.ok) throw new Error(`Could not load the font ${family}.`);
+                    if (!response.ok) throw new Error(L(`Could not load the font ${family}.`, `לא הצלחנו לטעון את הגופן ${family}.`));
                     let css = await response.text();
                     const urls = [...new Set(css.match(/url\([^)]+\)/g) ?? [])];
                     await Promise.all(urls.map(async (token) => {
                         const fontResponse = await fetch(token.slice(4, -1).replace(/["']/g, ''));
-                        if (!fontResponse.ok) throw new Error(`Could not load the font ${family}.`);
+                        if (!fontResponse.ok) throw new Error(L(`Could not load the font ${family}.`, `לא הצלחנו לטעון את הגופן ${family}.`));
                         css = css.split(token).join(`url(${await blobToDataUrl(await fontResponse.blob())})`);
                     }));
                     return css;
@@ -2124,7 +2212,7 @@
             return new Promise((resolve, reject) => {
                 const image = new Image();
                 image.onload = () => resolve(image);
-                image.onerror = () => reject(new Error('Could not load an image for export.'));
+                image.onerror = () => reject(new Error(L('Could not load an image for export.', 'לא הצלחנו לטעון תמונה לייצוא.')));
                 image.src = url;
             });
         }
@@ -2151,14 +2239,14 @@
             canvas.width = CANVAS_W;
             canvas.height = CANVAS_H;
             const context = canvas.getContext('2d');
-            if (!context) throw new Error('Canvas export is not supported in this browser.');
+            if (!context) throw new Error(L('Exporting is not supported in this browser.', 'הדפדפן הזה לא תומך בייצוא.'));
             context.drawImage(snapshot, 0, 0, CANVAS_W, CANVAS_H);
             return canvas;
         }
 
         function canvasToBlob(canvas, format = 'png') {
             return new Promise((resolve, reject) => {
-                canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error(`Could not encode the ${format.toUpperCase()}.`))),
+                canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error(L(`Could not create the ${format.toUpperCase()} file.`, `לא הצלחנו ליצור את קובץ ה־${format.toUpperCase()}.`)))),
                     format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92);
             });
         }
@@ -2224,7 +2312,7 @@
             try {
                 await task();
             } catch (error) {
-                alert(L(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, `ההורדה נכשלה: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`));
+                alert(L('Download failed: ', 'ההורדה נכשלה: ') + errorText(error, L('Unknown error', 'שגיאה לא ידועה')));
             } finally {
                 isExporting = false;
                 document.body.style.cursor = '';
@@ -2285,9 +2373,32 @@
             });
         }
 
-        function toggleDownloadMenu() { document.getElementById('download-menu').classList.toggle('hidden'); }
-        function closeDownloadMenu() { document.getElementById('download-menu').classList.add('hidden'); }
+        function toggleDownloadMenu() {
+            const menu = document.getElementById('download-menu');
+            const open = menu.classList.toggle('hidden') === false;
+            document.getElementById('download-button').setAttribute('aria-expanded', String(open));
+            if (open) menu.querySelector('button:not(:disabled)')?.focus();
+        }
+        function closeDownloadMenu() {
+            document.getElementById('download-menu').classList.add('hidden');
+            document.getElementById('download-button').setAttribute('aria-expanded', 'false');
+        }
         document.addEventListener('mousedown', (e) => { if (!e.target.closest('#download-wrap')) closeDownloadMenu(); });
+        // Escape closes the menu; the arrow keys move between its items
+        document.getElementById('download-wrap').addEventListener('keydown', (e) => {
+            const menu = document.getElementById('download-menu');
+            if (menu.classList.contains('hidden')) return;
+            if (e.key === 'Escape') {
+                closeDownloadMenu();
+                document.getElementById('download-button').focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const items = [...menu.querySelectorAll('button:not(:disabled)')];
+                const at = items.indexOf(document.activeElement);
+                items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
+                e.preventDefault();
+            }
+        });
 
         // --- Retries ---
         // Rate limits (Gemini RPM/TPM, the image API) and overload are temporary, so requests that fail with
@@ -2483,8 +2594,11 @@
             if (!carouselId) {
                 // Opened without a carousel: start a new one and open it at its own address
                 const response = await fetch('/api/carousels', { method: 'POST' });
-                const meta = await response.json();
-                window.top.location.replace(`/carousel?id=${meta.id}`);
+                const meta = await response.json().catch(() => null);
+                if (response.status === 401) return redirectToLogin();
+                if (!response.ok || !meta?.id) throw new Error(apiErrorMessage(meta, response.status));
+                const startPrompt = new URLSearchParams(location.search).get('prompt');
+                window.top.location.replace(`/carousel?id=${encodeURIComponent(meta.id)}${startPrompt ? `&prompt=${encodeURIComponent(startPrompt)}` : ''}`);
                 return;
             }
             const [response, historyResponse] = await Promise.all([
@@ -2554,9 +2668,11 @@
 
         // Init
         resetHistory();
+        showTitle();
+        fitZoom();
         switchRightTab('chat');
         renderAll();
-        loadCarousel().catch(error => showLoadError(error instanceof Error ? error.message : L('Could not load the carousel.', 'לא הצלחנו לטעון את הקרוסלה.')));
+        loadCarousel().catch(error => showLoadError(errorText(error, L('Could not load the carousel.', 'לא הצלחנו לטעון את הקרוסלה.'))));
         loadExportPlan();
     </script>
 </body>
