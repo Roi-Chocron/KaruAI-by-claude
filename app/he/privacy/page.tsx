@@ -1,12 +1,10 @@
 import Link from 'next/link';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
-import { LocaleRoot } from '@/components/locale-root';
 
 export const metadata = legalMetadata('he', '/privacy', 'מדיניות פרטיות - KaruAI', 'מדיניות הפרטיות ותקני הגנת המידע של KaruAI עבור המשתמשים שלה.');
 
 export default function HebrewPrivacyPage() {
   return (
-    <LocaleRoot locale="he" remember>
       <LegalPage locale="he" path="/privacy" title="מדיניות פרטיות" updated="נובמבר 2026">
 
         <section>
@@ -80,10 +78,9 @@ export default function HebrewPrivacyPage() {
         <section>
           <h2>7. צרו קשר</h2>
           <p>
-            לכל שאלה בנוגע למדיניות פרטיות זו, כתבו לנו לכתובת <strong>privacy@karuai.com</strong>.
+            לכל שאלה בנוגע למדיניות פרטיות זו, כתבו לנו לכתובת <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
           </p>
         </section>
       </LegalPage>
-    </LocaleRoot>
   );
 }

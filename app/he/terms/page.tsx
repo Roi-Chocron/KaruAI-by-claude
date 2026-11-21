@@ -1,12 +1,10 @@
 import Link from 'next/link';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
-import { LocaleRoot } from '@/components/locale-root';
 
 export const metadata = legalMetadata('he', '/terms', 'תנאי שימוש - KaruAI', 'תנאי השימוש בפלטפורמת KaruAI ובשירותי יצירת הקרוסלות באמצעות בינה מלאכותית.');
 
 export default function HebrewTermsPage() {
   return (
-    <LocaleRoot locale="he" remember>
       <LegalPage locale="he" path="/terms" title="תנאי שימוש" updated="נובמבר 2026">
 
         <section>
@@ -67,10 +65,9 @@ export default function HebrewTermsPage() {
         <section>
           <h2>8. פרטי התקשרות</h2>
           <p>
-            לכל שאלה או משוב בנוגע לתנאים אלה, פנו אלינו בכתובת <strong>support@karuai.com</strong>.
+            לכל שאלה או משוב בנוגע לתנאים אלה, פנו אלינו בכתובת <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a>.
           </p>
         </section>
       </LegalPage>
-    </LocaleRoot>
   );
 }

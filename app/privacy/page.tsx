@@ -16,7 +16,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>2. Information We Collect</h2>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li>
             <strong>Account Details:</strong> When you sign in with Google we receive your name, email address, profile picture and Google account ID. We never see or store a password.
           </li>
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>3. How We Use Information</h2>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li>To provide the AI carousel generator: designing slides from your prompts and generating images.</li>
           <li>To manage your account and sessions and protect the service against abuse.</li>
           <li>To apply the limits of your plan and, once payments are available, to manage your subscription.</li>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
         <p>
           We never sell or rent your personal information. We share data only with providers that run parts of the service for us:
         </p>
-        <ul className="list-disc list-inside space-y-1.5 text-graphite pl-2">
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
           <li><strong>Cloudflare</strong> hosts the application and stores your account and carousels.</li>
           <li><strong>Google</strong> handles sign-in, and its Gemini API receives your prompts and current carousel to design the slides.</li>
           <li><strong>Pollinations.ai</strong> receives the image descriptions (not your account details) to generate slide images.</li>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
       <section>
         <h2>7. Contact Us</h2>
         <p>
-          For any questions regarding this Privacy Policy, please email us at <strong>privacy@karuai.com</strong>.
+          For any questions regarding this Privacy Policy, please email us at <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
         </p>
       </section>
     </LegalPage>

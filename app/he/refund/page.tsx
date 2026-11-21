@@ -1,12 +1,10 @@
 import Link from 'next/link';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
-import { LocaleRoot } from '@/components/locale-root';
 
 export const metadata = legalMetadata('he', '/refund', 'מדיניות ביטול והחזרים - KaruAI', 'תנאי הביטול וההחזר הכספי של מינויים ורכישות ב־KaruAI.');
 
 export default function HebrewRefundPage() {
   return (
-    <LocaleRoot locale="he" remember>
       <LegalPage locale="he" path="/refund" title="מדיניות ביטול והחזרים" updated="נובמבר 2026">
 
         <section>
@@ -48,7 +46,7 @@ export default function HebrewRefundPage() {
             כדי להגיש בקשת ביטול או החזר:
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
-            <li>שלחו מייל לכתובת <strong>support@karuai.com</strong> עם הנושא &quot;Refund Request&quot;.</li>
+            <li>שלחו מייל לכתובת <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a> עם הנושא &quot;Refund Request&quot;.</li>
             <li>ציינו את כתובת המייל הרשומה בחשבון ואת מספר החשבונית או מזהה העסקה.</li>
             <li>צוות התמיכה שלנו יבדוק את הפנייה ויחזור אליכם בתוך 1–2 ימי עסקים.</li>
           </ul>
@@ -61,6 +59,5 @@ export default function HebrewRefundPage() {
           </p>
         </section>
       </LegalPage>
-    </LocaleRoot>
   );
 }
