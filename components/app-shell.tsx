@@ -134,7 +134,16 @@ function Frame({ user, active, locale, children }: { user: PublicUser; active: A
 // The title row every signed-in page starts with; it also names the browser tab
 export function PageHeading({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
   useEffect(() => {
-    document.title = `${title} - KaruAI`;
+    // Next writes the route's metadata title after a client-side navigation, which can land after this effect,
+    // so the title is put back whenever <head> changes
+    const wanted = `${title} - KaruAI`;
+    const apply = () => {
+      if (document.title !== wanted) document.title = wanted;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => observer.disconnect();
   }, [title]);
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">

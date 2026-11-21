@@ -6,24 +6,23 @@ import { useRouter } from 'next/navigation';
 import { ImageOff, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { AppShell, PageHeading } from '@/components/app-shell';
 import StarterPrompts from '@/components/starter-prompts';
-import { appMessages, type AppMessages } from '@/messages/app';
+import { appMessages, type AppMessages, type TimeUnit } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
 import type { CarouselMeta, PublicUser } from '@/types';
 
-const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+const UNITS: [TimeUnit, number][] = [
   ['year', 365 * 24 * 3600], ['month', 30 * 24 * 3600], ['week', 7 * 24 * 3600],
   ['day', 24 * 3600], ['hour', 3600], ['minute', 60],
 ];
 
 // "2 weeks ago", "yesterday", "לפני שבועיים", "אתמול"
-function timeAgo(iso: string, locale: Locale, justNow: string) {
-  // A clock running behind the server's would otherwise say "in 2 minutes"
-  const seconds = Math.min(0, (new Date(iso).getTime() - Date.now()) / 1000);
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+function timeAgo(iso: string, t: AppMessages['gallery']) {
+  // A clock running behind the server's would otherwise make it negative
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   for (const [unit, size] of UNITS) {
-    if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
+    if (seconds >= size) return t.ago(Math.round(seconds / size), unit);
   }
-  return justNow;
+  return t.justNow;
 }
 
 const Thumbnail = ({ carousel, t }: { carousel: CarouselMeta; t: AppMessages['gallery'] }) => {
@@ -208,7 +207,10 @@ function CarouselGrid({ locale }: { locale: Locale }) {
                   <Link href={href} className="min-w-0 text-start rounded-md">
                     <span className="block font-semibold truncate" dir="auto">{title}</span>
                     <span className="block text-sm text-graphite">
-                      {t.slides(carousel.slideCount)} · {t.edited(timeAgo(carousel.updatedAt, locale, t.justNow))}
+                      {/* On a narrow card it breaks at the dot, not inside "2 weeks ago" */}
+                      <span className="whitespace-nowrap">{t.slides(carousel.slideCount)}</span>
+                      {' · '}
+                      <span className="whitespace-nowrap">{t.edited(timeAgo(carousel.updatedAt, t))}</span>
                     </span>
                   </Link>
                   <button

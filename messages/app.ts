@@ -2,6 +2,9 @@ import type { Messages } from '@/lib/i18n';
 
 // The signed-in pages: the shared header, the gallery, billing and account
 
+// How long ago a carousel was edited is counted in these (the browsers' own Hebrew wording is broken)
+export type TimeUnit = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+
 const en = {
   shell: {
     carousels: 'Carousels',
@@ -22,9 +25,14 @@ const en = {
     untitled: 'Untitled carousel',
     empty: 'Empty',
     noPreview: 'No preview',
-    slides: (n: number) => (n === 1 ? '1 slide' : `${n} slides`),
+    slides: (n: number) => (n === 0 ? 'No slides' : n === 1 ? '1 slide' : `${n} slides`),
     edited: (when: string) => `edited ${when}`,
     justNow: 'just now',
+    ago: (n: number, unit: TimeUnit) => {
+      if (n === 1 && unit === 'day') return 'yesterday';
+      if (n === 1 && unit !== 'minute' && unit !== 'hour') return `last ${unit}`;
+      return `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+    },
     delete: 'Delete carousel',
     deleteNamed: (title: string) => `Delete ${title}`,
     confirmDeleteTitle: 'Delete this carousel?',
@@ -123,9 +131,22 @@ const he: AppMessages = {
     untitled: 'קרוסלה ללא שם',
     empty: 'ריקה',
     noPreview: 'אין תצוגה מקדימה',
-    slides: n => (n === 1 ? 'שקף אחד' : n === 2 ? 'שני שקפים' : `${n} שקפים`),
+    slides: n => (n === 0 ? 'אין שקפים' : n === 1 ? 'שקף אחד' : n === 2 ? 'שני שקפים' : `${n} שקפים`),
     edited: when => `נערכה ${when}`,
     justNow: 'הרגע',
+    ago: (n, unit) => {
+      // [one, two, many] and, for day/week/month/year, the word for "last ..."
+      const words: Record<TimeUnit, [string, string, string]> = {
+        minute: ['לפני דקה', 'לפני שתי דקות', 'דקות'],
+        hour: ['לפני שעה', 'לפני שעתיים', 'שעות'],
+        day: ['אתמול', 'שלשום', 'ימים'],
+        week: ['בשבוע שעבר', 'לפני שבועיים', 'שבועות'],
+        month: ['בחודש שעבר', 'לפני חודשיים', 'חודשים'],
+        year: ['בשנה שעברה', 'לפני שנתיים', 'שנים'],
+      };
+      const [one, two, many] = words[unit];
+      return n === 1 ? one : n === 2 ? two : `לפני ${n} ${many}`;
+    },
     delete: 'מחיקת הקרוסלה',
     deleteNamed: title => `מחיקת ${title}`,
     confirmDeleteTitle: 'למחוק את הקרוסלה?',
