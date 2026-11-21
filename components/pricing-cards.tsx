@@ -13,15 +13,15 @@ export function MonthlyYearlyToggle({ yearly, onChange, locale = 'en' }: { yearl
       type="button"
       aria-pressed={yearly === value}
       onClick={() => onChange(value)}
-      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${yearly === value ? 'bg-ink text-paper' : 'text-graphite hover:text-ink'}`}
+      className={`min-h-10 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${yearly === value ? 'bg-ink text-paper' : 'text-graphite hover:text-ink'}`}
     >
       {label}
     </button>
   );
   return (
-    <div className="inline-flex self-start md:self-auto items-center gap-1 p-1 rounded-xl border border-line bg-paper">
+    <div role="group" aria-label={t.period} className="inline-flex self-start md:self-auto items-center gap-1 p-1 rounded-xl border border-line bg-paper">
       {option(false, t.monthly)}
-      {option(true, <>{t.yearly} <span className={`ms-1 rounded px-1.5 py-0.5 text-xs ${yearly ? 'bg-lime text-ink' : 'bg-mist text-ink'}`} dir="ltr">−17%</span></>)}
+      {option(true, <>{t.yearly} <span aria-hidden="true" className={`ms-1 rounded px-1.5 py-0.5 text-xs ${yearly ? 'bg-lime text-ink' : 'bg-mist text-ink'}`} dir="ltr">−17%</span><span className="sr-only">, {t.saving}</span></>)}
     </div>
   );
 }
@@ -39,7 +39,7 @@ export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolea
         return (
           <div
             key={id}
-            className={`rounded-2xl p-7 flex flex-col justify-between ${dark ? 'bg-ink text-paper' : 'bg-paper border border-line'}`}
+            className={`rounded-2xl p-7 flex flex-col justify-between ${dark ? 'bg-ink text-paper [&_:focus-visible]:outline-lime' : 'bg-paper border border-line'}`}
           >
             <div>
               <div className="flex justify-between items-center gap-3 mb-3">
@@ -55,7 +55,7 @@ export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolea
               <ul className={`space-y-3 mb-8 text-sm border-t pt-6 ${dark ? 'border-paper/15' : 'border-line'}`}>
                 {copy.features.map(feature => (
                   <li key={feature} className="flex items-start gap-2.5">
-                    <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${dark ? 'text-lime' : 'text-ink'}`} strokeWidth={2.5} />
+                    <Check aria-hidden="true" className={`w-4 h-4 mt-0.5 flex-shrink-0 ${dark ? 'text-lime' : 'text-ink'}`} strokeWidth={2.5} />
                     <span>{feature}</span>
                   </li>
                 ))}
