@@ -15,6 +15,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # karuai.com belongs to someone else: no page may send mail or people there (business details live in shared/business.ts)
+      - name: No links to karuai.com
+        run: "! grep -rnI 'karuai\\.com' app components lib messages shared worker/src public"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

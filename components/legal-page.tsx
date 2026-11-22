@@ -3,10 +3,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
+import { BusinessDetailsLine } from '@/components/business';
 import { LocaleRoot } from '@/components/locale-root';
 import { dirOf, localePath, type Locale } from '@/lib/i18n';
 
-const PAGES = ['/terms', '/privacy', '/cookies', '/refund', '/accessibility'] as const;
+const PAGES = ['/terms', '/privacy', '/cookies', '/refund', '/accessibility', '/contact', '/cancel'] as const;
 
 const COPY = {
   en: {
@@ -14,14 +15,14 @@ const COPY = {
     home: 'Home',
     otherLanguage: 'עברית',
     legalNav: 'Legal pages',
-    pages: { '/terms': 'Terms of Service', '/privacy': 'Privacy Policy', '/cookies': 'Cookie Policy', '/refund': 'Refund Policy', '/accessibility': 'Accessibility Statement' },
+    pages: { '/terms': 'Terms of Service', '/privacy': 'Privacy Policy', '/cookies': 'Cookie Policy', '/refund': 'Refund Policy', '/accessibility': 'Accessibility Statement', '/contact': 'Contact us', '/cancel': 'Cancel subscription' },
   },
   he: {
     updated: 'עודכן לאחרונה',
     home: 'דף הבית',
     otherLanguage: 'English',
     legalNav: 'מסמכים משפטיים',
-    pages: { '/terms': 'תנאי שימוש', '/privacy': 'מדיניות פרטיות', '/cookies': 'מדיניות עוגיות', '/refund': 'מדיניות ביטולים', '/accessibility': 'הצהרת נגישות' },
+    pages: { '/terms': 'תנאי שימוש', '/privacy': 'מדיניות פרטיות', '/cookies': 'מדיניות עוגיות', '/refund': 'מדיניות ביטולים', '/accessibility': 'הצהרת נגישות', '/contact': 'צור קשר', '/cancel': 'ביטול עסקה' },
     // The Hebrew text is a translation; the English one is the binding version
     translation: 'זהו תרגום לעברית של הנוסח באנגלית. אם יש הבדל בין הנוסחים, הנוסח באנגלית הוא הקובע.',
     original: 'לנוסח באנגלית',
@@ -85,6 +86,9 @@ export function LegalPage({ locale = 'en', path, title, updated, translated = tr
           <div className="legal mt-12 space-y-10 border-t border-ink pt-10 [&_section>*+*]:mt-4">{children}</div>
         </main>
         <footer className="border-t border-line">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+            <BusinessDetailsLine locale={locale} />
+          </div>
           <nav aria-label={t.legalNav} className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
             <ul className="flex flex-wrap gap-x-2 gap-y-1 -ms-2 text-sm text-graphite">
               {PAGES.map(page => (
@@ -118,7 +122,5 @@ export function LegalTable({ label, children }: { label: string; children: React
   );
 }
 
-// Text still to be filled in before launch, marked clearly on the page
-export function Placeholder({ children }: { children: ReactNode }) {
-  return <mark className="bg-lime text-ink rounded px-1 font-semibold">[{children}]</mark>;
-}
+// Text still to be filled in before launch (defined with the business details)
+export { Placeholder } from '@/components/business';

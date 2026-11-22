@@ -136,6 +136,9 @@ function SignIn({ locale }: { locale: Locale }) {
           {error && (
             <div role="alert" className="mt-8 p-4 rounded-xl border border-red-700 text-red-700 text-sm">
               {error}
+              {errorCode === 'suspended' && (
+                <> <Link href={localePath(locale, '/contact')} className="font-semibold underline underline-offset-2">{t.contact}</Link></>
+              )}
             </div>
           )}
 

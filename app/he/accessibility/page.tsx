@@ -1,4 +1,6 @@
-import { LegalPage, Placeholder, legalMetadata } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
+import { BusinessValue, EmailLink, PhoneLink } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 
 export const metadata = legalMetadata('he', '/accessibility', 'הצהרת נגישות - KaruAI', 'איך KaruAI מנגישה את האתר, מה עדיין אינו נגיש, ואיך פונים לרכז הנגישות שלנו.');
 
@@ -11,7 +13,7 @@ export default function HebrewAccessibilityPage() {
       <section>
         <h2>1. המחויבות שלנו</h2>
         <p>
-          <strong><Placeholder>שם העסק</Placeholder></strong>, המפעיל את <strong>KaruAI</strong>, רוצה שכל אחד ואחת, כולל אנשים עם מוגבלות, יוכלו להשתמש באתר ובשירותים שלנו באופן עצמאי ובקלות. אנחנו פועלים להנגשת האתר בהתאם לחוק שוויון זכויות לאנשים עם מוגבלות, התשנ&quot;ח-1998, ולתקנות הנגישות לשירות שהותקנו מכוחו.
+          <strong><BusinessValue value={BUSINESS.legalNameHe} missing="שם העסק" /></strong>, המפעיל את <strong>KaruAI</strong>, רוצה שכל אחד ואחת, כולל אנשים עם מוגבלות, יוכלו להשתמש באתר ובשירותים שלנו באופן עצמאי ובקלות. אנחנו פועלים להנגשת האתר בהתאם לחוק שוויון זכויות לאנשים עם מוגבלות, התשנ&quot;ח-1998, ולתקנות הנגישות לשירות שהותקנו מכוחו.
         </p>
       </section>
 
@@ -61,10 +63,10 @@ export default function HebrewAccessibilityPage() {
           אם נתקלתם בבעיית נגישות, או שיש לכם שאלה או הצעה, אנא פנו לרכז הנגישות שלנו. נשיב בהקדם האפשרי.
         </p>
         <ul className="space-y-1.5 ps-2">
-          <li><strong>שם:</strong> <Placeholder>שם רכז הנגישות</Placeholder></li>
-          <li><strong>דוא&quot;ל:</strong> <Placeholder>כתובת הדוא&quot;ל של רכז הנגישות</Placeholder></li>
-          <li><strong>טלפון:</strong> <Placeholder>הטלפון של רכז הנגישות</Placeholder></li>
-          <li><strong>כתובת למשלוח דואר:</strong> <Placeholder>כתובת העסק</Placeholder></li>
+          <li><strong>שם:</strong> <BusinessValue value={BUSINESS.accessibilityCoordinator.nameHe} missing="שם רכז הנגישות" /></li>
+          <li><strong>דוא&quot;ל:</strong> <EmailLink email={BUSINESS.accessibilityCoordinator.email ?? BUSINESS.accessibilityEmail} missing="כתובת המייל של רכז הנגישות" /></li>
+          <li><strong>טלפון:</strong> <PhoneLink phone={BUSINESS.accessibilityCoordinator.phone} missing="הטלפון של רכז הנגישות" /></li>
+          <li><strong>כתובת למשלוח דואר:</strong> <BusinessValue value={BUSINESS.addressHe} missing="כתובת העסק" /></li>
         </ul>
         <p>
           כדי שנוכל לתקן את הבעיה במהירות, אנא תארו אותה, ציינו באיזה דף היא הופיעה ובאיזה דפדפן ובאיזו טכנולוגיה מסייעת (אם בכלל) השתמשתם.

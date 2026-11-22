@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { identifyUser, resetUser } from '@/lib/analytics';
+import { localePath } from '@/lib/i18n';
 import { useLocale } from '@/lib/locale';
 import { appMessages } from '@/messages/app';
 import type { PublicUser } from '@/types';
@@ -30,7 +32,8 @@ export async function logOut() {
 export function RequireAuth({ children, admin = false }: { children: (user: PublicUser) => ReactNode; admin?: boolean }) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [error, setError] = useState<'loadFailed' | 'suspended' | null>(null);
-  const t = appMessages[useLocale()].shell;
+  const locale = useLocale();
+  const t = appMessages[locale].shell;
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -62,7 +65,15 @@ export function RequireAuth({ children, admin = false }: { children: (user: Publ
   return (
     <div className="min-h-screen flex items-center justify-center bg-paper text-sm text-graphite px-6 text-center">
       {error ? (
-        <p role="alert">{t[error]}</p>
+        <div role="alert">
+          <p>{t[error]}</p>
+          {error === 'suspended' && (
+            <p className="mt-3 flex flex-wrap justify-center gap-x-4">
+              <Link href={localePath(locale, '/contact')} className="inline-flex items-center min-h-10 text-ink underline underline-offset-4">{t.contact}</Link>
+              <Link href={localePath(locale, '/cancel')} className="inline-flex items-center min-h-10 text-ink underline underline-offset-4">{t.cancel}</Link>
+            </p>
+          )}
+        </div>
       ) : (
         <span role="status">
           <Loader2 className="animate-spin text-ink" size={28} aria-hidden="true" />

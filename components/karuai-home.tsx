@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Menu, X } from 'lucide-react';
 import { PricingCards } from '@/components/pricing-cards';
+import { BusinessDetailsLine } from '@/components/business';
 import { Logo } from '@/components/brand/logo';
 import { MarkedText } from '@/components/brand/marked-text';
 import { ExampleCarousel } from '@/components/home/example-carousel';
@@ -229,8 +230,14 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
               <li><Link href={localePath(locale, '/cookies')} className="inline-flex items-center min-h-10 hover:text-ink transition-colors">{t.footer.cookies}</Link></li>
               <li><Link href={localePath(locale, '/refund')} className="inline-flex items-center min-h-10 hover:text-ink transition-colors">{t.footer.refund}</Link></li>
               <li><Link href={localePath(locale, '/accessibility')} className="inline-flex items-center min-h-10 hover:text-ink transition-colors">{t.footer.accessibility}</Link></li>
+              <li><Link href={localePath(locale, '/contact')} className="inline-flex items-center min-h-10 hover:text-ink transition-colors">{t.footer.contact}</Link></li>
+              {/* The law asks for a prominent cancellation link on the home page (Consumer Protection Law 14ט) */}
+              <li><Link href={localePath(locale, '/cancel')} className="inline-flex items-center min-h-10 font-semibold text-ink hover:underline underline-offset-4">{t.footer.cancel}</Link></li>
             </ul>
           </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+          <BusinessDetailsLine locale={locale} />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 border-t border-line flex flex-wrap items-center justify-between gap-4 text-sm text-graphite">
           <p>© {new Date().getFullYear()} KaruAI. {t.footer.rights}</p>

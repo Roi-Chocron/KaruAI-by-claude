@@ -1,4 +1,6 @@
 import { LegalPage, LegalTable, legalMetadata } from '@/components/legal-page';
+import { EmailLink } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { ShieldCheck, BarChart3, Sliders, AlertCircle } from 'lucide-react';
 import { CookieSettingsButton } from '@/components/cookie-banner';
 
@@ -162,7 +164,7 @@ export default function HebrewCookiesPage() {
           <h2>5. צרו קשר</h2>
           <p>
             לכל שאלה או משוב בנוגע לשימוש שלנו בעוגיות או בטכנולוגיות מעקב, אתם מוזמנים לפנות אלינו בכתובת{' '}
-            <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
+            <EmailLink email={BUSINESS.privacyEmail} missing="מייל הפרטיות" />.
           </p>
         </section>
       </LegalPage>

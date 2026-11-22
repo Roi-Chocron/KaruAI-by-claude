@@ -1,7 +1,12 @@
 import type { NextConfig } from 'next';
 import { withSentryConfig } from '@sentry/nextjs/config';
+import { checkLaunchReadiness } from './lib/launch-guard';
+import { SITE_URL } from './lib/site';
 
 const isDev = process.env.NODE_ENV === 'development';
+
+// A build for the real address stops while business details or page placeholders are missing (lib/launch-guard.ts)
+if (process.env.NODE_ENV === 'production') checkLaunchReadiness(SITE_URL);
 
 // The site is exported as static files (out/) that Cloudflare serves; the API is the Worker in worker/.
 // In development `next dev` forwards /api/* to the Worker that `wrangler dev` runs on port 8787 (or API_DEV_PORT).

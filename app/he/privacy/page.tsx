@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { BusinessValue, EmailLink, Registration } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
 
 export const metadata = legalMetadata('he', '/privacy', 'מדיניות פרטיות - KaruAI', 'מדיניות הפרטיות ותקני הגנת המידע של KaruAI עבור המשתמשים שלה.');
@@ -10,7 +12,7 @@ export default function HebrewPrivacyPage() {
         <section>
           <h2>1. סקירה כללית</h2>
           <p>
-            ב־<strong>KaruAI</strong> אנחנו מכבדים את הפרטיות שלכם ומחויבים להגנה על מידע אישי. מדיניות פרטיות זו מתארת כיצד אנחנו אוספים, שומרים ומעבדים מידע כשאתם משתמשים בפלטפורמה שלנו.
+            ב־<strong>KaruAI</strong> אנחנו מכבדים את הפרטיות שלכם ומחויבים להגנה על מידע אישי. מדיניות פרטיות זו מתארת כיצד אנחנו אוספים, שומרים ומעבדים מידע כשאתם משתמשים בפלטפורמה שלנו. בעל השליטה במאגר המידע הוא <BusinessValue value={BUSINESS.legalNameHe} missing="שם העסק" /> (<Registration locale="he" />), <BusinessValue value={BUSINESS.addressHe} missing="כתובת העסק" />, וניתן לפנות אליו בכתובת <EmailLink email={BUSINESS.privacyEmail} missing="מייל הפרטיות" />.
           </p>
         </section>
 
@@ -78,7 +80,7 @@ export default function HebrewPrivacyPage() {
         <section>
           <h2>7. צרו קשר</h2>
           <p>
-            לכל שאלה בנוגע למדיניות פרטיות זו, כתבו לנו לכתובת <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
+            לכל שאלה בנוגע למדיניות פרטיות זו, כתבו לנו לכתובת <EmailLink email={BUSINESS.privacyEmail} missing="מייל הפרטיות" />.
           </p>
         </section>
       </LegalPage>

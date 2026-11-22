@@ -1,4 +1,6 @@
 import { LegalPage, LegalTable, legalMetadata } from '@/components/legal-page';
+import { EmailLink } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { ShieldCheck, BarChart3, Sliders, AlertCircle } from 'lucide-react';
 import { CookieSettingsButton } from '@/components/cookie-banner';
 
@@ -162,7 +164,7 @@ export default function CookiesPage() {
         <h2>5. Contact Us</h2>
         <p>
           If you have any questions or feedback regarding our use of cookies or tracking technologies, please feel free to reach out to us at{' '}
-          <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
+          <EmailLink email={BUSINESS.privacyEmail} missing="privacy email" />.
         </p>
       </section>
     </LegalPage>

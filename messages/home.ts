@@ -70,6 +70,8 @@ const en = {
     cookies: 'Cookie Policy',
     refund: 'Refund Policy',
     accessibility: 'Accessibility Statement',
+    contact: 'Contact us',
+    cancel: 'Cancel subscription',
     rights: 'All rights reserved.',
   },
 };
@@ -143,6 +145,8 @@ const he: HomeMessages = {
     cookies: 'מדיניות עוגיות',
     refund: 'מדיניות החזרים',
     accessibility: 'הצהרת נגישות',
+    contact: 'צור קשר',
+    cancel: 'ביטול עסקה',
     rights: 'כל הזכויות שמורות.',
   },
 };

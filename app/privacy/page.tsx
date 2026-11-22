@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { BusinessValue, EmailLink, Registration } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
 
 export const metadata = legalMetadata('en', '/privacy', 'Privacy Policy - KaruAI', 'Privacy Policy and data protection standards for KaruAI users.');
@@ -10,7 +12,7 @@ export default function PrivacyPage() {
       <section>
         <h2>1. Overview</h2>
         <p>
-          At <strong>KaruAI</strong>, we respect your privacy and are committed to protecting personal data. This Privacy Policy describes how we collect, store, and process information when you use our platform.
+          At <strong>KaruAI</strong>, we respect your privacy and are committed to protecting personal data. This Privacy Policy describes how we collect, store, and process information when you use our platform. The controller of your data is <BusinessValue value={BUSINESS.legalName} missing="business name" /> (<Registration locale="en" />), <BusinessValue value={BUSINESS.address} missing="business address" />, reachable at <EmailLink email={BUSINESS.privacyEmail} missing="privacy email" />.
         </p>
       </section>
 
@@ -78,7 +80,7 @@ export default function PrivacyPage() {
       <section>
         <h2>7. Contact Us</h2>
         <p>
-          For any questions regarding this Privacy Policy, please email us at <a href="mailto:privacy@karuai.com" dir="ltr">privacy@karuai.com</a>.
+          For any questions regarding this Privacy Policy, please email us at <EmailLink email={BUSINESS.privacyEmail} missing="privacy email" />.
         </p>
       </section>
     </LegalPage>

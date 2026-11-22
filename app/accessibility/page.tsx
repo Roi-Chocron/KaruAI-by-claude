@@ -1,8 +1,10 @@
-import { LegalPage, Placeholder, legalMetadata } from '@/components/legal-page';
+import { LegalPage, legalMetadata } from '@/components/legal-page';
+import { BusinessValue, EmailLink, PhoneLink } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 
 export const metadata = legalMetadata('en', '/accessibility', 'Accessibility Statement - KaruAI', 'How KaruAI makes its website accessible, what is not accessible yet, and how to contact our accessibility coordinator.');
 
-// Text in [square brackets] is a placeholder to fill in before launch
+// The business and coordinator details come from shared/business.ts; missing ones show as lime placeholders
 export default function AccessibilityPage() {
   return (
     <LegalPage path="/accessibility" title="Accessibility Statement" updated="November 2026">
@@ -10,7 +12,7 @@ export default function AccessibilityPage() {
       <section>
         <h2>1. Our Commitment</h2>
         <p>
-          <strong><Placeholder>business name</Placeholder></strong>, which operates <strong>KaruAI</strong>, wants everyone, including people with disabilities, to be able to use our website and services independently and with ease. We work to make the site accessible in line with the Equal Rights for Persons with Disabilities Law, 5758-1998, and its regulations on accessibility of services.
+          <strong><BusinessValue value={BUSINESS.legalName} missing="business name" /></strong>, which operates <strong>KaruAI</strong>, wants everyone, including people with disabilities, to be able to use our website and services independently and with ease. We work to make the site accessible in line with the Equal Rights for Persons with Disabilities Law, 5758-1998, and its regulations on accessibility of services.
         </p>
       </section>
 
@@ -60,10 +62,10 @@ export default function AccessibilityPage() {
           If you run into an accessibility problem, or have a question or suggestion, please contact our accessibility coordinator. We will reply as soon as we can.
         </p>
         <ul className="space-y-1.5 ps-2">
-          <li><strong>Name:</strong> <Placeholder>accessibility coordinator&apos;s name</Placeholder></li>
-          <li><strong>Email:</strong> <Placeholder>accessibility coordinator&apos;s email</Placeholder></li>
-          <li><strong>Phone:</strong> <Placeholder>accessibility coordinator&apos;s phone</Placeholder></li>
-          <li><strong>Mailing address:</strong> <Placeholder>business address</Placeholder></li>
+          <li><strong>Name:</strong> <BusinessValue value={BUSINESS.accessibilityCoordinator.name} missing="accessibility coordinator's name" /></li>
+          <li><strong>Email:</strong> <EmailLink email={BUSINESS.accessibilityCoordinator.email ?? BUSINESS.accessibilityEmail} missing="accessibility coordinator's email" /></li>
+          <li><strong>Phone:</strong> <PhoneLink phone={BUSINESS.accessibilityCoordinator.phone} missing="accessibility coordinator's phone" /></li>
+          <li><strong>Mailing address:</strong> <BusinessValue value={BUSINESS.address} missing="business address" /></li>
         </ul>
         <p>
           To help us fix the problem quickly, please describe it, tell us which page it was on, and which browser and assistive technology (if any) you used.
