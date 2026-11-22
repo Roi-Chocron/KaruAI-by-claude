@@ -31,7 +31,10 @@
     "POLAR_PRODUCT_VIP": "",
     // Days a failed renewal keeps the plan while Polar retries the card (match Polar's "grace period for benefit
     // revocation" setting)
-    "POLAR_GRACE_DAYS": "7"
+    "POLAR_GRACE_DAYS": "7",
+    // Countries without the AI features (ISO codes, by Cloudflare's CF-IPCountry). The Gemini API's free tier may not
+    // serve the European Economic Area, the UK or Switzerland; empty this once the key is on a paid tier.
+    "AI_BLOCKED_COUNTRIES": "AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,IS,LI,NO,GB,CH"
   },
 
   "d1_databases": [

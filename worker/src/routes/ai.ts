@@ -51,6 +51,16 @@ function formatWait(seconds: number | undefined) {
 
 const ai = createApp();
 
+// The AI features are off in AI_BLOCKED_COUNTRIES (see wrangler.jsonc): the Gemini API's free tier may not serve them
+ai.use('*', async (c, next) => {
+    const country = (c.req.header('cf-ipcountry') ?? '').toUpperCase();
+    const blocked = ((c.env as { AI_BLOCKED_COUNTRIES?: string }).AI_BLOCKED_COUNTRIES ?? '').split(',').map(code => code.trim().toUpperCase());
+    if (country && blocked.includes(country) && ['/api/chat', '/api/images'].includes(c.req.path)) {
+        return errorJson(c, 'The AI features are not available in your country yet.', 451, { code: 'region_unavailable', retryable: false });
+    }
+    await next();
+});
+
 // Each route checks the session itself: this app is mounted at /api, so a use('*') here would cover every route
 ai.post('/chat', requireUser, async c => {
     const user = c.get('user');

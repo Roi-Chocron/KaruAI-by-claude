@@ -27,6 +27,7 @@ const en = {
     tryAnyway: 'Try signing in here anyway',
   },
   agree: { before: 'By continuing you agree to our ', terms: 'Terms of Service', and: ' and ', privacy: 'Privacy Policy', after: '.' },
+  adults: 'KaruAI is for people aged 18 and over.',
   panelTitle: { before: 'One sentence in.\n', marked: 'A whole carousel', after: ' out.' },
   panelNote: 'The free plan is included. No card needed.',
   dev: {
@@ -82,6 +83,7 @@ const he: typeof en = {
     tryAnyway: 'לנסות להתחבר כאן בכל זאת',
   },
   agree: { before: 'בהמשך אתם מסכימים ל', terms: 'תנאי השימוש', and: ' ול', privacy: 'מדיניות הפרטיות', after: ' שלנו.' },
+  adults: 'השירות מיועד לבני 18 ומעלה.',
   panelTitle: { before: 'משפט אחד נכנס.\n', marked: 'קרוסלה שלמה', after: ' יוצאת.' },
   panelNote: 'התוכנית החינמית כלולה. בלי כרטיס אשראי.',
   dev: {

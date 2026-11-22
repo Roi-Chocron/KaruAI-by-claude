@@ -14,6 +14,13 @@
 - [ ] Polar live setup (payments work end to end in the sandbox): live products, access token, webhook endpoint and
       secrets — the steps are under "Production setup (Polar live)" in README.md.
 
+- [ ] A lawyer's review of the Terms, the refund policy and the privacy policy (drafted with the recommended defaults:
+      18+, liability capped at 12 months' payments or ₪100, Tel Aviv-Jaffa courts, no cancellation fee).
+- [ ] Production needs a Pollinations API key (every image request now requires one): Admin page or
+      `npx wrangler secret put POLLINATIONS_API_KEY`.
+- [ ] When the Gemini key moves to a paid tier, empty `AI_BLOCKED_COUNTRIES` in `wrangler.jsonc` and drop the free-tier
+      paragraph from section 4 of the Terms.
+
 ## Improvements
 
 - [ ] Editor: rows in the layers list can't be reached with the keyboard (the accessibility statement lists this as a

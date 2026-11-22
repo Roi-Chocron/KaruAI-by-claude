@@ -236,3 +236,17 @@ describe('request size caps', () => {
         expect(bodies[0].generationConfig.responseSchema.properties.slides.maxItems).toBe(20);
     });
 });
+
+describe('regions', () => {
+    it('keeps the AI features off where the Gemini free tier may not serve', async () => {
+        const { cookie } = await signIn();
+        const id = await createCarousel(cookie);
+        const upstream = vi.spyOn(globalThis, 'fetch');
+        for (const [path, json] of [['/api/chat', { carouselId: id, message: 'hi' }], ['/api/images', { prompt: 'tea', width: 512, height: 512 }]] as const) {
+            const response = await api(path, { method: 'POST', cookie, json, headers: { 'cf-ipcountry': 'DE' } });
+            expect(response.status).toBe(451);
+            expect(await response.json()).toMatchObject({ code: 'region_unavailable' });
+        }
+        expect(upstream.mock.calls.length).toBe(0);
+    });
+});

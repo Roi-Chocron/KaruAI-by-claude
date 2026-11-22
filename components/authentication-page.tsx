@@ -161,6 +161,7 @@ function SignIn({ locale }: { locale: Locale }) {
             <Link href={localePath(locale, '/privacy')} className="text-ink underline underline-offset-2">{t.agree.privacy}</Link>
             {t.agree.after}
           </p>
+          <p className="mt-2 text-sm text-graphite">{t.adults}</p>
 
           {devLogin && <DevLogin next={next} t={t} />}
         </div>
