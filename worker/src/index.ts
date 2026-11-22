@@ -6,7 +6,8 @@ import carousels from './routes/carousels';
 import ai from './routes/ai';
 import admin from './routes/admin';
 import account from './routes/account';
-import billing, { syncOverdueSubscriptions } from './routes/billing';
+import billing, { dailyBillingCheck } from './routes/billing';
+import support from './routes/support';
 
 // The API. Cloudflare serves the static pages from out/ itself and only runs this Worker for /api/* (see wrangler.jsonc).
 const app = createApp().basePath('/api');
@@ -17,6 +18,7 @@ app.route('/carousels', carousels);
 app.route('/admin', admin);
 app.route('/account', account);
 app.route('/billing', billing);
+app.route('/support', support);
 app.route('/', ai);
 
 app.notFound(c => c.json({ error: 'Not found.' }, 404));
@@ -30,11 +32,11 @@ export default Sentry.withSentry(
     (env: Env) => ({ dsn: env.SENTRY_DSN, enabled: !!env.SENTRY_DSN, tracesSampleRate: 0.1 }),
     {
         fetch: app.fetch,
-        // Daily cleanup, and a check on Polar for subscriptions whose webhook may have been missed (see "triggers" in
-        // wrangler.jsonc)
+        // Daily cleanup, plans whose grace period or comp ran out, and a check on Polar for subscriptions whose webhook
+        // may have been missed (see "triggers" in wrangler.jsonc)
         async scheduled(_controller, env, ctx) {
             ctx.waitUntil(cleanUp(env.DB));
-            ctx.waitUntil(syncOverdueSubscriptions(env));
+            ctx.waitUntil(dailyBillingCheck(env));
         },
     } satisfies ExportedHandler<Env>
 );

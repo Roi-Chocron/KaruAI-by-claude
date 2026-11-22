@@ -2,17 +2,18 @@ import { PAID_PLAN_IDS, type PaidPlanId } from '../../shared/plans';
 
 // Polar (https://polar.sh/docs) over plain fetch: checkouts, customer portal sessions, subscriptions and webhook
 // signatures. The user's KaruAI id is their Polar "external customer id", so no Polar ids need to be stored up front.
-// The access token needs the scopes checkouts:write, customer_sessions:write and subscriptions:read.
+// The access token needs the scopes checkouts:read, checkouts:write, customer_sessions:write, subscriptions:read,
+// subscriptions:write, customers:write, orders:read, refunds:write and products:read.
 
 // API version pinned, so Polar's quarterly changes reach us only when we choose to move. Polar keeps a version for
 // about nine months: 2026-10 is deprecated in January 2027 and removed in April 2027 (move the webhook endpoint too).
-const POLAR_VERSION = '2026-10';
+export const POLAR_VERSION = '2026-10';
 
 // Charged in shekels, as the site shows the prices; without this Polar picks a currency from the buyer's location
 const CURRENCY = 'ils';
 
 export class PolarError extends Error {
-    constructor(message: string, readonly status: number) {
+    constructor(message: string, readonly status: number, readonly versionHeader: string | null = null) {
         super(message);
     }
 }
@@ -31,7 +32,10 @@ export function planForProduct(env: PolarEnv, id: string): PaidPlanId | null {
     return PAID_PLAN_IDS.find(plan => productId(env, plan) === id) ?? null;
 }
 
-async function polarRequest<T>(env: PolarEnv, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+// The Polar-Version header of Polar's last answer, for the admin's billing health card
+export let lastPolarVersion: string | null = null;
+
+async function polarRequest<T>(env: PolarEnv, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
     const started = Date.now();
     const response = await fetch(`${apiBase(env)}${path}`, {
         method,
@@ -45,21 +49,34 @@ async function polarRequest<T>(env: PolarEnv, method: 'GET' | 'POST', path: stri
     });
     // The path without its query, which can hold a user id
     console.log(JSON.stringify({ event: 'polar', method, path: path.split('?')[0], status: response.status, durationMs: Date.now() - started }));
+    lastPolarVersion = response.headers.get('polar-version') ?? lastPolarVersion;
     if (!response.ok) {
         const detail = (await response.text()).trim().slice(0, 500);
         throw new PolarError(`Polar ${method} ${path.split('?')[0]} failed with status ${response.status}: ${detail}`, response.status);
     }
-    return response.json<T>();
+    return (response.status === 204 ? null : await response.json()) as T;
+}
+
+// null instead of an error when Polar has no such object
+async function orNull<T>(request: Promise<T>): Promise<T | null> {
+    try {
+        return await request;
+    } catch (error) {
+        if (error instanceof PolarError && (error.status === 404 || error.status === 422)) return null;
+        throw error;
+    }
 }
 
 // A hosted checkout page for the plan; returns its URL
 export async function createCheckout(
     env: PolarEnv,
-    options: { plan: PaidPlanId; userId: string; email: string; name: string; ip: string | null; successUrl: string; returnUrl: string }
+    options: { plan: PaidPlanId; userId: string; email: string; name: string; ip: string | null; locale: 'en' | 'he'; successUrl: string; returnUrl: string }
 ): Promise<string> {
     const body = {
         products: [productId(env, options.plan)],
         currency: CURRENCY,
+        // Polar's checkout falls back to English for a language it doesn't have yet (Hebrew, for now)
+        locale: options.locale,
         external_customer_id: options.userId,
         customer_email: options.email,
         customer_name: options.name || undefined,
@@ -90,12 +107,86 @@ export async function createPortalSession(env: PolarEnv, userId: string, returnU
     return session.customer_portal_url;
 }
 
+// One page (up to 100) of the organization's subscriptions that match `filters` (see GET /v1/subscriptions/)
+export async function listSubscriptionsPage(env: PolarEnv, filters: Record<string, string>, page = 1) {
+    const query = new URLSearchParams({ ...filters, limit: '100', page: String(page) });
+    const result = await polarRequest<{ items: PolarSubscription[]; pagination: { max_page: number } }>(env, 'GET', `/v1/subscriptions/?${query}`);
+    return { items: result.items, maxPage: result.pagination?.max_page ?? 1 };
+}
+
 // Every subscription the user has on Polar, whatever its status (one page holds them all: a user has a few at most)
 export async function listSubscriptions(env: PolarEnv, userId: string): Promise<PolarSubscription[]> {
-    const query = new URLSearchParams({ external_customer_id: userId, limit: '100' });
-    const page = await polarRequest<{ items: PolarSubscription[] }>(env, 'GET', `/v1/subscriptions/?${query}`);
-    return page.items;
+    return (await listSubscriptionsPage(env, { external_customer_id: userId })).items;
 }
+
+export interface PolarCheckout {
+    id: string;
+    status: 'open' | 'expired' | 'confirmed' | 'succeeded' | 'failed';
+    external_customer_id: string | null;
+    metadata?: Record<string, unknown>;
+}
+
+// A checkout session, or null when there is none with that id
+export const getCheckout = (env: PolarEnv, id: string) => orNull(polarRequest<PolarCheckout>(env, 'GET', `/v1/checkouts/${encodeURIComponent(id)}`));
+
+export type CancellationReason = 'customer_service' | 'low_quality' | 'missing_features' | 'switched_service' | 'too_complex' | 'too_expensive' | 'unused' | 'other';
+
+// Cancels at the end of the period (or undoes that), or revokes the subscription now; returns it as it now is
+export function updateSubscription(
+    env: PolarEnv,
+    id: string,
+    change: { cancel_at_period_end: boolean } | { revoke: true },
+    reason?: CancellationReason
+): Promise<PolarSubscription> {
+    return polarRequest<PolarSubscription>(env, 'PATCH', `/v1/subscriptions/${encodeURIComponent(id)}`, {
+        ...change,
+        ...(reason ? { customer_cancellation_reason: reason } : {}),
+    });
+}
+
+export interface PolarOrder {
+    id: string;
+    status: 'draft' | 'pending' | 'paid' | 'refunded' | 'partially_refunded' | 'void';
+    created_at: string;
+    total_amount: number;
+    refundable_amount: number;
+    currency: string;
+    subscription_id: string | null;
+}
+
+export const getOrder = (env: PolarEnv, id: string) => orNull(polarRequest<PolarOrder & { refunded_amount: number }>(env, 'GET', `/v1/orders/${encodeURIComponent(id)}`));
+
+// The subscription's orders, newest first
+export async function listOrders(env: PolarEnv, subscriptionId: string): Promise<PolarOrder[]> {
+    const query = new URLSearchParams({ subscription_id: subscriptionId, sorting: '-created_at', limit: '20' });
+    return (await polarRequest<{ items: PolarOrder[] }>(env, 'GET', `/v1/orders/?${query}`)).items;
+}
+
+// Refunds part of an order (amount in agorot, before tax); the subscription itself is changed separately
+export function createRefund(env: PolarEnv, orderId: string, amount: number, comment: string) {
+    return polarRequest<{ id: string; amount: number; status: string }>(env, 'POST', '/v1/refunds/', {
+        order_id: orderId,
+        amount,
+        reason: 'customer_request',
+        comment,
+    });
+}
+
+// Deletes the user's Polar customer, which cancels their subscriptions, and anonymizes it; false when Polar has none
+export async function deleteCustomer(env: PolarEnv, userId: string): Promise<boolean> {
+    const result = await orNull(polarRequest<null>(env, 'DELETE', `/v1/customers/external/${encodeURIComponent(userId)}?anonymize=true`).then(() => true));
+    return result === true;
+}
+
+export interface PolarProduct {
+    id: string;
+    name: string;
+    is_archived: boolean;
+    recurring_interval: string | null;
+    prices: { amount_type: string; price_amount?: number; price_currency: string; is_archived: boolean }[];
+}
+
+export const getProduct = (env: PolarEnv, id: string) => orNull(polarRequest<PolarProduct>(env, 'GET', `/v1/products/${encodeURIComponent(id)}`));
 
 // --- Webhooks (Standard Webhooks: https://www.standardwebhooks.com) ---
 
@@ -154,13 +245,13 @@ export interface PolarSubscription {
     id: string;
     status: string;
     product_id: string;
+    current_period_start?: string | null;
     current_period_end: string | null;
     cancel_at_period_end: boolean;
+    past_due_at?: string | null;
     created_at: string;
     modified_at: string | null;
     metadata?: Record<string, unknown>;
     customer?: { external_id?: string | null };
 }
 
-// Statuses that keep the plan's benefits (past_due, unpaid, canceled and the rest end them)
-export const ACCESS_STATUSES = ['active', 'trialing'];

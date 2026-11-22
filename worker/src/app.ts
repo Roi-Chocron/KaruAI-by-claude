@@ -90,6 +90,10 @@ export const LIMITS = {
     imagesUser: { limit: 30, windowMs: MINUTE },
     // Asking Polar for the user's subscriptions (the billing page, and its polling after a checkout)
     billingSync: { limit: 40, windowMs: 10 * MINUTE },
+    // Checkouts, portal sessions and cancellations
+    billingUser: { limit: 10, windowMs: MINUTE },
+    // Support requests and cancellation requests sent without signing in
+    supportIp: { limit: 5, windowMs: 60 * MINUTE },
 } as const;
 
 

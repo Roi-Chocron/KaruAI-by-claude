@@ -1,65 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { signWebhook, verifyWebhook } from '../src/polar';
-import { syncOverdueSubscriptions } from '../src/routes/billing';
+import { dailyBillingCheck } from '../src/routes/billing';
 import { api, signIn } from './helpers';
+import { deliver, inDays, mockPolar, planOf, subscriptionEvent, subscriptionList } from './polar-helpers';
 
 afterEach(() => vi.restoreAllMocks());
-
-let deliveries = 0;
-
-// Delivers a Polar webhook signed with the test secret
-async function deliver(event: unknown, options: { id?: string; secret?: string } = {}) {
-    const body = JSON.stringify(event);
-    const id = options.id ?? `msg_${++deliveries}_${crypto.randomUUID()}`;
-    const timestamp = Math.floor(Date.now() / 1000);
-    return api('/api/billing/webhook', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'webhook-id': id,
-            'webhook-timestamp': String(timestamp),
-            'webhook-signature': await signWebhook(options.secret ?? env.POLAR_WEBHOOK_SECRET, id, timestamp, body),
-        },
-        body,
-    });
-}
-
-const subscriptionEvent = (type: string, userId: string, fields: Record<string, unknown> = {}) => ({
-    type,
-    timestamp: new Date().toISOString(),
-    data: {
-        id: 'sub_1',
-        status: 'active',
-        product_id: 'prod-pro',
-        current_period_end: '2026-12-22T00:00:00Z',
-        cancel_at_period_end: false,
-        created_at: '2026-11-22T00:00:00Z',
-        modified_at: '2026-11-22T00:00:00Z',
-        metadata: {},
-        customer: { external_id: userId },
-        ...fields,
-    },
-});
-
-const planOf = async (cookie: string) => (await (await api('/api/account', { cookie })).json<any>()).plan.id;
-
-// Answers the Worker's calls to Polar's sandbox API with `reply` and records them
-function mockPolar(reply: (url: string, body: any) => Response) {
-    const calls: { url: string; method: string; body: any; headers: Headers }[] = [];
-    const realFetch = globalThis.fetch;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-        const url = input instanceof Request ? input.url : String(input);
-        if (!url.startsWith('https://sandbox-api.polar.sh/')) return realFetch(input, init);
-        const body = init?.body ? JSON.parse(String(init.body)) : null;
-        calls.push({ url, method: init?.method ?? 'GET', body, headers: new Headers(init?.headers) });
-        return reply(url, body);
-    });
-    return calls;
-}
-
-// Polar's list of the user's subscriptions, as GET /v1/subscriptions/ answers it
-const subscriptionList = (...items: unknown[]) => Response.json({ items, pagination: { total_count: items.length, max_page: 1 } });
 
 describe('webhook signatures', () => {
     it('accepts a Standard Webhooks signature and refuses others', async () => {
@@ -159,7 +105,7 @@ describe('checkout and portal', () => {
     it('leaves the email to the checkout page when Polar refuses it', async () => {
         const { cookie } = await signIn();
         const refused = { error: 'RequestValidationError', detail: [{ loc: ['body', 'customer_email'], msg: 'The domain name example.test does not accept email.' }] };
-        const calls = mockPolar((_url, body) => body.customer_email
+        const calls = mockPolar(({ body }) => body.customer_email
             ? Response.json(refused, { status: 422 })
             : Response.json({ url: 'https://sandbox.polar.sh/checkout/def' }, { status: 201 }));
         expect(await (await api('/api/billing/checkout', { method: 'POST', cookie, json: { plan: 'basic' } })).json()).toEqual({ url: 'https://sandbox.polar.sh/checkout/def' });
@@ -252,40 +198,16 @@ describe('sync from Polar', () => {
         await deliver(subscriptionEvent('subscription.active', overdue.user.id, { id: overdueId, current_period_end: '2026-01-01T00:00:00Z' }));
         await deliver(subscriptionEvent('subscription.active', current.user.id, { id: `sub_${crypto.randomUUID()}`, current_period_end: '2099-01-01T00:00:00Z' }));
 
-        const calls = mockPolar(url => {
+        const calls = mockPolar(({ url }) => {
             const userId = new URL(url).searchParams.get('external_customer_id')!;
             return userId === overdue.user.id
                 ? subscriptionList(polarSubscription(userId, { id: overdueId, status: 'canceled', current_period_end: '2026-01-01T00:00:00Z', modified_at: '2026-11-25T00:00:00Z' }))
                 : subscriptionList();
         });
-        await syncOverdueSubscriptions(env);
+        await dailyBillingCheck(env);
         expect(calls.map(call => new URL(call.url).searchParams.get('external_customer_id'))).toContain(overdue.user.id);
         expect(calls.map(call => new URL(call.url).searchParams.get('external_customer_id'))).not.toContain(current.user.id);
         expect(await planOf(overdue.cookie)).toBe('free');
         expect(await planOf(current.cookie)).toBe('pro');
-    });
-});
-
-describe('deleting an account with a subscription', () => {
-    it('waits until the subscription is set to end', async () => {
-        const { user, cookie } = await signIn();
-        const id = `sub_${crypto.randomUUID()}`;
-        await deliver(subscriptionEvent('subscription.active', user.id, { id }));
-        const blocked = await api('/api/account', { method: 'DELETE', cookie, json: { confirmEmail: user.email } });
-        expect(blocked.status).toBe(409);
-        expect(await blocked.json()).toMatchObject({ code: 'has_subscription' });
-
-        // Canceled in the portal; the webhook has not arrived, but the API asks Polar before refusing again
-        mockPolar(() => subscriptionList(subscriptionEvent('subscription.canceled', user.id, { id, cancel_at_period_end: true, modified_at: '2026-11-23T00:00:00Z' }).data));
-        expect((await api('/api/account', { method: 'DELETE', cookie, json: { confirmEmail: user.email } })).status).toBe(204);
-    });
-
-    it('stops an admin from deleting a paying user', async () => {
-        const { cookie: adminCookie } = await signIn('admin@example.test');
-        const { user } = await signIn();
-        await deliver(subscriptionEvent('subscription.active', user.id, { id: `sub_${crypto.randomUUID()}` }));
-        const response = await api(`/api/admin/users/${user.id}`, { method: 'DELETE', cookie: adminCookie });
-        expect(response.status).toBe(409);
-        expect(await response.json()).toMatchObject({ code: 'has_subscription' });
     });
 });

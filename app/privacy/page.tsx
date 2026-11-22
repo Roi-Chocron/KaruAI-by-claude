@@ -57,7 +57,7 @@ export default function PrivacyPage() {
           <li><strong>Pollinations.ai</strong> receives the image descriptions (not your account details) to generate slide images.</li>
           <li><strong>Sentry</strong> receives error reports so we can fix problems.</li>
           <li><strong>PostHog, Google Analytics and Microsoft Clarity</strong> receive usage analytics, only if you accept analytics cookies.</li>
-          <li><strong>Polar</strong> (polar.sh) processes payments for paid plans and receives your email address and name for the checkout; we never see or store card numbers.</li>
+          <li><strong>Polar</strong> (polar.sh) processes payments for paid plans and receives your email address, name and IP address for the checkout (the IP address lets Polar find your country, for tax); we never see or store card numbers.</li>
         </ul>
       </section>
 

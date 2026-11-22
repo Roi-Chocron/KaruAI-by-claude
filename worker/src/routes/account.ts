@@ -4,7 +4,8 @@ import {
 } from '../db';
 import { deleteCarouselFiles, readCarouselDocument } from '../storage';
 import { clearSessionCookies, createApp, errorJson, requireUser } from '../app';
-import { renewingSubscription } from './billing';
+import { PolarError } from '../polar';
+import { closeBillingForDeletion } from './billing';
 
 // The signed-in user's own account: plan and usage, profile, sessions, data export and deletion
 const account = createApp();
@@ -60,9 +61,16 @@ account.delete('/', async c => {
     if (user.role === 'admin' && (await countAdmins(c.env.DB)) <= 1) {
         return errorJson(c, 'You are the only admin. Make someone else an admin before deleting your account.', 400);
     }
-    // Polar would go on charging a deleted account, so the subscription must be canceled first
-    if (await renewingSubscription(c.env, user.id)) {
-        return errorJson(c, 'Cancel your subscription under "Plan and billing" before deleting your account.', 409, { code: 'has_subscription' });
+    // Polar would go on charging a deleted account: a renewing subscription ends now with the unused days refunded, and
+    // the Polar customer is deleted. If Polar fails, nothing is deleted.
+    try {
+        if ((await closeBillingForDeletion(c.env, user.id)) === 'has_subscription') {
+            return errorJson(c, 'Cancel your subscription under "Plan and billing" before deleting your account.', 409, { code: 'has_subscription' });
+        }
+    } catch (error) {
+        if (!(error instanceof PolarError)) throw error;
+        console.error(`[account] ${error.message}`);
+        return errorJson(c, 'The payment service is not responding, so the account was not deleted. Please try again in a minute.', 502, { code: 'polar_unavailable' });
     }
     const carouselIds = await deleteUser(c.env.DB, user.id);
     c.executionCtx.waitUntil(Promise.all(carouselIds.map(id => deleteCarouselFiles(c.env.FILES, id).catch(() => undefined))));

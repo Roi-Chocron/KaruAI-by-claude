@@ -57,7 +57,7 @@ export default function HebrewPrivacyPage() {
             <li><strong>Pollinations.ai</strong> מקבלת את תיאורי התמונות (בלי פרטי החשבון שלכם) כדי ליצור את תמונות השקפים.</li>
             <li><strong>Sentry</strong> מקבלת דיווחי שגיאות כדי שנוכל לתקן תקלות.</li>
             <li><strong>PostHog,&rlm; Google Analytics ו־Microsoft Clarity</strong> מקבלות נתוני שימוש, רק אם אישרתם עוגיות סטטיסטיקה.</li>
-            <li><strong>Polar</strong> (polar.sh) מעבדת את התשלומים על התוכניות בתשלום ומקבלת לשם כך את כתובת המייל והשם שלכם; אנחנו לא רואים ולא שומרים מספרי כרטיס אשראי.</li>
+            <li><strong>Polar</strong> (polar.sh) מעבדת את התשלומים על התוכניות בתשלום ומקבלת לשם כך את כתובת המייל, השם וכתובת ה־IP שלכם (לפי כתובת ה־IP היא מזהה את המדינה שלכם, לצורכי מס); אנחנו לא רואים ולא שומרים מספרי כרטיס אשראי.</li>
           </ul>
         </section>
 

@@ -13,6 +13,10 @@ export interface User {
     lastLoginAt: string | null;
     lastSeenAt: string | null;
     suspendedAt: string | null;
+    // A plan an admin gave by hand (see migrations/0004); the user's plan is the better of it and their subscription
+    planOverride: Exclude<PlanId, 'free'> | null;
+    planOverrideUntil: string | null;
+    planOverrideReason: string | null;
 }
 
 export type SettingKey = 'gemini_api_key' | 'pollinations_api_key' | 'gemini_model';
