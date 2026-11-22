@@ -119,10 +119,12 @@ function BillingPage({ locale }: { locale: Locale }) {
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [failed, setFailed] = useState(false);
-  const [actionError, setActionError] = useState<BillingError | null>(null);
+  // Shown beside the button that failed: the subscription box (portal) or the plans (checkout)
+  const [actionError, setActionError] = useState<{ key: BillingError; at: 'portal' | 'plans' } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [activation, setActivation] = useState<'waiting' | 'slow' | null>(null);
   const autoCheckout = useRef(false);
+  const plansAlert = useRef<HTMLParagraphElement>(null);
 
   const load = useCallback(async () => {
     const [nextAccount, nextBilling] = await Promise.all([fetchAccount(), fetchBilling()]);
@@ -137,7 +139,7 @@ function BillingPage({ locale }: { locale: Locale }) {
     try {
       window.location.href = await request();
     } catch (err) {
-      setActionError(err instanceof BillingRequestError ? err.key : 'failed');
+      setActionError({ key: err instanceof BillingRequestError ? err.key : 'failed', at: key === 'portal' ? 'portal' : 'plans' });
       setBusy(null);
     }
   }, []);
@@ -174,6 +176,11 @@ function BillingPage({ locale }: { locale: Locale }) {
     };
   }, [load, checkout]);
 
+  // On a phone the plans' error can be a few cards above the button that was pressed
+  useEffect(() => {
+    if (actionError?.at === 'plans') plansAlert.current?.scrollIntoView({ block: 'center' });
+  }, [actionError]);
+
   const subscription = billing?.subscription ?? null;
   const subscribed = !!subscription?.active;
   const longDate = (iso: string) => new Date(iso).toLocaleDateString(intlLocale(locale), { dateStyle: 'long' });
@@ -199,7 +206,6 @@ function BillingPage({ locale }: { locale: Locale }) {
 
       <div aria-live="polite" className="empty:hidden space-y-4 mb-8">
         {failed && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.loadFailed}</p>}
-        {actionError && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.errors[actionError]}</p>}
         {activation === 'waiting' && (
           <p className="flex items-center gap-2 text-sm rounded-xl bg-lime text-ink p-4">
             <Loader2 size={16} className="animate-spin flex-none" aria-hidden="true" /> {t.activating}
@@ -208,11 +214,6 @@ function BillingPage({ locale }: { locale: Locale }) {
         {activation === 'slow' && <p className="text-sm rounded-xl border border-line p-4">{t.activationSlow}</p>}
         {subscription && !subscription.active && subscription.status === 'past_due' && (
           <p className="text-sm text-amber-900 rounded-xl border border-amber-500 bg-amber-50 p-4">{t.pastDue}</p>
-        )}
-        {busy && busy !== 'portal' && (
-          <p role="status" className="flex items-center gap-2 text-sm text-graphite">
-            <Loader2 size={16} className="animate-spin flex-none" aria-hidden="true" /> {t.redirecting}
-          </p>
         )}
       </div>
 
@@ -256,6 +257,7 @@ function BillingPage({ locale }: { locale: Locale }) {
                   {busy === 'portal' && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {t.manage}
                 </button>
               )}
+              {actionError?.at === 'portal' && <p role="alert" className="mt-3 text-sm text-red-700">{t.errors[actionError.key]}</p>}
             </section>
             <section className="rounded-2xl border border-line p-6">
               <h2 className="flex items-center gap-2 font-semibold mb-2"><Receipt size={18} strokeWidth={1.75} aria-hidden="true" /> {t.invoices}</h2>
@@ -267,6 +269,14 @@ function BillingPage({ locale }: { locale: Locale }) {
 
       <section id="plans" aria-labelledby="plans-heading" className="mt-16 sm:mt-20 scroll-mt-24">
         <h2 id="plans-heading" className="font-display font-bold text-5xl md:text-6xl leading-none mb-8">{t.plans}</h2>
+        <div aria-live="polite" className="empty:hidden mb-6">
+          {actionError?.at === 'plans' && <p ref={plansAlert} role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.errors[actionError.key]}</p>}
+          {busy && busy !== 'portal' && (
+            <p role="status" className="flex items-center gap-2 text-sm text-graphite">
+              <Loader2 size={16} className="animate-spin flex-none" aria-hidden="true" /> {t.redirecting}
+            </p>
+          )}
+        </div>
         <PricingCards
           locale={locale}
           action={plan => {

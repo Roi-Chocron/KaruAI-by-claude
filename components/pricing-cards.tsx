@@ -26,7 +26,7 @@ export function PricingCards({ action, locale = 'en' }: { action: (plan: Plan) =
                 <h3 className="font-display font-bold text-4xl leading-none" dir="ltr">{plan.name}</h3>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-md ${dark ? 'bg-lime text-ink' : 'bg-mist text-ink'}`}>{copy.badge}</span>
               </div>
-              <p className={`text-sm mb-6 min-h-[40px] ${dark ? 'text-paper/70' : 'text-graphite'}`}>{copy.description}</p>
+              <p className={`text-sm mb-6 min-h-[40px] xl:min-h-[3.75rem] ${dark ? 'text-paper/70' : 'text-graphite'}`}>{copy.description}</p>
               <div className="mb-6 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="font-display font-bold text-7xl xl:text-6xl leading-none" dir="ltr">{formatPrice(plan.monthlyPrice)}</span>
                 <span className={`text-sm ${dark ? 'text-paper/70' : 'text-graphite'}`}>{t.perMonth}</span>
