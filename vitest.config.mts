@@ -9,6 +9,8 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
+          // An empty database for testing the migrations themselves on existing rows (worker/test/migrations.test.ts)
+          d1Databases: ['MIGRATION_TEST_DB'],
           // Fixed values, so the tests never depend on .dev.vars or reach Google with a real key
           bindings: {
             TEST_MIGRATIONS: migrations,

@@ -15,10 +15,13 @@ GEMINI_MODEL=
 POLLINATIONS_API_KEY=
 
 # Polar payments, against the sandbox (https://sandbox.polar.sh, test card 4242 4242 4242 4242, any future date and CVC).
-# Settings -> Access Tokens: create an Organization Access Token with the scopes checkouts:write,
-# customer_sessions:write and subscriptions:read.
-# Settings -> Webhooks: an endpoint (format Raw, API version 2026-10, subscription.* events) gives the secret. Polar
-# can't reach localhost, so locally the plan follows Polar through the billing page's sync instead (see README).
+# Settings -> Access Tokens: create an Organization Access Token with the scopes checkouts:read, checkouts:write,
+# customer_sessions:write, subscriptions:read, subscriptions:write, customers:write, orders:read, refunds:write and
+# products:read.
+# Settings -> Webhooks: an endpoint (format Raw, API version 2026-10, subscription.*, order.refunded and refund.*
+# events) gives the secret. Polar can't reach localhost, so locally the plan follows Polar through the billing page's
+# sync instead (see README); point the endpoint at a reserved address such as https://karuai-sandbox.invalid/... and
+# its delivery log keeps the payloads.
 POLAR_SERVER=sandbox
 POLAR_ACCESS_TOKEN=
 POLAR_WEBHOOK_SECRET=

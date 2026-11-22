@@ -39,48 +39,69 @@ shows a "Dev login" form that takes just an email. The API refuses it unless `AP
 ## Plans and payments
 
 Prices, limits and features live in `shared/plans.ts`; the API enforces the monthly limits. The paid plans (Basic
-₪29, Pro ₪59, VIP ₪119, monthly) are Polar products, sold through Polar's hosted checkout
-(`worker/src/polar.ts`, `worker/src/routes/billing.ts`):
+₪29, Pro ₪59, VIP ₪119, monthly, VAT included) are Polar products, sold through Polar's hosted checkout. Polar is the
+reseller and merchant of record. Code: `worker/src/polar.ts` (the API client) and `worker/src/routes/billing.ts`.
 
-- `POST /api/billing/checkout` opens a checkout for a plan, charged in ILS; `POST /api/billing/portal` opens Polar's
-  customer portal (change plan, card, cancel, invoices). Users who already pay change plans in the portal.
-- The `subscriptions` table follows Polar, and each user's plan is the best plan among their subscriptions that are
-  `active` or `trialing` (free without one). It is kept up to date two ways, so a missed webhook only delays a change:
-  - Polar's webhook `POST /api/billing/webhook` (signed, Standard Webhooks).
-  - Asking Polar's API: the billing page calls `POST /api/billing/sync` when it loads and while it waits after a
-    checkout, and the daily cron looks up subscriptions whose paid period ended without an update.
-- An admin can still set a plan by hand on the Admin page; it stays until something changes on Polar for that user.
-- An account (or, for an admin, a user) can't be deleted while its subscription still renews: Polar would go on
-  charging it. Canceling first (it then ends at the end of the period) is enough.
+- **Buying and changing plans:** `POST /api/billing/checkout` opens a checkout (in ILS, with the buyer's IP so Polar
+  places them for tax); `POST /api/billing/portal` opens Polar's customer portal (plan changes, card, invoices).
+  People who already pay change plans in the portal, never through a second checkout.
+- **Who gets which plan:** the `subscriptions` table follows Polar. A user's plan is the better of their best
+  subscription that grants access and an admin's comp. Access means `active` or `trialing`, or `past_due` for
+  `POLAR_GRACE_DAYS` (7) after the renewal failed, while Polar retries the card (2, 7, 14 and 21 days after).
+- **Staying in sync:** Polar's webhook (`POST /api/billing/webhook`, Standard Webhooks signatures, subscription.*,
+  order.refunded and refund.* events) and Polar's API: the billing page syncs when it loads and after a checkout,
+  and the daily cron re-checks subscriptions that started, were canceled or failed to renew in the last two days,
+  those whose period ended without an update, and drops plans whose grace period or comp ran out. Either path alone
+  is enough. Deliveries we can't use are listed on the Admin page and reported to Sentry.
+- **Cancelling** (Consumer Protection Law 14ט): `/cancel` is linked from every footer. Subscribers cancel at the end
+  of the period, undo that, or end now with the unused days refunded (`POST /api/billing/cancel`). Anyone else
+  (signed out, suspended) sends a request (`POST /api/support`), which the Admin page lists under Requests.
+- **Refunds:** a fully refunded subscription order ends the subscription (Polar itself does not); partial refunds are
+  only logged. The policy is on `/refund` (Hebrew binding for Israeli consumers).
+- **Deleting an account** ends a renewing subscription now with the unused days refunded, then deletes and anonymizes
+  the Polar customer; if Polar fails nothing is deleted. Suspending a payer can also end their subscription at the
+  period end.
+- **Comps:** on the Admin page, "Change plan" gives a plan by hand (optionally until a date). Webhooks and syncs keep
+  it, and a plan below what the user pays for is refused.
 - Polar sends buyers back with a `customer_session_token` in the address; `app/layout.tsx` removes it before any
   other script runs, so analytics and error reports never see it.
 
-### Local development (Polar sandbox)
-
-`.dev.vars` points at the sandbox (https://sandbox.polar.sh, organization "Karu AI"): `POLAR_SERVER=sandbox`, an
-access token, the webhook secret and the three sandbox product ids. Pay with the test card 4242 4242 4242 4242, any
-future date, any CVC. Polar can't reach `localhost`, so locally the plan changes through the sync alone (when the
-billing page loads, and right after the checkout); the webhook is covered by `worker/test/billing.test.ts`.
+| | Sandbox (local) | Live (production) |
+|---|---|---|
+| Dashboard | https://sandbox.polar.sh | https://polar.sh |
+| API | sandbox-api.polar.sh (`POLAR_SERVER=sandbox`) | api.polar.sh (`POLAR_SERVER=production`, in `wrangler.jsonc`) |
+| Settings | `.dev.vars` | `wrangler.jsonc` vars and `wrangler secret put` |
+| Webhooks | can't reach localhost; the sync does the work | `<APP_URL>/api/billing/webhook` |
+| Cards | 4242 4242 4242 4242 (paid), 4000 0000 0000 0002 (declined), 4000 0000 0000 0341 (charges fail later) | real cards |
 
 ### Production setup (Polar live)
 
-1. In the live Polar dashboard (https://polar.sh), create three monthly products priced in ILS, matching
-   `shared/plans.ts`: Basic ₪29, Pro ₪59, VIP ₪119 (the sandbox products are the model). Put their ids in
-   `POLAR_PRODUCT_BASIC`, `POLAR_PRODUCT_PRO` and `POLAR_PRODUCT_VIP` in `wrangler.jsonc` (`POLAR_SERVER` is already
-   `production`). Until then the site says online payments are not set up.
-2. Settings → Access Tokens → Create token with exactly the scopes `checkouts:write`, `customer_sessions:write` and
-   `subscriptions:read`, then `npx wrangler secret put POLAR_ACCESS_TOKEN`.
-3. Settings → Webhooks → Add endpoint `<APP_URL>/api/billing/webhook`, format Raw, API version 2026-10, events
-   `subscription.created`, `subscription.updated`, `subscription.active`, `subscription.canceled`,
-   `subscription.uncanceled`, `subscription.revoked`, `subscription.past_due`; then
-   `npx wrangler secret put POLAR_WEBHOOK_SECRET` with its secret.
-4. If the site is behind Cloudflare's Bot Fight Mode, turn it off for `/api/billing/webhook`, or Polar's calls get a 403.
+1. Organization settings: default currency ILS; tax behavior Inclusive; "Allow multiple subscriptions" off;
+   proration "Invoice" (upgrades are charged right away); Subscriptions → grace period for benefit revocation 7 days
+   (equal to `POLAR_GRACE_DAYS`); customer portal plan changes on.
+2. Create three monthly products priced in ILS, matching `shared/plans.ts`: Basic ₪29, Pro ₪59, VIP ₪119 (the sandbox
+   products are the model). Put their ids in `POLAR_PRODUCT_BASIC`, `POLAR_PRODUCT_PRO` and `POLAR_PRODUCT_VIP` in
+   `wrangler.jsonc`. Until then the site says online payments are not set up.
+3. Settings → Access Tokens → Create token with the scopes `checkouts:read`, `checkouts:write`,
+   `customer_sessions:write`, `subscriptions:read`, `subscriptions:write`, `customers:write`, `orders:read`,
+   `refunds:write` and `products:read`, then `npx wrangler secret put POLAR_ACCESS_TOKEN`.
+4. Settings → Webhooks → Add endpoint `<APP_URL>/api/billing/webhook`, format Raw, API version 2026-10, events
+   `subscription.*` (created, updated, active, canceled, uncanceled, revoked, past_due), `order.refunded`,
+   `refund.created` and `refund.updated`; then `npx wrangler secret put POLAR_WEBHOOK_SECRET` with its secret.
+5. Keep Cloudflare's Bot Fight Mode off: it blocks Polar's webhook calls, and on the Free plan it can't exempt a path.
+6. Open the Admin page: the Payments card checks the token, the products and their prices, and the webhook secret.
 
-Keep the prices in `shared/plans.ts` equal to the Polar prices: the site shows them, Polar charges its own.
+Keep the prices in `shared/plans.ts` equal to the Polar prices: the site shows them, Polar charges its own (the
+Payments card flags a difference).
 
-The Polar API version is pinned to 2026-10 (`POLAR_VERSION` in `worker/src/polar.ts`, and the webhook endpoint's API
-version). Polar deprecates it in January 2027 and removes it in April 2027: move both to the next version before then
-and run the tests.
+**Refund by hand:** Polar → Sales → Orders → the order → Refund. A full refund of a subscription order ends that
+subscription through the webhook; check the user's plan on the Admin page, and revoke the subscription in Polar if
+it is still active (for example when the webhook could not be delivered).
+
+**API version:** pinned to 2026-10 (`POLAR_VERSION` in `worker/src/polar.ts`, and the webhook endpoint's API
+version). Polar deprecates it in January 2027 and removes it in April 2027. Before then: read the new version's
+changes, change `POLAR_VERSION`, run `npm test` and a sandbox checkout, then move the webhook endpoint to the same
+version.
 
 ## Deploying (first time)
 
