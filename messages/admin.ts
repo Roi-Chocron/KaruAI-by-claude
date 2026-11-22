@@ -56,6 +56,7 @@ const en = {
   confirmDelete: (email: string, n: number) => `Delete ${email} and their ${n} carousel${n === 1 ? '' : 's'}? This can't be undone.`,
   updateFailed: "Couldn't update the user.",
   deleteFailed: "Couldn't delete the user.",
+  hasSubscription: 'This user has a subscription that still renews. Cancel it on Polar first.',
   offline: "Couldn't reach the server. Check the connection and try again.",
   requestFailed: (status: number) => `The request failed (status ${status}).`,
 };
@@ -116,6 +117,7 @@ const he: typeof en = {
   confirmDelete: (email, n) => `למחוק את ${email} ואת ${n === 1 ? 'הקרוסלה שלו' : `${n} הקרוסלות שלו`}? אי אפשר לבטל את זה.`,
   updateFailed: 'לא הצלחנו לעדכן את המשתמש.',
   deleteFailed: 'לא הצלחנו למחוק את המשתמש.',
+  hasSubscription: 'למשתמש יש מינוי שמתחדש. קודם מבטלים אותו ב־Polar.',
   offline: 'אין חיבור לשרת. בדקו את החיבור ונסו שוב.',
   requestFailed: status =>
     status === 401 ? 'צריך להתחבר מחדש.'

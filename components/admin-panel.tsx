@@ -35,7 +35,7 @@ const formatNumber = (n: number, locale: Locale) => n.toLocaleString(intlLocale(
 const card = 'rounded-2xl border border-line p-6 sm:p-8';
 const sectionTitle = 'font-display font-bold text-4xl leading-none';
 
-// The API's own error messages are English, so in Hebrew a failed request is described by its status instead
+// The API's own error messages are English, so in Hebrew a failed request is described by its status (or its code) instead
 async function request<T>(locale: Locale, url: string, init?: RequestInit): Promise<T> {
   const t = adminMessages[locale];
   let res: Response;
@@ -45,7 +45,7 @@ async function request<T>(locale: Locale, url: string, init?: RequestInit): Prom
     throw new Error(t.offline);
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
-  if (!res.ok) throw new Error((locale === 'en' && data?.error) || t.requestFailed(res.status));
+  if (!res.ok) throw new Error(data?.code === 'has_subscription' ? t.hasSubscription : (locale === 'en' && data?.error) || t.requestFailed(res.status));
   return data as T;
 }
 

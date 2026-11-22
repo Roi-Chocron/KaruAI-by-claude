@@ -6,6 +6,7 @@ import {
 } from '../db';
 import { deleteCarouselFiles } from '../storage';
 import { createApp, errorJson, requireAdmin, requireUser, type AppContext } from '../app';
+import { renewingSubscription } from './billing';
 
 const SECRET_KEYS: SettingKey[] = ['gemini_api_key', 'pollinations_api_key'];
 const ALL_KEYS: SettingKey[] = [...SECRET_KEYS, 'gemini_model'];
@@ -79,6 +80,10 @@ admin.patch('/users/:id', async c => {
 admin.delete('/users/:id', async c => {
     const { target, response } = await targetUser(c);
     if (!target) return response;
+    // Polar would go on charging a deleted account
+    if (await renewingSubscription(c.env, target.id)) {
+        return errorJson(c, 'This user has a subscription that still renews. Cancel it on Polar first.', 409, { code: 'has_subscription' });
+    }
     const carouselIds = await deleteUser(c.env.DB, target.id);
     c.executionCtx.waitUntil(Promise.all(carouselIds.map(id => deleteCarouselFiles(c.env.FILES, id).catch(() => undefined))));
     return c.body(null, 204);

@@ -88,6 +88,8 @@ export const LIMITS = {
     authIp: { limit: 30, windowMs: 15 * MINUTE },
     chatUser: { limit: 20, windowMs: MINUTE },
     imagesUser: { limit: 30, windowMs: MINUTE },
+    // Asking Polar for the user's subscriptions (the billing page, and its polling after a checkout)
+    billingSync: { limit: 40, windowMs: 10 * MINUTE },
 } as const;
 
 

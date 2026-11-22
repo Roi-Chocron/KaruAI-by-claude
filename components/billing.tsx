@@ -100,8 +100,9 @@ async function postForUrl(path: string, body?: unknown): Promise<string> {
   throw new BillingRequestError('failed');
 }
 
-async function fetchBilling(): Promise<BillingSummary> {
-  const res = await fetch('/api/billing');
+// The subscription, after the API asked Polar about it (so a missed or slow webhook does not leave the plan behind)
+async function syncBilling(): Promise<BillingSummary> {
+  const res = await fetch('/api/billing/sync', { method: 'POST' });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
   return data;
@@ -110,7 +111,7 @@ async function fetchBilling(): Promise<BillingSummary> {
 // A plan name inside a sentence, isolated so it reads correctly in right-to-left text
 const isolate = (name: string) => `\u2068${name}\u2069`;
 
-// After Polar's checkout the webhook may land a few seconds after the user does, so the page asks again a few times
+// After Polar's checkout the subscription may appear a few seconds after the user returns, so the page asks again a few times
 const ACTIVATION_POLLS = 15;
 const ACTIVATION_POLL_MS = 2000;
 
@@ -126,8 +127,10 @@ function BillingPage({ locale }: { locale: Locale }) {
   const autoCheckout = useRef(false);
   const plansAlert = useRef<HTMLParagraphElement>(null);
 
+  // The account (plan and usage) is read after the sync, which can change the plan
   const load = useCallback(async () => {
-    const [nextAccount, nextBilling] = await Promise.all([fetchAccount(), fetchBilling()]);
+    const nextBilling = await syncBilling();
+    const nextAccount = await fetchAccount();
     setAccount(nextAccount);
     setBilling(nextBilling);
     return nextBilling;

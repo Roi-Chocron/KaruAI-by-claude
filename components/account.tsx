@@ -16,8 +16,8 @@ const heading = 'font-display font-bold text-4xl leading-none mb-6';
 const field = 'w-full border border-line rounded-[10px] px-3.5 py-3 bg-paper focus:outline-none focus:border-ink';
 
 // The worker answers in English; the messages it can send this page are shown in the visitor's language
-type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin';
-const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin'];
+type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin' | 'hasSubscription';
+const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin', 'hasSubscription'];
 type ErrorMessage = ServerMessage | 'saveFailed' | 'deleteFailed';
 
 class RequestError extends Error {

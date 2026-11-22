@@ -187,6 +187,22 @@ export async function getCurrentSubscription(db: D1Database, userId: string, acc
     return row ? toSubscription(row) : null;
 }
 
+// All of the user's stored subscriptions, to compare with Polar's
+export async function getSubscriptions(db: D1Database, userId: string): Promise<SubscriptionRow[]> {
+    const { results } = await db.prepare('SELECT * FROM subscriptions WHERE user_id = ?').bind(userId).all();
+    return results.map(toSubscription);
+}
+
+// Users with a subscription that still grants access although its paid period ended before `before`: Polar renews or
+// ends a subscription at the end of its period and tells us by webhook, so these may have missed one. Oldest first.
+export async function listOverdueSubscriptionUsers(db: D1Database, accessStatuses: string[], before: string, limit: number): Promise<string[]> {
+    const statuses = accessStatuses.map(() => '?').join(', ');
+    const { results } = await db.prepare(`SELECT user_id FROM subscriptions
+        WHERE status IN (${statuses}) AND current_period_end IS NOT NULL AND current_period_end < ?
+        GROUP BY user_id ORDER BY MIN(current_period_end) LIMIT ?`).bind(...accessStatuses, before, limit).all<{ user_id: string }>();
+    return results.map(row => row.user_id);
+}
+
 // Records a webhook delivery; false when it was already handled
 export async function markWebhookEvent(db: D1Database, id: string): Promise<boolean> {
     const result = await db.prepare('INSERT INTO webhook_events (id, received_at) VALUES (?, ?) ON CONFLICT(id) DO NOTHING').bind(id, now()).run();

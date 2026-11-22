@@ -6,7 +6,7 @@ import carousels from './routes/carousels';
 import ai from './routes/ai';
 import admin from './routes/admin';
 import account from './routes/account';
-import billing from './routes/billing';
+import billing, { syncOverdueSubscriptions } from './routes/billing';
 
 // The API. Cloudflare serves the static pages from out/ itself and only runs this Worker for /api/* (see wrangler.jsonc).
 const app = createApp().basePath('/api');
@@ -30,9 +30,11 @@ export default Sentry.withSentry(
     (env: Env) => ({ dsn: env.SENTRY_DSN, enabled: !!env.SENTRY_DSN, tracesSampleRate: 0.1 }),
     {
         fetch: app.fetch,
-        // Daily cleanup (see "triggers" in wrangler.jsonc)
+        // Daily cleanup, and a check on Polar for subscriptions whose webhook may have been missed (see "triggers" in
+        // wrangler.jsonc)
         async scheduled(_controller, env, ctx) {
             ctx.waitUntil(cleanUp(env.DB));
+            ctx.waitUntil(syncOverdueSubscriptions(env));
         },
     } satisfies ExportedHandler<Env>
 );

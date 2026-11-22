@@ -1,10 +1,15 @@
 import { PAID_PLAN_IDS, type PaidPlanId } from '../../shared/plans';
 
-// Polar (https://polar.sh/docs) over plain fetch: checkouts, customer portal sessions and webhook signatures.
-// The user's KaruAI id is their Polar "external customer id", so no Polar ids need to be stored up front.
+// Polar (https://polar.sh/docs) over plain fetch: checkouts, customer portal sessions, subscriptions and webhook
+// signatures. The user's KaruAI id is their Polar "external customer id", so no Polar ids need to be stored up front.
+// The access token needs the scopes checkouts:write, customer_sessions:write and subscriptions:read.
 
-// API version pinned, so Polar's quarterly changes reach us only when we choose to move
+// API version pinned, so Polar's quarterly changes reach us only when we choose to move. Polar keeps a version for
+// about nine months: 2026-10 is deprecated in January 2027 and removed in April 2027 (move the webhook endpoint too).
 const POLAR_VERSION = '2026-10';
+
+// Charged in shekels, as the site shows the prices; without this Polar picks a currency from the buyer's location
+const CURRENCY = 'ils';
 
 export class PolarError extends Error {
     constructor(message: string, readonly status: number) {
@@ -26,18 +31,23 @@ export function planForProduct(env: PolarEnv, id: string): PaidPlanId | null {
     return PAID_PLAN_IDS.find(plan => productId(env, plan) === id) ?? null;
 }
 
-async function polarPost<T>(env: PolarEnv, path: string, body: unknown): Promise<T> {
+async function polarRequest<T>(env: PolarEnv, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
     const started = Date.now();
     const response = await fetch(`${apiBase(env)}${path}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'Polar-Version': POLAR_VERSION },
-        body: JSON.stringify(body),
+        method,
+        headers: {
+            Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
+            'Polar-Version': POLAR_VERSION,
+            ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(15_000),
     });
-    console.log(JSON.stringify({ event: 'polar', path, status: response.status, durationMs: Date.now() - started }));
+    // The path without its query, which can hold a user id
+    console.log(JSON.stringify({ event: 'polar', method, path: path.split('?')[0], status: response.status, durationMs: Date.now() - started }));
     if (!response.ok) {
         const detail = (await response.text()).trim().slice(0, 500);
-        throw new PolarError(`Polar ${path} failed with status ${response.status}: ${detail}`, response.status);
+        throw new PolarError(`Polar ${method} ${path.split('?')[0]} failed with status ${response.status}: ${detail}`, response.status);
     }
     return response.json<T>();
 }
@@ -45,13 +55,16 @@ async function polarPost<T>(env: PolarEnv, path: string, body: unknown): Promise
 // A hosted checkout page for the plan; returns its URL
 export async function createCheckout(
     env: PolarEnv,
-    options: { plan: PaidPlanId; userId: string; email: string; name: string; successUrl: string; returnUrl: string }
+    options: { plan: PaidPlanId; userId: string; email: string; name: string; ip: string | null; successUrl: string; returnUrl: string }
 ): Promise<string> {
-    const checkout = await polarPost<{ url: string }>(env, '/v1/checkouts/', {
+    const checkout = await polarRequest<{ url: string }>(env, 'POST', '/v1/checkouts/', {
         products: [productId(env, options.plan)],
+        currency: CURRENCY,
         external_customer_id: options.userId,
         customer_email: options.email,
         customer_name: options.name || undefined,
+        // The checkout is created by the Worker, so Polar would otherwise place the buyer (country, tax) by our IP
+        customer_ip_address: options.ip ?? undefined,
         success_url: options.successUrl,
         return_url: options.returnUrl,
         // Copied to the subscription, so its webhooks can name the user even if the customer has no external id
@@ -62,11 +75,18 @@ export async function createCheckout(
 
 // Polar's customer portal, where the user changes plan, updates the card, cancels and downloads invoices
 export async function createPortalSession(env: PolarEnv, userId: string, returnUrl: string): Promise<string> {
-    const session = await polarPost<{ customer_portal_url: string }>(env, '/v1/customer-sessions/', {
+    const session = await polarRequest<{ customer_portal_url: string }>(env, 'POST', '/v1/customer-sessions/', {
         external_customer_id: userId,
         return_url: returnUrl,
     });
     return session.customer_portal_url;
+}
+
+// Every subscription the user has on Polar, whatever its status (one page holds them all: a user has a few at most)
+export async function listSubscriptions(env: PolarEnv, userId: string): Promise<PolarSubscription[]> {
+    const query = new URLSearchParams({ external_customer_id: userId, limit: '100' });
+    const page = await polarRequest<{ items: PolarSubscription[] }>(env, 'GET', `/v1/subscriptions/?${query}`);
+    return page.items;
 }
 
 // --- Webhooks (Standard Webhooks: https://www.standardwebhooks.com) ---
