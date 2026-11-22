@@ -372,6 +372,30 @@ describe('comps', () => {
     });
 });
 
+describe('billing health', () => {
+    it('checks the products against the plans and flags a wrong price', async () => {
+        const { cookie: admin } = await signIn('admin@example.test');
+        const product = (id: string, amount: number) => Response.json({
+            id, name: id, is_archived: false, recurring_interval: 'month',
+            prices: [{ amount_type: 'fixed', price_amount: amount, price_currency: 'ils', is_archived: false }],
+        });
+        const calls = mockPolar(({ path }) => {
+            if (path === '/v1/products/prod-basic') return product('prod-basic', 3000);
+            if (path === '/v1/products/prod-pro') return product('prod-pro', 5900);
+            if (path === '/v1/products/prod-vip') return Response.json({ error: 'ResourceNotFound' }, { status: 404 });
+            return subscriptionList();
+        });
+        const health = await (await api('/api/admin/billing-health', { cookie: admin })).json<any>();
+        expect(health).toMatchObject({ configured: true, server: 'sandbox', token: 'ok', webhookSecret: true, apiVersion: { sent: '2026-10' } });
+        expect(Object.fromEntries(health.products.map((item: any) => [item.plan, item.problems]))).toEqual({
+            basic: ['price 30 instead of 29'], pro: [], vip: ['not found on Polar'],
+        });
+        expect(calls.every(call => call.headers.get('polar-version') === '2026-10')).toBe(true);
+        const { cookie: someone } = await signIn();
+        expect((await api('/api/admin/billing-health', { cookie: someone })).status).toBe(403);
+    });
+});
+
 describe('ended subscriptions and old webhook ids', () => {
     it('shows an ended subscription as inactive', async () => {
         const { user, cookie, id } = await subscriber();

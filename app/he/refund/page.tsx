@@ -1,60 +1,71 @@
 import Link from 'next/link';
+import { BusinessValue, EmailLink, PhoneLink } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
+import { PLANS } from '@/shared/plans';
 
-export const metadata = legalMetadata('he', '/refund', 'מדיניות ביטול והחזרים - KaruAI', 'תנאי הביטול וההחזר הכספי של מינויים ורכישות ב־KaruAI.');
+export const metadata = legalMetadata('he', '/refund', 'מדיניות ביטולים והחזרים - KaruAI', 'איך מבטלים מינוי ל־KaruAI, מתי מקבלים כסף בחזרה, ומה קורה בחשבון אחרי שתוכנית בתשלום מסתיימת.');
 
+// לפי חוק הגנת הצרכן (סעיפים 13ד, 14ג, 14ה ו־14ט). לצרכנים בישראל הנוסח העברי הוא הקובע.
 export default function HebrewRefundPage() {
+  const free = PLANS.free.limits;
   return (
-      <LegalPage locale="he" path="/refund" title="מדיניות ביטול והחזרים" updated="נובמבר 2026">
+    <LegalPage locale="he" path="/refund" title="מדיניות ביטולים והחזרים" updated="נובמבר 2026" translated={false}>
 
-        <section>
-          <h2>1. ביטול מינוי</h2>
-          <p>
-            אתם יכולים לבטל את המינוי החודשי שלכם בכל עת ב&quot;ניהול המינוי&quot; בעמוד <Link href="/billing">תוכנית ותשלום</Link> (דרך ספק התשלומים שלנו, Polar), או בפנייה לשירות הלקוחות.
-          </p>
-          <p>
-            עם הביטול:
-          </p>
-          <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
-            <li>חיובי החידוש האוטומטי ייפסקו מיד לכל מחזורי החיוב הבאים.</li>
-            <li>הגישה המלאה לתכונות התוכנית בתשלום תישאר אצלכם עד סוף מחזור החיוב הנוכחי.</li>
-            <li>בתום תקופת החיוב החשבון שלכם יעבור לתוכנית Free החינמית, וכל הקרוסלות הקודמות שלכם יישמרו.</li>
-          </ul>
-        </section>
+      <section>
+        <h2>1. אפשר לבטל בכל רגע, בכל אחת מהדרכים האלה</h2>
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
+          <li><strong>באתר:</strong> בדף <Link href="/he/cancel">ביטול עסקה</Link>, עם התחברות או בלי, או ב&quot;ניהול המינוי&quot; בדף <Link href="/billing">תוכנית ותשלום</Link>.</li>
+          <li><strong>במייל:</strong> <EmailLink email={BUSINESS.supportEmail} missing="מייל התמיכה" /></li>
+          <li><strong>בטלפון:</strong> <PhoneLink phone={BUSINESS.phone} missing="מספר הטלפון" /></li>
+          <li><strong>בדואר:</strong> <BusinessValue value={BUSINESS.addressHe} missing="כתובת העסק" /></li>
+        </ul>
+        <p>
+          כשמבטלים במייל, בטלפון או בדואר, כתבו לנו את שמכם ואת כתובת המייל של חשבון ה־KaruAI שלכם (מספר תעודת הזהות עוזר לנו למצוא אותו). נפסיק את החיובים
+          תוך 3 ימי עסקים מקבלת הבקשה ונאשר את הביטול בכתב. ביטול באתר נכנס לתוקף מיד.
+        </p>
+      </section>
 
-        <section>
-          <h2>2. זכאות להחזר כספי</h2>
-          <p>
-            מכיוון ש־KaruAI מספקת משאבי מחשוב ויצירת תמונות באמצעות בינה מלאכותית באופן מיידי עם ההרשמה:
-          </p>
-          <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
-            <li>
-              <strong>תוכניות חודשיות:</strong> דמי המינוי החודשי אינם ניתנים להחזר לאחר שתקופת החיוב התחילה ובוצעו יצירות.
-            </li>
-            <li>
-              <strong>תקלות טכניות:</strong> אם תקלה טכנית מתמשכת מצדנו מונעת מכם לחלוטין להשתמש בשירות, נבחן את המקרה שלכם לצורך החזר מלא או חלקי.
-            </li>
-          </ul>
-        </section>
+      <section>
+        <h2>2. בתוך 14 ימים מהתשלום הראשון</h2>
+        <p>
+          אפשר לבטל בתוך 14 ימים מיום ההצטרפות למינוי ולקבל את התשלום בחזרה, בניכוי שווי הימים שכבר נוצלו. אנחנו לא גובים דמי ביטול.
+        </p>
+      </section>
 
-        <section>
-          <h2>3. איך מבקשים החזר</h2>
-          <p>
-            כדי להגיש בקשת ביטול או החזר:
-          </p>
-          <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
-            <li>שלחו מייל לכתובת <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a> עם הנושא &quot;Refund Request&quot;.</li>
-            <li>ציינו את כתובת המייל הרשומה בחשבון ואת מספר החשבונית או מזהה העסקה.</li>
-            <li>צוות התמיכה שלנו יבדוק את הפנייה ויחזור אליכם בתוך 1–2 ימי עסקים.</li>
-          </ul>
-        </section>
+      <section>
+        <h2>3. אחרי 14 הימים הראשונים</h2>
+        <p>בוחרים אחת מהאפשרויות:</p>
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
+          <li><strong>ביטול בסוף התקופה:</strong> התוכנית נשארת עד סוף החודש ששולם, ולא יהיו חיובים נוספים.</li>
+          <li><strong>סיום עכשיו:</strong> התוכנית מסתיימת מיד, ומקבלים בחזרה את החלק של החודש הנוכחי שלא נוצל, לפי מספר הימים שנותרו.</li>
+        </ul>
+        <p>אם תקלה אצלנו מונעת מכם להשתמש ב־KaruAI, ספרו לנו ונחזיר את התשלום על הזמן שלא יכולתם להשתמש בשירות.</p>
+      </section>
 
-        <section>
-          <h2>4. זמן הטיפול</h2>
-          <p>
-            החזרים שאושרו יזוכו דרך Polar, ספק התשלומים שלנו, לאמצעי התשלום המקורי בתוך 5–10 ימי עסקים, בהתאם לזמני הטיפול של הבנק שלכם.
-          </p>
-        </section>
-      </LegalPage>
+      <section>
+        <h2>4. איך ומתי מקבלים את הכסף</h2>
+        <p>
+          התשלומים מטופלים על ידי Polar (polar.sh), המשווקת שלנו והגורם המוכר בפועל, ולכן החיוב בכרטיס מופיע בשם Polar. ההחזרים חוזרים לכרטיס שבו שילמתם
+          תוך 14 ימים מהביטול; ייתכן שיעברו עוד כמה ימים עד שהבנק יציג אותם.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. אחרי שתוכנית בתשלום מסתיימת</h2>
+        <ul className="list-disc list-inside space-y-1.5 text-graphite ps-2">
+          <li>החשבון עובר לתוכנית החינמית: {free.carouselsPerMonth} קרוסלות חדשות, {free.aiMessagesPerMonth} הודעות AI ו־{free.aiImagesPerMonth} תמונות AI בחודש.</li>
+          <li>בקבצים שתייצאו מעכשיו יופיע שוב סימן המים הקטן של KaruAI.</li>
+          <li>כל הקרוסלות נשארות בחשבון, ואפשר להמשיך לפתוח, לערוך ולייצא אותן.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. שאלות</h2>
+        <p>
+          כתבו לנו לכתובת <EmailLink email={BUSINESS.supportEmail} missing="מייל התמיכה" /> או היכנסו ל<Link href="/he/contact">דף יצירת הקשר</Link>.
+        </p>
+      </section>
+    </LegalPage>
   );
 }

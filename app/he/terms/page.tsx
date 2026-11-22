@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { BusinessValue, EmailLink, Registration } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
 
 export const metadata = legalMetadata('he', '/terms', 'תנאי שימוש - KaruAI', 'תנאי השימוש בפלטפורמת KaruAI ובשירותי יצירת הקרוסלות באמצעות בינה מלאכותית.');
@@ -10,7 +12,7 @@ export default function HebrewTermsPage() {
         <section>
           <h2>1. הסכמה לתנאים</h2>
           <p>
-            ברוכים הבאים ל־<strong>KaruAI</strong> (&quot;השירות&quot;, &quot;הפלטפורמה&quot;, &quot;אנחנו&quot;). בכניסה לאתר שלנו ולשירותי יצירת העיצובים באמצעות בינה מלאכותית, בהרשמה אליהם או בשימוש בהם, אתם מסכימים להיות מחויבים לתנאי שימוש אלה. אם אינכם מסכימים לתנאים, אנא אל תשתמשו בשירות.
+            ברוכים הבאים ל־<strong>KaruAI</strong> (&quot;השירות&quot;, &quot;הפלטפורמה&quot;, &quot;אנחנו&quot;), המופעל על ידי <BusinessValue value={BUSINESS.legalNameHe} missing="שם העסק" /> (<Registration locale="he" />), <BusinessValue value={BUSINESS.addressHe} missing="כתובת העסק" />. בכניסה לאתר שלנו ולשירותי יצירת העיצובים באמצעות בינה מלאכותית, בהרשמה אליהם או בשימוש בהם, אתם מסכימים להיות מחויבים לתנאי שימוש אלה. אם אינכם מסכימים לתנאים, אנא אל תשתמשו בשירות.
           </p>
         </section>
 
@@ -44,7 +46,7 @@ export default function HebrewTermsPage() {
         <section>
           <h2>5. מינויים ותשלומים</h2>
           <p>
-            אנחנו מציעים תוכנית חינמית ותוכניות מינוי בתשלום (Basic, Pro, VIP). מחירי התוכניות בתשלום הם בשקלים, והן מחויבות מראש בכל חודש דרך ספק התשלומים שלנו, Polar (polar.sh), עד שתבטלו. לתנאי הביטול ולזכאות להחזר כספי, עיינו ב<Link href="/he/refund">מדיניות הביטול וההחזרים</Link> שלנו.
+            אנחנו מציעים תוכנית חינמית ותוכניות מינוי בתשלום (Basic, Pro, VIP). מחירי התוכניות בתשלום הם בשקלים וכוללים מע&quot;מ, והן מחויבות מראש בכל חודש עד שתבטלו. את התשלומים מעבדת Polar (polar.sh), שמוכרת לכם את המינוי כמשווקת שלנו וכגורם המוכר בפועל. אפשר לבטל בכל רגע, גם בדף <Link href="/he/cancel">ביטול עסקה</Link>; בתוך 14 ימים מהתשלום הראשון מקבלים את הכסף בחזרה בניכוי הימים שנוצלו. התנאים המלאים מופיעים ב<Link href="/he/refund">מדיניות הביטולים וההחזרים</Link> שלנו.
           </p>
         </section>
 
@@ -65,7 +67,7 @@ export default function HebrewTermsPage() {
         <section>
           <h2>8. פרטי התקשרות</h2>
           <p>
-            לכל שאלה או משוב בנוגע לתנאים אלה, פנו אלינו בכתובת <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a>.
+            לכל שאלה או משוב בנוגע לתנאים אלה, פנו אלינו בכתובת <EmailLink email={BUSINESS.supportEmail} missing="מייל התמיכה" />.
           </p>
         </section>
       </LegalPage>

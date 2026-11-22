@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { CreditCard, Loader2, Receipt } from 'lucide-react';
 import { AppShell, PageHeading } from '@/components/app-shell';
 import { appMessages } from '@/messages/app';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/locale';
 import { RequireAuth } from '@/lib/session';
 import { useTabTitle } from '@/lib/tab-title';
 import { PricingCards } from '@/components/pricing-cards';
-import { formatPrice, isPaidPlanId, PLANS, type PaidPlanId, type Plan } from '@/shared/plans';
+import { formatPrice, isPaidPlanId, planRank, PLANS, type PaidPlanId, type Plan } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser } from '@/types';
 
 export type AccountSummary = { user: PublicUser; plan: Plan; usage: MonthlyUsage; carouselCount: number };
@@ -69,7 +70,20 @@ export function UsageMeter({ label, used, limit, unlimited }: { label: string; u
 
 export type BillingSummary = {
   enabled: boolean;
-  subscription: { plan: PaidPlanId; status: string; active: boolean; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
+  subscription: {
+    plan: PaidPlanId;
+    status: string;
+    active: boolean;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+    // While a failed renewal is retried: when the plan ends unless the card is fixed, and Polar's next try
+    graceEndsAt: string | null;
+    nextRetryAt: string | null;
+  } | null;
+  // A plan given by KaruAI (a comp), and until when
+  override: { plan: PaidPlanId; until: string | null } | null;
+  // After a checkout: how it went (only for the user's own checkout)
+  checkout?: 'open' | 'expired' | 'confirmed' | 'succeeded' | 'failed' | null;
 };
 
 type BillingError = keyof (typeof appMessages)['en']['billing']['errors'];
@@ -95,14 +109,21 @@ async function postForUrl(path: string, body?: unknown): Promise<string> {
   const data = await res.json().catch(() => null);
   if (res.ok && typeof data?.url === 'string') return data.url;
   if (res.status === 503) throw new BillingRequestError('notConfigured');
+  if (data?.code === 'past_due') throw new BillingRequestError('pastDue');
   if (res.status === 409) throw new BillingRequestError('hasSubscription');
   if (res.status === 502) throw new BillingRequestError('unavailable');
+  if (res.status === 429) throw new BillingRequestError('tooMany');
   throw new BillingRequestError('failed');
 }
 
-// The subscription, after the API asked Polar about it (so a missed or slow webhook does not leave the plan behind)
-async function syncBilling(): Promise<BillingSummary> {
-  const res = await fetch('/api/billing/sync', { method: 'POST' });
+// The subscription, after the API asked Polar about it (so a missed or slow webhook does not leave the plan behind).
+// With the checkout id Polar sent the user back with, it also says how that checkout went.
+async function syncBilling(checkoutId?: string | null): Promise<BillingSummary> {
+  const res = await fetch('/api/billing/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(checkoutId ? { checkoutId } : {}),
+  });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
   return data;
@@ -128,8 +149,8 @@ function BillingPage({ locale }: { locale: Locale }) {
   const plansAlert = useRef<HTMLParagraphElement>(null);
 
   // The account (plan and usage) is read after the sync, which can change the plan
-  const load = useCallback(async () => {
-    const nextBilling = await syncBilling();
+  const load = useCallback(async (checkoutId?: string | null) => {
+    const nextBilling = await syncBilling(checkoutId);
     const nextAccount = await fetchAccount();
     setAccount(nextAccount);
     setBilling(nextBilling);
@@ -146,19 +167,21 @@ function BillingPage({ locale }: { locale: Locale }) {
       setBusy(null);
     }
   }, []);
-  const checkout = useCallback((plan: PaidPlanId) => go(plan, () => postForUrl('/api/billing/checkout', { plan })), [go]);
+  const checkout = useCallback((plan: PaidPlanId) => go(plan, () => postForUrl('/api/billing/checkout', { plan, locale })), [go, locale]);
   const openPortal = useCallback(() => go('portal', () => postForUrl('/api/billing/portal')), [go]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const returning = params.get('checkout') === 'success';
+    const checkoutId = params.get('checkout') === 'success' ? params.get('checkout_id') : null;
     const wanted = params.get('plan');
-    if (returning || wanted) window.history.replaceState(null, '', '/billing');
+    if (params.has('checkout') || wanted) window.history.replaceState(null, '', '/billing');
 
     let cancelled = false;
     (async () => {
-      let state = await load();
-      if (returning && !state.subscription?.active) {
+      let state = await load(checkoutId);
+      // "Payment received" only for a paid checkout of this user, not for anyone who opens ?checkout=success
+      const paid = state.checkout === 'confirmed' || state.checkout === 'succeeded';
+      if (paid && !state.subscription?.active) {
         setActivation('waiting');
         for (let i = 0; i < ACTIVATION_POLLS && !cancelled && !state.subscription?.active; i++) {
           await new Promise(resolve => setTimeout(resolve, ACTIVATION_POLL_MS));
@@ -195,13 +218,19 @@ function BillingPage({ locale }: { locale: Locale }) {
   ];
   const reached = limits?.filter(meter => meter.limit !== null && meter.used >= meter.limit) ?? [];
 
-  const subscriptionText = !billing?.enabled
-    ? t.paymentBody
-    : !subscription
-      ? t.freeBody
-      : subscription.active && subscription.currentPeriodEnd
-        ? (subscription.cancelAtPeriodEnd ? t.cancels : t.renews)(isolate(PLANS[subscription.plan].name), longDate(subscription.currentPeriodEnd))
-        : t.manageAny;
+  const override = billing?.override ?? null;
+  const pastDue = subscription?.status === 'past_due' && subscription.active;
+  const subscriptionText = override && (!subscription?.active || planRank(override.plan) > planRank(subscription.plan))
+    ? (override.until ? t.compUntil(isolate(PLANS[override.plan].name), longDate(override.until)) : t.comp(isolate(PLANS[override.plan].name)))
+    : !billing?.enabled
+      ? t.paymentBody
+      : !subscription
+        ? t.freeBody
+        : pastDue
+          ? t.pastDueBody
+          : subscription.active && subscription.currentPeriodEnd
+            ? (subscription.cancelAtPeriodEnd ? t.cancels : t.renews)(isolate(PLANS[subscription.plan].name), longDate(subscription.currentPeriodEnd))
+            : t.manageAny;
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -215,6 +244,16 @@ function BillingPage({ locale }: { locale: Locale }) {
           </p>
         )}
         {activation === 'slow' && <p className="text-sm rounded-xl border border-line p-4">{t.activationSlow}</p>}
+        {/* A failed renewal: the plan stays during the grace period while Polar retries the card */}
+        {pastDue && subscription.graceEndsAt && (
+          <div role="alert" className="text-sm text-amber-900 rounded-xl border border-amber-500 bg-amber-50 p-4">
+            <p className="font-semibold">{t.pastDueGrace(longDate(subscription.graceEndsAt))}</p>
+            {subscription.nextRetryAt && <p className="mt-1">{t.nextRetry(longDate(subscription.nextRetryAt))}</p>}
+            <button type="button" onClick={openPortal} disabled={busy !== null} className="mt-3 btn-secondary !bg-paper disabled:opacity-60">
+              {busy === 'portal' && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {t.updateCard}
+            </button>
+          </div>
+        )}
         {subscription && !subscription.active && subscription.status === 'past_due' && (
           <p className="text-sm text-amber-900 rounded-xl border border-amber-500 bg-amber-50 p-4">{t.pastDue}</p>
         )}
@@ -261,6 +300,11 @@ function BillingPage({ locale }: { locale: Locale }) {
                 </button>
               )}
               {actionError?.at === 'portal' && <p role="alert" className="mt-3 text-sm text-red-700">{t.errors[actionError.key]}</p>}
+              {subscription?.active && (
+                <Link href={localePath(locale, '/cancel')} className="inline-flex items-center min-h-10 mt-2 text-sm text-graphite underline underline-offset-4 hover:text-ink">
+                  {t.cancelLink}
+                </Link>
+              )}
             </section>
             <section className="rounded-2xl border border-line p-6">
               <h2 className="flex items-center gap-2 font-semibold mb-2"><Receipt size={18} strokeWidth={1.75} aria-hidden="true" /> {t.invoices}</h2>
@@ -287,14 +331,21 @@ function BillingPage({ locale }: { locale: Locale }) {
             const name = isolate(plan.name);
             // Already canceled: the free plan takes over when the paid period ends
             const freeFrom = plan.id === 'free' && subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd;
+            // A comp from KaruAI already covers this plan
+            const coveredByComp = !!override && planRank(plan.id) <= planRank(override.plan);
             const label = current
               ? t.yourPlan
               : !billing?.enabled
                 ? t.soon
-                : subscribed
-                  ? plan.id === 'free' ? (freeFrom ? t.freeFrom(longDate(freeFrom)) : t.cancelInPortal) : t.switchTo(name)
-                  : plan.id === 'free' ? t.included : t.upgrade(name);
-            const disabled = current || !billing?.enabled || busy !== null || (plan.id === 'free' && (!subscribed || !!freeFrom));
+                : pastDue
+                  ? t.updateCard
+                  : coveredByComp
+                    ? t.included
+                    : subscribed
+                      ? plan.id === 'free' ? (freeFrom ? t.freeFrom(longDate(freeFrom)) : t.cancelInPortal) : t.switchTo(name)
+                      : plan.id === 'free' ? t.included : t.upgrade(name);
+            const disabled = current || !billing?.enabled || busy !== null || (!pastDue && coveredByComp)
+              || (!pastDue && plan.id === 'free' && (!subscribed || !!freeFrom));
             const style = current
               ? plan.highlighted ? 'bg-lime text-ink' : 'bg-ink text-paper'
               : disabled
@@ -304,7 +355,7 @@ function BillingPage({ locale }: { locale: Locale }) {
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => (subscribed ? openPortal() : isPaidPlanId(plan.id) && checkout(plan.id))}
+                onClick={() => (subscribed || pastDue ? openPortal() : isPaidPlanId(plan.id) && checkout(plan.id))}
                 className={`btn w-full whitespace-normal text-center ${style}`}
               >
                 {busy === plan.id && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {label}

@@ -1,21 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { AppShell, PageHeading } from '@/components/app-shell';
 import { adminMessages } from '@/messages/admin';
 import { appMessages } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
-import { PAID_PLAN_IDS, PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
+import { PLANS, PLAN_IDS, type PaidPlanId, type PlanId } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser, User } from '@/types';
 
 type Setting = { key: string; value: string; source: 'admin' | 'env' | 'none'; envName: string; updatedAt: string | null };
-type AdminUser = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'> };
+type Subscription = { plan: PaidPlanId; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean };
+type AdminUser = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'>; subscription: Subscription | null };
 type Stats = {
   users: number;
   activeLast7Days: number;
   suspended: number;
   carousels: number;
+  paying: number;
+  comped: number;
   plans: Partial<Record<PlanId, number>>;
   month: Omit<MonthlyUsage, 'month'>;
   daily: { day: string; messages: number; images: number; tokens: number }[];
@@ -45,9 +48,19 @@ async function request<T>(locale: Locale, url: string, init?: RequestInit): Prom
     throw new Error(t.offline);
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.code === 'has_subscription' ? t.hasSubscription : (locale === 'en' && data?.error) || t.requestFailed(res.status));
+  if (!res.ok) {
+    const known = data?.code === 'has_subscription' ? t.hasSubscription
+      : data?.code === 'below_subscription' ? t.belowSubscription(PLANS[data.subscriptionPlan as PlanId]?.name ?? '')
+      : data?.code === 'polar_unavailable' ? t.polarUnavailable
+      : null;
+    throw new Error(known || (locale === 'en' && data?.error) || t.requestFailed(res.status));
+  }
   return data as T;
 }
+
+// A subscription that will charge again: it grants its plan and is not set to end
+const renewing = (subscription: Subscription | null) =>
+  !!subscription && ['active', 'trialing', 'past_due'].includes(subscription.status) && !subscription.cancelAtPeriodEnd;
 
 const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (setting: Setting) => void; locale: Locale }) => {
   const t = adminMessages[locale];
@@ -193,6 +206,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compFor, setCompFor] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     request<{ settings: Setting[] }>(locale, '/api/admin/settings').then(data => setSettings(data.settings)).catch(err => setError(err.message));
@@ -210,14 +224,34 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
     }
   };
 
-  const toggleSuspended = (user: AdminUser) => {
+  const day = (iso: string | null) => formatDate(iso, locale, { dateStyle: 'medium' });
+
+  // Suspending a payer also sets their subscription to end at the period's end, unless the admin says no
+  const toggleSuspended = async (user: AdminUser) => {
     const suspend = !user.suspendedAt;
-    if (suspend && !confirm(t.confirmSuspend(user.email))) return;
-    updateUser(user, { suspended: suspend });
+    if (!suspend) return updateUser(user, { suspended: false });
+    if (!confirm(t.confirmSuspend(user.email))) return;
+    const sub = user.subscription;
+    const cancelSubscription = renewing(sub) ? confirm(t.confirmSuspendSubscription(PLANS[sub!.plan].name, day(sub!.currentPeriodEnd))) : false;
+    try {
+      const data = await request<{ user: User; subscription: 'canceled' | 'failed' | null }>(locale, `/api/admin/users/${user.id}`, {
+        method: 'PATCH', body: JSON.stringify({ suspended: true, cancelSubscription }),
+      });
+      setUsers(prev => prev?.map(item => (item.id === user.id
+        ? { ...item, ...data.user, subscription: data.subscription === 'canceled' && item.subscription ? { ...item.subscription, cancelAtPeriodEnd: true } : item.subscription }
+        : item)) ?? null);
+      if (data.subscription === 'failed') alert(t.suspendSubscriptionFailed);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t.updateFailed);
+    }
   };
 
   const removeUser = async (user: AdminUser) => {
-    if (!confirm(t.confirmDelete(user.email, user.carouselCount))) return;
+    const sub = user.subscription;
+    const question = renewing(sub)
+      ? t.confirmDeletePayer(user.email, user.carouselCount, PLANS[sub!.plan].name, day(sub!.currentPeriodEnd))
+      : t.confirmDelete(user.email, user.carouselCount);
+    if (!confirm(question)) return;
     try {
       await request(locale, `/api/admin/users/${user.id}`, { method: 'DELETE' });
       setUsers(prev => prev?.filter(item => item.id !== user.id) ?? null);
@@ -230,7 +264,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
     { label: t.tiles.users, value: stats?.users },
     { label: t.tiles.active, value: stats?.activeLast7Days },
     { label: t.tiles.carousels, value: stats?.carousels },
-    { label: t.tiles.paying, value: stats ? PAID_PLAN_IDS.reduce((sum, id) => sum + (stats.plans[id] ?? 0), 0) : undefined },
+    { label: t.tiles.paying, value: stats?.paying },
     { label: t.tiles.messages, value: stats?.month.messages },
     { label: t.tiles.images, value: stats?.month.images },
     { label: t.tiles.tokens, value: stats?.month.tokens },
@@ -252,18 +286,31 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
       <option value="admin">{t.roles.admin}</option>
     </select>
   );
-  const planSelect = (user: AdminUser, isMe: boolean) => (
-    <select
-      value={user.plan}
-      disabled={isMe}
-      onChange={e => updateUser(user, { plan: e.target.value })}
-      title={isMe ? t.ownPlan : undefined}
-      aria-label={t.planOf(user.email)}
-      className={select}
-    >
-      {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
-    </select>
-  );
+  // The plan, where it comes from (Polar or a comp), and a button to change the comp
+  const planSelect = (user: AdminUser, isMe: boolean) => {
+    const sub = user.subscription;
+    const state = !sub ? null
+      : sub.status === 'past_due' ? t.polarState.pastDue
+      : !['active', 'trialing'].includes(sub.status) ? t.polarState.ended
+      : sub.cancelAtPeriodEnd ? t.polarState.ends(day(sub.currentPeriodEnd))
+      : t.polarState.renews(day(sub.currentPeriodEnd));
+    return (
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold"><bdi dir="ltr">{PLANS[user.plan].name}</bdi></span>
+          {!isMe && (
+            <button type="button" onClick={() => setCompFor(user)} aria-label={t.changePlanOf(user.email)} className="min-h-10 text-sm font-semibold px-2 rounded-lg underline underline-offset-4 hover:bg-mist">
+              {t.changePlan}
+            </button>
+          )}
+        </div>
+        {sub && state && <p className="text-xs text-graphite">{t.polarBadge(PLANS[sub.plan].name, state)}</p>}
+        {user.planOverride && (
+          <p className="text-xs"><span className="bg-lime text-ink rounded px-1 font-semibold">{t.compBadge(PLANS[user.planOverride].name, user.planOverrideUntil && day(user.planOverrideUntil))}</span></p>
+        )}
+      </div>
+    );
+  };
   // No dir="ltr": in Hebrew the three numbers read right to left, in the same order as the column title
   const month = (user: AdminUser) => (
     <span className="whitespace-nowrap tabular-nums" title={t.monthTitle}>{user.usage.carousels} / {user.usage.messages} / {user.usage.images}</span>
@@ -317,6 +364,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
                 {PLAN_IDS.map(id => (
                   <li key={id}><span dir="ltr">{PLANS[id].name}</span> <span className="font-semibold text-ink tabular-nums">{formatNumber(stats.plans[id] ?? 0, locale)}</span></li>
                 ))}
+                <li>{t.comped} <span className="font-semibold text-ink tabular-nums">{formatNumber(stats.comped, locale)}</span></li>
               </ul>
             </div>
           </div>
@@ -324,6 +372,10 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
           <DailyChart daily={stats.daily} locale={locale} />
         </section>
       )}
+
+      <BillingHealth locale={locale} />
+
+      <SupportRequests locale={locale} />
 
       <section className={card}>
         <h2 className={sectionTitle}>{t.keys}</h2>
@@ -407,7 +459,218 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
           </>
         )}
       </section>
+
+      {compFor && (
+        <CompDialog
+          user={compFor}
+          locale={locale}
+          onClose={() => setCompFor(null)}
+          onSaved={next => {
+            setUsers(prev => prev?.map(item => (item.id === next.id ? { ...item, ...next } : item)) ?? null);
+            setCompFor(null);
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+// Changing a user's plan by hand: a comp kept apart from Polar, optionally until a date
+function CompDialog({ user, locale, onClose, onSaved }: { user: AdminUser; locale: Locale; onClose: () => void; onSaved: (user: User) => void }) {
+  const t = adminMessages[locale];
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [plan, setPlan] = useState<PlanId>(user.planOverride ?? user.plan);
+  const [until, setUntil] = useState(user.planOverrideUntil?.slice(0, 10) ?? '');
+  const [reason, setReason] = useState(user.planOverrideReason ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await request<{ user: User }>(locale, `/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ plan, until: until ? new Date(`${until}T23:59:59`).toISOString() : null, reason: reason || null }),
+      });
+      onSaved(data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.updateFailed);
+      setBusy(false);
+    }
+  };
+
+  const field = 'w-full min-h-10 border border-line bg-paper rounded-lg px-3 py-2 text-sm';
+  return (
+    <dialog ref={dialog} onClose={onClose} aria-labelledby="comp-title" className="rounded-2xl p-0 backdrop:bg-ink/40 w-[min(32rem,calc(100vw-2rem))]">
+      <form onSubmit={save} className="p-6 space-y-4 text-ink">
+        <h2 id="comp-title" className="font-display font-bold text-3xl leading-none break-words">{t.compTitle(user.email)}</h2>
+        <p className="text-sm text-graphite">{t.compHelp}</p>
+        <label className="block text-sm">
+          <span className="block font-medium mb-1">{t.compPlan}</span>
+          <select value={plan} onChange={e => setPlan(e.target.value as PlanId)} className={field}>
+            {PLAN_IDS.map(id => <option key={id} value={id}>{PLANS[id].name}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="block font-medium mb-1">{t.compUntil}</span>
+          <input type="date" value={until} onChange={e => setUntil(e.target.value)} disabled={plan === 'free'} className={field} />
+        </label>
+        <label className="block text-sm">
+          <span className="block font-medium mb-1">{t.compReason}</span>
+          <input value={reason} onChange={e => setReason(e.target.value)} maxLength={200} disabled={plan === 'free'} className={field} />
+        </label>
+        <p role="alert" className="text-sm text-red-700 empty:hidden">{error}</p>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <button type="button" onClick={() => dialog.current?.close()} className="btn-secondary">{t.compCancel}</button>
+          <button type="submit" disabled={busy} className="btn-primary disabled:opacity-60">
+            {busy && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {t.compSave}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+type Health = {
+  configured: boolean;
+  server: 'sandbox' | 'production';
+  token: 'ok' | 'missing' | 'refused' | 'unreachable';
+  products: { plan: PaidPlanId; id: string | null; name: string | null; amount: number | null; expected: number; problems: string[] }[];
+  webhookSecret: boolean;
+  lastWebhookAt: string | null;
+  apiVersion: { sent: string; answered: string | null };
+  ignoredWebhooks: { receivedAt: string; type: string; reason: string }[];
+};
+
+// Whether payments can work, checked against Polar when the page opens
+function BillingHealth({ locale }: { locale: Locale }) {
+  const t = adminMessages[locale];
+  const [health, setHealth] = useState<Health | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    request<Health>(locale, '/api/admin/billing-health').then(setHealth).catch(err => setError(err.message));
+  }, [locale]);
+
+  const price = (agorot: number | null) => (agorot === null ? '—' : `₪${agorot / 100}`);
+  const rows = health && [
+    { ok: health.configured, text: health.configured ? t.billingServer(health.server) : t.billingNotConfigured },
+    { ok: health.token === 'ok', text: t.billingToken[health.token] },
+    ...health.products.map(product => ({
+      ok: product.problems.length === 0,
+      text: t.billingProduct(PLANS[product.plan].name, product.problems.length ? product.problems.join(', ') : price(product.amount)),
+    })),
+    { ok: health.webhookSecret, text: t.billingWebhookSecret(health.webhookSecret) },
+    { ok: true, text: t.billingLastWebhook(health.lastWebhookAt && formatDate(health.lastWebhookAt, locale)) },
+    { ok: !health.apiVersion.answered || health.apiVersion.answered === health.apiVersion.sent, text: t.billingVersion(health.apiVersion.sent, health.apiVersion.answered) },
+  ];
+  const allOk = rows?.every(row => row.ok);
+  return (
+    <section className={card}>
+      <h2 className={sectionTitle}>{t.billing}</h2>
+      <p className="text-sm text-graphite mt-3 mb-4 max-w-2xl">{t.billingSub}</p>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {!rows ? (
+        !error && <div role="status" className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+      ) : (
+        <>
+          {allOk && <p className="mb-3 text-sm font-semibold"><span className="bg-lime text-ink rounded px-1">{t.billingOk}</span></p>}
+          <ul className="space-y-1.5 text-sm">
+            {rows.map(row => (
+              <li key={row.text} className={row.ok ? '' : 'text-red-700 font-semibold'}>
+                <span aria-hidden="true">{row.ok ? '✓' : '✗'}</span> {row.text}
+              </li>
+            ))}
+          </ul>
+          <h3 className="font-semibold mt-6 mb-2">{t.ignored}</h3>
+          {health!.ignoredWebhooks.length === 0 ? (
+            <p className="text-sm text-graphite">{t.ignoredNone}</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-graphite">
+              {health!.ignoredWebhooks.map(item => (
+                <li key={`${item.receivedAt}-${item.type}`}><bdi>{t.ignoredRow(item.type, item.reason, formatDate(item.receivedAt, locale))}</bdi></li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+type SupportRequest = {
+  id: string;
+  createdAt: string;
+  category: string;
+  status: 'open' | 'done';
+  name: string | null;
+  email: string | null;
+  idNumber: string | null;
+  plan: string | null;
+  page: string | null;
+  message: string | null;
+};
+
+// Cancellations and contact messages, open ones first
+function SupportRequests({ locale }: { locale: Locale }) {
+  const t = adminMessages[locale];
+  const [requests, setRequests] = useState<SupportRequest[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    request<{ requests: SupportRequest[] }>(locale, '/api/admin/requests').then(data => setRequests(data.requests)).catch(err => setError(err.message));
+  }, [locale]);
+
+  const close = async (id: string) => {
+    try {
+      await request(locale, `/api/admin/requests/${encodeURIComponent(id)}/done`, { method: 'POST' });
+      setRequests(prev => prev?.map(item => (item.id === id ? { ...item, status: 'done' } : item)) ?? null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t.updateFailed);
+    }
+  };
+
+  return (
+    <section className={card}>
+      <h2 className={sectionTitle}>{t.requests}</h2>
+      <p className="text-sm text-graphite mt-3 mb-4 max-w-2xl">{t.requestsSub}</p>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {!requests ? (
+        !error && <div role="status" className="flex items-center gap-2 text-sm text-graphite"><Loader2 size={16} className="animate-spin" /> {appMessages[locale].shell.loading}</div>
+      ) : requests.length === 0 ? (
+        <p className="text-sm text-graphite">{t.noRequests}</p>
+      ) : (
+        <ul className="divide-y divide-line border-t border-ink">
+          {requests.map(item => (
+            <li key={item.id} className={`py-4 text-sm ${item.status === 'done' ? 'text-graphite' : ''}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">
+                  <span dir="ltr">{item.id}</span> · {t.categories[item.category] ?? item.category} · {item.status === 'open' ? t.requestOpen : t.requestClosed}
+                  <span className="ms-2 font-normal text-graphite">{formatDate(item.createdAt, locale)}</span>
+                </p>
+                {item.status === 'open' && (
+                  <button type="button" onClick={() => close(item.id)} aria-label={t.requestDoneNamed(item.id)} className="btn-secondary !min-h-10 !py-1.5">
+                    {t.requestDone}
+                  </button>
+                )}
+              </div>
+              <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+                {(['name', 'email', 'idNumber', 'plan', 'page', 'message'] as const).map(key => item[key] && (
+                  <div key={key} className="contents">
+                    <dt className="text-graphite">{t.requestFields[key]}</dt>
+                    <dd className="break-words whitespace-pre-line"><bdi>{item[key]}</bdi></dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

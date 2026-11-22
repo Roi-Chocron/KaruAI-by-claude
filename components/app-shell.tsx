@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { LogOut, Menu, X } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
+import { BusinessDetailsLine } from '@/components/business';
 import { LanguageSwitch } from '@/components/language-switch';
 import { UserLocaleRoot } from '@/components/locale-root';
 import { logOut } from '@/lib/session';
@@ -127,16 +128,26 @@ function Frame({ user, active, locale, children }: { user: PublicUser; active: A
           </div>
         )}
       </header>
+      {/* A failed renewal: shown on every signed-in page while Polar retries the card (the plan stays meanwhile) */}
+      {user.paymentIssue && active !== 'billing' && (
+        <div role="alert" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <p className="text-sm text-amber-900 rounded-xl border border-amber-500 bg-amber-50 p-4">
+            {t.paymentIssue(new Date(user.paymentIssue.graceEndsAt).toLocaleDateString(locale === 'he' ? 'he-IL' : 'en-GB', { dateStyle: 'long' }))}{' '}
+            <Link href="/billing" className="font-semibold underline underline-offset-4">{t.paymentIssueLink}</Link>
+          </p>
+        </div>
+      )}
       {children}
       {/* The accessibility statement has to be reachable from every page (IS 5568) */}
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-8 border-t border-line">
         <nav aria-label={t.footer} className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-graphite">
-          {(['accessibility', 'terms', 'privacy'] as const).map(page => (
+          {(['accessibility', 'terms', 'privacy', 'contact', 'cancel'] as const).map(page => (
             <Link key={page} href={localePath(locale, `/${page}`)} className="inline-flex items-center min-h-10 hover:text-ink">
               {t[page]}
             </Link>
           ))}
         </nav>
+        <BusinessDetailsLine locale={locale} className="mt-3" />
       </footer>
     </div>
   );

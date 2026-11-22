@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { BusinessValue, EmailLink, Registration } from '@/components/business';
+import { BUSINESS } from '@/shared/business';
 import { LegalPage, legalMetadata } from '@/components/legal-page';
 
 export const metadata = legalMetadata('en', '/terms', 'Terms of Service - KaruAI', 'Terms of Service for using the KaruAI platform and AI carousel generation services.');
@@ -10,7 +12,7 @@ export default function TermsPage() {
       <section>
         <h2>1. Acceptance of Terms</h2>
         <p>
-          Welcome to <strong>KaruAI</strong> ("Service", "Platform", "we", "us"). By accessing, registering, or using our website and AI design generation services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.
+          Welcome to <strong>KaruAI</strong> ("Service", "Platform", "we", "us"), operated by <BusinessValue value={BUSINESS.legalName} missing="business name" /> (<Registration locale="en" />), <BusinessValue value={BUSINESS.address} missing="business address" />. By accessing, registering, or using our website and AI design generation services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.
         </p>
       </section>
 
@@ -44,7 +46,7 @@ export default function TermsPage() {
       <section>
         <h2>5. Subscriptions & Payments</h2>
         <p>
-          We provide a free plan and paid subscription plans (Basic, Pro, VIP). Paid plans are priced in Israeli shekels and billed in advance every month through our payment provider, Polar (polar.sh), until you cancel. For cancellation conditions and refund eligibility, please review our <Link href="/refund">Refund & Cancellation Policy</Link>.
+          We provide a free plan and paid subscription plans (Basic, Pro, VIP). Paid plans are priced in Israeli shekels, including VAT, and billed in advance every month until you cancel. Payments are processed by Polar (polar.sh), which sells the subscription to you as our reseller and merchant of record. You can cancel at any time, including on the <Link href="/cancel">Cancel subscription</Link> page; within 14 days of your first payment you get your money back minus the days you used. The full terms are in our <Link href="/refund">Cancellation & Refund Policy</Link>.
         </p>
       </section>
 
@@ -65,7 +67,7 @@ export default function TermsPage() {
       <section>
         <h2>8. Contact Information</h2>
         <p>
-          If you have any questions or feedback regarding these Terms, please contact us at <a href="mailto:support@karuai.com" dir="ltr">support@karuai.com</a>.
+          If you have any questions or feedback regarding these Terms, please contact us at <EmailLink email={BUSINESS.supportEmail} missing="support email" />.
         </p>
       </section>
     </LegalPage>

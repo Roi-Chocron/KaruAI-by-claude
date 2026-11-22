@@ -1,9 +1,10 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import { normalizeEmail, publicUser, randomToken, upsertDevUser, upsertGoogleUser } from '../db';
+import { getCurrentSubscription, grantsAccess, normalizeEmail, publicUser, randomToken, upsertDevUser, upsertGoogleUser } from '../db';
 import {
     clearSessionCookies, clientIp, createApp, currentUser, devLoginEnabled, endSession, errorJson, isSecure, rateLimit, startSession,
     SUSPENDED_MESSAGE, type AppContext,
 } from '../app';
+import { accessTimes } from './billing';
 
 // Sign-in with Google (OAuth 2.0 authorization code flow with PKCE). There are no passwords.
 
@@ -141,7 +142,13 @@ auth.get('/me', async c => {
         return user ? errorJson(c, SUSPENDED_MESSAGE, 403, { code: 'suspended' }) : errorJson(c, 'Please sign in.', 401);
     }
     c.header('Cache-Control', 'no-store');
-    return c.json({ user: publicUser(user) });
+    // A failed renewal still in its grace period, for the banner on every signed-in page
+    const at = accessTimes(c.env);
+    const subscription = user.plan === 'free' ? null : await getCurrentSubscription(c.env.DB, user.id, at);
+    const paymentIssue = subscription?.status === 'past_due' && grantsAccess(subscription, at) && subscription.pastDueAt
+        ? { graceEndsAt: new Date(Date.parse(subscription.pastDueAt) + (Date.parse(at.now) - Date.parse(at.graceStart))).toISOString() }
+        : null;
+    return c.json({ user: { ...publicUser(user), paymentIssue } });
 });
 
 auth.post('/logout', async c => {

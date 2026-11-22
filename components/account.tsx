@@ -7,8 +7,9 @@ import { resetUser } from '@/lib/analytics';
 import { AppShell, Avatar, PageHeading } from '@/components/app-shell';
 import { fetchAccount, UsageMeter, type AccountSummary } from '@/components/billing';
 import { appMessages } from '@/messages/app';
-import type { Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n';
 import { RequireAuth } from '@/lib/session';
+import { PLANS, type PaidPlanId } from '@/shared/plans';
 import type { PublicUser } from '@/types';
 
 const card = 'rounded-2xl border border-line p-6 sm:p-8';
@@ -16,8 +17,8 @@ const heading = 'font-display font-bold text-4xl leading-none mb-6';
 const field = 'w-full border border-line rounded-[10px] px-3.5 py-3 bg-paper focus:outline-none focus:border-ink';
 
 // The worker answers in English; the messages it can send this page are shown in the visitor's language
-type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin' | 'hasSubscription';
-const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin', 'hasSubscription'];
+type ServerMessage = 'nameInvalid' | 'confirmMismatch' | 'onlyAdmin' | 'hasSubscription' | 'polarUnavailable';
+const serverMessages: ServerMessage[] = ['nameInvalid', 'confirmMismatch', 'onlyAdmin', 'hasSubscription', 'polarUnavailable'];
 type ErrorMessage = ServerMessage | 'saveFailed' | 'deleteFailed';
 
 class RequestError extends Error {
@@ -40,11 +41,23 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<ErrorMessage | null>(null);
 
+  // A subscription that renews: deleting the account ends it now and refunds the unused days, so the box says so
+  const [renewing, setRenewing] = useState<{ plan: string; date: string } | null>(null);
+
   useEffect(() => {
     fetchAccount()
       .then(data => { setAccount(data); setName(data.user.name); })
       .catch(() => setError(true));
-  }, []);
+    fetch('/api/billing')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        const sub = data?.subscription;
+        if (sub?.active && !sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
+          setRenewing({ plan: PLANS[sub.plan as PaidPlanId].name, date: new Date(sub.currentPeriodEnd).toLocaleDateString(locale === 'he' ? 'he-IL' : 'en-GB', { dateStyle: 'long' }) });
+        }
+      })
+      .catch(() => undefined);
+  }, [locale]);
 
   const send = async (url: string, init: RequestInit) => {
     const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json' } });
@@ -158,6 +171,12 @@ function AccountPage({ user, locale }: { user: PublicUser; locale: Locale }) {
           <section className={`${card} !border-red-700`}>
             <h2 className={`${heading} text-red-700`}>{t.deleteTitle}</h2>
             <p className="text-graphite mb-5">{t.deleteBody(account.carouselCount)}</p>
+            {renewing && (
+              <p className="text-graphite -mt-2 mb-5">
+                {t.deleteSubscription(`\u2068${renewing.plan}\u2069`, renewing.date)}{' '}
+                <Link href={localePath(locale, '/refund')} className="underline underline-offset-4 hover:text-ink">{t.refundPolicy}</Link>
+              </p>
+            )}
             <form onSubmit={deleteAccount} className="flex flex-col sm:flex-row gap-2">
               <input
                 value={confirmEmail}

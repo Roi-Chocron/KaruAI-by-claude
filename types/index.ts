@@ -43,8 +43,9 @@ export interface UndoHistory {
     index: number;
 }
 
-// The signed-in user as the API hands it to the browser
-export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'avatarUrl' | 'role' | 'plan'>;
+// The signed-in user as the API hands it to the browser. paymentIssue is set (by /api/auth/me) while a failed renewal
+// is retried, so every signed-in page can say so.
+export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'avatarUrl' | 'role' | 'plan'> & { paymentIssue?: { graceEndsAt: string } | null };
 
 // What a user used in a calendar month (UTC), as counted by the API
 export interface MonthlyUsage {
