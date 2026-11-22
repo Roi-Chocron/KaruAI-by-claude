@@ -97,6 +97,11 @@ const ELEMENT_SCHEMA = {
     required: ['id', 'type', 'name', 'x', 'y', 'w', 'h', 'rotation', 'fillColor', 'fillOpacity'],
 } satisfies ResponseSchema;
 
+// Caps on what one answer may contain: the slides in the schema, and the tokens Gemini may write (well above a full
+// 20-slide carousel), so a runaway answer can't cost more than that
+export const MAX_SLIDES = 20;
+const MAX_OUTPUT_TOKENS = 32_768;
+
 export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
     type: SchemaType.OBJECT,
     properties: {
@@ -106,7 +111,8 @@ export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
         },
         slides: {
             type: SchemaType.ARRAY,
-            description: 'The carousel slides in display order',
+            description: 'The carousel slides in display order (at most 20)',
+            maxItems: MAX_SLIDES,
             items: {
                 type: SchemaType.OBJECT,
                 properties: {
@@ -114,7 +120,7 @@ export const CAROUSEL_RESPONSE_SCHEMA: ResponseSchema = {
                     title: { type: SchemaType.STRING, description: 'Short summary of the slide, for the editor UI' },
                     imagePrompt: {
                         type: SchemaType.STRING,
-                        description: 'English prompt for the image element of withImage, composed for its aspect ratio',
+                        description: 'English prompt for the image element of withImage, composed for its aspect ratio, at most 600 characters',
                     },
                     withImage: { type: SchemaType.ARRAY, items: ELEMENT_SCHEMA, description: 'Design with exactly one image element' },
                     withoutImage: { type: SchemaType.ARRAY, items: ELEMENT_SCHEMA, description: 'Design without any image element' },
@@ -154,7 +160,7 @@ export async function generateKaruResponse(options: {
     const modelConfig: ModelParams = {
         model: modelName,
         // Force structured JSON output matching the carousel schema
-        generationConfig: { responseMimeType: 'application/json', responseSchema: CAROUSEL_RESPONSE_SCHEMA },
+        generationConfig: { responseMimeType: 'application/json', responseSchema: CAROUSEL_RESPONSE_SCHEMA, maxOutputTokens: MAX_OUTPUT_TOKENS },
     };
     if (systemPrompt.trim() !== '') modelConfig.systemInstruction = systemPrompt;
     const chat = new GoogleGenerativeAI(apiKey).getGenerativeModel(modelConfig).startChat({
@@ -192,4 +198,48 @@ export async function generateKaruResponse(options: {
     } satisfies ConversationState);
 
     return { responseText, currentRequestTokens, totalConversationTokens };
+}
+
+// --- Checking generated images ---
+
+// A small, cheap model for one question per image
+export const IMAGE_MODERATION_MODEL = 'gemini-3.5-flash-lite';
+
+const MODERATION_SCHEMA: ResponseSchema = {
+    type: SchemaType.OBJECT,
+    properties: {
+        allowed: { type: SchemaType.BOOLEAN, description: 'true when the image may be shown' },
+        reason: { type: SchemaType.STRING, description: 'A few words on why not, empty when allowed' },
+    },
+    required: ['allowed', 'reason'],
+};
+
+const MODERATION_PROMPT = [
+    'This image was generated for a slide in a social media carousel. Decide whether it may be shown.',
+    'Not allowed: nudity or sexual content, graphic violence, gore or self-harm, hateful symbols, and anything that',
+    'sexualizes minors. Everything else is allowed, including people, everyday scenes, text and logos.',
+].join(' ');
+
+const toBase64 = (bytes: ArrayBuffer) => {
+    const view = new Uint8Array(bytes);
+    let binary = '';
+    for (let i = 0; i < view.length; i += 0x8000) binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
+    return btoa(binary);
+};
+
+// Whether a generated image may be shown, as Gemini sees it
+export async function moderateImage(options: { apiKey: string; image: ArrayBuffer; mimeType: string; model?: string }) {
+    const model = new GoogleGenerativeAI(options.apiKey).getGenerativeModel(
+        {
+            model: options.model ?? IMAGE_MODERATION_MODEL,
+            generationConfig: { responseMimeType: 'application/json', responseSchema: MODERATION_SCHEMA, maxOutputTokens: 200 },
+        },
+        { timeout: 20_000 }
+    );
+    const result = await model.generateContent([
+        { inlineData: { data: toBase64(options.image), mimeType: options.mimeType } },
+        { text: MODERATION_PROMPT },
+    ]);
+    const verdict = JSON.parse(result.response.text());
+    return { allowed: verdict?.allowed !== false, reason: typeof verdict?.reason === 'string' ? verdict.reason : '' };
 }

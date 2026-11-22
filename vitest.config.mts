@@ -20,6 +20,9 @@ export default defineConfig(async () => {
             GEMINI_API_KEY: 'test-gemini-key',
             GEMINI_MODEL: '',
             POLLINATIONS_API_KEY: 'test-pollinations-key',
+            POLLINATIONS_MODEL: '',
+            // Checked in its own tests, which turn it on
+            IMAGE_MODERATION: 'off',
             GOOGLE_CLIENT_ID: '',
             GOOGLE_CLIENT_SECRET: '',
             SENTRY_DSN: '',

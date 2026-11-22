@@ -19,7 +19,7 @@ export interface User {
     planOverrideReason: string | null;
 }
 
-export type SettingKey = 'gemini_api_key' | 'pollinations_api_key' | 'gemini_model';
+export type SettingKey = 'gemini_api_key' | 'pollinations_api_key' | 'gemini_model' | 'pollinations_model' | 'image_moderation';
 
 export interface CarouselRow {
     id: string;
@@ -130,7 +130,9 @@ export interface PollinationsImageOptions {
     width?: number;
     height?: number;
     seed?: number;
-    safe?: boolean;
+    // true, or a comma-separated list of Pollinations' safety features (see IMAGE_SAFETY in worker/src/images.ts)
+    safe?: boolean | string;
+    model?: string;
     timeoutMs?: number;
     apiKey?: string;
 }

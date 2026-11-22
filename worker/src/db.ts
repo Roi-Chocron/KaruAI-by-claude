@@ -455,6 +455,8 @@ export const SETTING_ENV = {
     gemini_api_key: 'GEMINI_API_KEY',
     pollinations_api_key: 'POLLINATIONS_API_KEY',
     gemini_model: 'GEMINI_MODEL',
+    pollinations_model: 'POLLINATIONS_MODEL',
+    image_moderation: 'IMAGE_MODERATION',
 } as const satisfies Record<SettingKey, keyof Env>;
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';

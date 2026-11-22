@@ -112,8 +112,8 @@ const SettingRow = ({ setting, onSaved, locale }: { setting: Setting; onSaved: (
             type={secret ? 'password' : 'text'}
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            placeholder={secret ? t.newKey : t.newModel}
-            aria-label={`${meta.label}: ${secret ? t.newKey : t.newModel}`}
+            placeholder={secret ? t.newKey : setting.key === 'image_moderation' ? t.newOnOff : t.newModel}
+            aria-label={`${meta.label}: ${secret ? t.newKey : setting.key === 'image_moderation' ? t.newOnOff : t.newModel}`}
             autoComplete="off"
             dir="ltr"
             className="min-w-0 flex-1 lg:flex-none lg:w-64 border border-line rounded-[10px] px-3 py-2.5 text-sm focus:outline-none focus:border-ink"

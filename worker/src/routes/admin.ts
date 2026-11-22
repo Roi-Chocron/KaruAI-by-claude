@@ -6,12 +6,20 @@ import {
     setSetting, setUserRole, setUserSuspended,
 } from '../db';
 import { getProduct, lastPolarVersion, listSubscriptionsPage, polarConfigured, PolarError, POLAR_VERSION, productId, updateSubscription } from '../polar';
+import { DEFAULT_IMAGE_MODEL } from '../images';
 import { deleteCarouselFiles } from '../storage';
 import { createApp, errorJson, requireAdmin, requireUser, type AppContext } from '../app';
 import { accessTimes, closeBillingForDeletion, renewingSubscription } from './billing';
 
 const SECRET_KEYS: SettingKey[] = ['gemini_api_key', 'pollinations_api_key'];
-const ALL_KEYS: SettingKey[] = [...SECRET_KEYS, 'gemini_model'];
+const ALL_KEYS: SettingKey[] = [...SECRET_KEYS, 'gemini_model', 'pollinations_model', 'image_moderation'];
+
+// What a setting means when nothing is set
+const DEFAULTS: Partial<Record<SettingKey, string>> = {
+    gemini_model: DEFAULT_GEMINI_MODEL,
+    pollinations_model: DEFAULT_IMAGE_MODEL,
+    image_moderation: 'on',
+};
 
 // API keys never go back to the browser in full: only their last 4 characters
 const mask = (value: string) => (value.length <= 8 ? '••••' : `••••••••${value.slice(-4)}`);
@@ -20,7 +28,7 @@ async function describe(env: Env, key: SettingKey) {
     const stored = await getStoredSetting(env.DB, key);
     const envValue = env[SETTING_ENV[key]];
     const value = stored?.value || envValue || '';
-    const shown = SECRET_KEYS.includes(key) ? (value ? mask(value) : '') : value || DEFAULT_GEMINI_MODEL;
+    const shown = SECRET_KEYS.includes(key) ? (value ? mask(value) : '') : value || DEFAULTS[key] || '';
     return {
         key,
         value: shown,
@@ -40,6 +48,9 @@ admin.put('/settings', async c => {
     const body: any = await c.req.json().catch(() => null);
     if (!ALL_KEYS.includes(body?.key) || (body.value !== null && typeof body.value !== 'string') || (body.value?.length ?? 0) > 500) {
         return errorJson(c, 'Invalid setting.', 400);
+    }
+    if (body.key === 'image_moderation' && body.value && !['on', 'off'].includes(body.value.trim())) {
+        return errorJson(c, '`image_moderation` must be "on" or "off".', 400);
     }
     await setSetting(c.env.DB, body.key, body.value);
     return c.json({ setting: await describe(c.env, body.key) });

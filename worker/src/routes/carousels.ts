@@ -4,7 +4,7 @@ import {
     deleteCarouselFiles, HistoryOutOfSyncError, IMAGE_TYPES, isCarouselId, MAX_IMAGE_BYTES, readCarouselDocument,
     readHistory, readImage, readThumbnail, saveHistory, saveImage, writeCarouselDocument, writeThumbnail,
 } from '../storage';
-import { createApp, errorJson, requireUser, useQuota, type AppContext } from '../app';
+import { bodySize, createApp, errorJson, requireUser, useQuota, type AppContext } from '../app';
 
 // The gallery and the editor's storage. Request and response bodies that are files (the document, images,
 // thumbnails) are streamed between the browser and R2 without being parsed, which keeps the Worker's CPU time low.
@@ -19,12 +19,6 @@ async function ownedCarousel(c: AppContext) {
 }
 
 const notFound = (c: AppContext) => errorJson(c, 'Carousel not found.', 404);
-
-// The body's size from Content-Length, or null when it is missing or over `max`
-function bodySize(c: AppContext, max: number): number | null {
-    const length = Number(c.req.header('content-length'));
-    return Number.isInteger(length) && length > 0 && length <= max ? length : null;
-}
 
 const carousels = createApp();
 carousels.use('*', requireUser);

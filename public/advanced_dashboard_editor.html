@@ -537,9 +537,21 @@
             ['Please sign in.', 'צריך להתחבר מחדש.'],
             ['Unexpected server error.', 'שגיאה לא צפויה בשרת.'],
         ];
+        // Hebrew for the errors the API names with a code (the English text comes from the API)
+        const HE_API_CODES = {
+            image_blocked: 'מסנן הבטיחות חסם את התמונה הזו. נסו לתאר אותה אחרת.',
+            image_unavailable: 'יצירת תמונות לא זמינה כרגע. נסו שוב מאוחר יותר.',
+            image_busy: 'שירות התמונות עמוס. מנסים שוב…',
+            image_failed: 'לא הצלחנו ליצור את התמונה. נסו שוב.',
+            message_too_long: 'ההודעה ארוכה מדי.',
+            prompt_too_long: 'תיאור התמונה ארוך מדי.',
+            carousel_too_large: 'הקרוסלה גדולה מדי לשליחה.',
+            request_too_large: 'הבקשה גדולה מדי.',
+        };
         function apiErrorMessage(data, status) {
             const message = typeof data?.error === 'string' ? data.error : '';
             if (LOCALE !== 'he') return message || `Request failed with status ${status}.`;
+            if (HE_API_CODES[data?.code]) return HE_API_CODES[data.code];
             if (data?.code === 'quota_exceeded') {
                 const what = { messages: 'הודעות ה־AI', images: 'תמונות ה־AI', carousels: 'הקרוסלות החדשות' }[data.kind] ?? 'השימושים';
                 return `ניצלתם את כל ${what} של התוכנית החודש (${data.limit}). שדרגו את התוכנית או חכו לחודש הבא.`;

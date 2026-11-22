@@ -9,7 +9,7 @@ export type AppEnv = { Bindings: Env; Variables: { user: User } };
 export type AppContext = Context<AppEnv>;
 export const createApp = () => new Hono<AppEnv>();
 
-export const errorJson = (c: AppContext, message: string, status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 502 | 503, extra?: Record<string, unknown>) =>
+export const errorJson = (c: AppContext, message: string, status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500 | 502 | 503, extra?: Record<string, unknown>) =>
     c.json({ error: message, ...extra }, status);
 
 // --- Sessions ---
@@ -78,6 +78,12 @@ export const sameOrigin = createMiddleware<AppEnv>(async (c, next) => {
     }
     await next();
 });
+
+// The body's size from Content-Length, or null when it is missing or over `max`
+export function bodySize(c: AppContext, max: number): number | null {
+    const length = Number(c.req.header('content-length'));
+    return Number.isInteger(length) && length > 0 && length <= max ? length : null;
+}
 
 // --- Rate limits and daily quotas ---
 

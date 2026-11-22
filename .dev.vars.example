@@ -13,6 +13,10 @@ ADMIN_EMAIL=
 GEMINI_API_KEY=
 GEMINI_MODEL=
 POLLINATIONS_API_KEY=
+# The Pollinations image model (default zimage) and whether Gemini checks each generated image before it is shown
+# (on/off, default on); both can also be set on the Admin page
+POLLINATIONS_MODEL=
+IMAGE_MODERATION=
 
 # Polar payments, against the sandbox (https://sandbox.polar.sh, test card 4242 4242 4242 4242, any future date and CVC).
 # Settings -> Access Tokens: create an Organization Access Token with the scopes checkouts:read, checkouts:write,
