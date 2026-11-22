@@ -9,6 +9,7 @@ import { api, APP, signIn } from './helpers';
 import { DAY, deliver, inDays, mockPolar, planOf, subscriptionEvent, subscriptionList, type PolarCall } from './polar-helpers';
 import created from './fixtures/polar/subscription.created.json';
 import canceled from './fixtures/polar/subscription.canceled.json';
+import orderRefunded from './fixtures/polar/order.refunded.json';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -259,6 +260,28 @@ describe('cancelling in the app', () => {
         expect(await planOf(cookie)).toBe('free');
     });
 
+    it('refunds every order of the period, an upgrade included, and none from before it', async () => {
+        const { cookie, data } = await subscriber('prod-pro');
+        const { calls } = polarWith(data, call => call.method === 'GET' && call.path === '/v1/orders/'
+            ? Response.json({ items: [
+                // The upgrade to Pro 5 days ago, charged for the 25 days left then
+                { id: 'ord_upgrade', status: 'paid', created_at: inDays(-5), total_amount: 2500, refundable_amount: 2500, currency: 'ils', subscription_id: data.id },
+                { id: 'ord_period', status: 'paid', created_at: inDays(-10), total_amount: 2900, refundable_amount: 2900, currency: 'ils', subscription_id: data.id },
+                { id: 'ord_last_month', status: 'paid', created_at: inDays(-40), total_amount: 2900, refundable_amount: 2900, currency: 'ils', subscription_id: data.id },
+                { id: 'ord_pending', status: 'pending', created_at: inDays(-1), total_amount: 500, refundable_amount: 0, currency: 'ils', subscription_id: data.id },
+            ] })
+            : null);
+        const body = await (await api('/api/billing/cancel', { method: 'POST', cookie, json: { mode: 'now' } })).json<any>();
+        const refunds = Object.fromEntries(calls.filter(call => call.path === '/v1/refunds/').map(call => [call.body.order_id, call.body.amount]));
+        // 20 days are left: 20/25 of the upgrade and 20/30 of the period's order
+        expect(Object.keys(refunds).sort()).toEqual(['ord_period', 'ord_upgrade']);
+        expect(refunds.ord_upgrade).toBeGreaterThan(1990);
+        expect(refunds.ord_upgrade).toBeLessThanOrEqual(2000);
+        expect(refunds.ord_period).toBeGreaterThan(1925);
+        expect(refunds.ord_period).toBeLessThanOrEqual(1934);
+        expect(body.refunded).toBe(refunds.ord_upgrade + refunds.ord_period);
+    });
+
     it('refuses a cancellation with nothing to cancel or an unknown mode', async () => {
         const { cookie } = await signIn();
         expect((await api('/api/billing/cancel', { method: 'POST', cookie, json: { mode: 'now' } })).status).toBe(409);
@@ -289,6 +312,16 @@ describe('cancelling in the app', () => {
 
 describe('refunds', () => {
     const order = (fields: Record<string, unknown>) => Response.json({ id: 'ord_9', status: 'refunded', total_amount: 5900, refunded_amount: 5900, currency: 'ils', ...fields });
+
+    it("ends the subscription on Polar's real order.refunded payload, once", async () => {
+        const { cookie, data } = await subscriber();
+        const event = { ...orderRefunded, data: { ...orderRefunded.data, id: 'ord_real', subscription_id: data.id } };
+        const { calls } = polarWith(data, call => call.path === '/v1/orders/ord_real' ? order({ id: 'ord_real', subscription_id: data.id }) : null);
+        expect((await deliver(event, { id: 'msg_refund_real' })).status).toBe(200);
+        expect((await deliver(event, { id: 'msg_refund_real' })).status).toBe(200);
+        expect(calls.filter(call => call.method === 'PATCH').length).toBe(1);
+        expect(await planOf(cookie)).toBe('free');
+    });
 
     it('a full refund ends the subscription, a partial one does not', async () => {
         const { cookie, data } = await subscriber();

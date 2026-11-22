@@ -74,6 +74,27 @@ reseller and merchant of record. Code: `worker/src/polar.ts` (the API client) an
 | Webhooks | can't reach localhost; the sync does the work | `<APP_URL>/api/billing/webhook` |
 | Cards | 4242 4242 4242 4242 (paid), 4000 0000 0000 0002 (declined), 4000 0000 0000 0341 (charges fail later) | real cards |
 
+### Checking payments in the sandbox
+
+Run this list after any billing change (`npm run dev`, Dev login, test cards as in the table). Polar can't reach
+localhost: to try a webhook, copy the payload from the sandbox endpoint's delivery log and post it to
+`http://localhost:8787/api/billing/webhook` signed with `POLAR_WEBHOOK_SECRET` (as `signWebhook()` in
+`worker/src/polar.ts` does). Last run 2026-11-22, all passed:
+
+- [x] Buy Basic with 4242…: back on /billing the plan is Basic at once (sync, no webhook); "payment received" only
+      for the user's own checkout.
+- [x] Declined card 4000 0000 0000 0002: the checkout says so, no subscription.
+- [x] Polar refuses a dev-login address (example.com): the checkout opens without it and asks for the email.
+- [x] Portal plan change Basic → Pro: charged right away (proration "invoice"), the plan follows on return.
+- [x] /cancel: cancel at period end, undo, then end now: unused days refunded on every paid order of the period,
+      subscription revoked, plan Free; each step gets a reference number on the Admin page.
+- [x] Full refund of an order in Polar, its order.refunded replayed (twice): the subscription is revoked once.
+- [x] Old and repeated deliveries change nothing; a bad signature gets 401.
+- [x] Suspending a payer from the Admin page sets the subscription to end at the period end.
+- [x] Deleting a payer: both orders refunded pro rata, subscription revoked, Polar customer deleted and anonymized.
+- [x] Admin Payments card green against the sandbox.
+- [ ] A failed renewal (4000 0000 0000 0341) can't be forced in the sandbox; the grace period is covered by tests.
+
 ### Production setup (Polar live)
 
 1. Organization settings: default currency ILS; tax behavior Inclusive; "Allow multiple subscriptions" off;

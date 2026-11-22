@@ -148,22 +148,26 @@ export async function renewingSubscription(env: Env, userId: string): Promise<Su
     return subscription && grantsAccess(subscription, at) && !subscription.cancelAtPeriodEnd ? subscription : null;
 }
 
-// Ends the subscription now and refunds the unused part of the current period, in agorot before tax. The refund comes
-// first: if ending fails after it, the customer has their money and Sentry tells us to end it by hand.
+// Ends the subscription now and refunds the unused part of the current period, in agorot before tax: every paid order
+// of this period (the renewal, and any upgrade charged in between) gets back its share of the time left. The refunds
+// come first: if ending fails after them, the customer has their money and Sentry tells us to end it by hand.
 export async function endNowWithRefund(env: Env, subscription: SubscriptionRow, reason: CancellationReason, comment: string) {
     const nowMs = Date.now();
-    const orders = await listOrders(env, subscription.id);
-    const order = orders.find(item => (item.status === 'paid' || item.status === 'partially_refunded') && item.refundable_amount > 0);
+    const [remote, orders] = await Promise.all([listSubscriptions(env, subscription.userId), listOrders(env, subscription.id)]);
+    const current = remote.find(item => item.id === subscription.id);
+    const end = Date.parse(current?.current_period_end ?? subscription.currentPeriodEnd ?? '');
+    // Orders from before this period paid for time already used (an hour's slack for the first order's timestamp)
+    const periodStart = Date.parse(current?.current_period_start ?? '') - 3600 * 1000;
     let refunded = 0;
-    if (order && subscription.currentPeriodEnd) {
+    for (const order of orders) {
         const start = Date.parse(order.created_at);
-        const end = Date.parse(subscription.currentPeriodEnd);
+        if ((order.status !== 'paid' && order.status !== 'partially_refunded') || order.refundable_amount <= 0) continue;
+        if (!Number.isNaN(periodStart) && start < periodStart) continue;
         const unused = end > nowMs && end > start ? Math.min(1, (end - nowMs) / (end - start)) : 0;
         const amount = Math.floor(order.refundable_amount * unused);
-        if (amount >= 1) {
-            await createRefund(env, order.id, amount, comment);
-            refunded = amount;
-        }
+        if (amount < 1) continue;
+        await createRefund(env, order.id, amount, comment);
+        refunded += amount;
     }
     try {
         const ended = await updateSubscription(env, subscription.id, { revoke: true }, reason);
@@ -173,7 +177,7 @@ export async function endNowWithRefund(env: Env, subscription: SubscriptionRow, 
         if (refunded) monitoring.notice('Refunded but could not end the subscription; end it in Polar', { subscription: subscription.id, refunded });
         throw error;
     }
-    return { refunded, currency: order?.currency ?? 'ils' };
+    return { refunded, currency: orders[0]?.currency ?? 'ils' };
 }
 
 // Before an account is deleted: a renewing subscription is ended now with a refund of the unused days, then the Polar

@@ -1,0 +1,22 @@
+{
+  "type": "refund.created",
+  "timestamp": "2026-11-22T14:16:50.301498Z",
+  "api_version": "2026-10",
+  "data": {
+    "created_at": "2026-11-22T14:16:50.292314Z",
+    "modified_at": null,
+    "id": "00000000-0000-4000-8000-000000000011",
+    "metadata": {},
+    "status": "succeeded",
+    "reason": "customer_request",
+    "amount": 2900,
+    "tax_amount": 0,
+    "currency": "ils",
+    "organization_id": "00000000-0000-4000-8000-000000000008",
+    "order_id": "00000000-0000-4000-8000-000000000001",
+    "subscription_id": "00000000-0000-4000-8000-000000000005",
+    "customer_id": "00000000-0000-4000-8000-000000000002",
+    "revoke_benefits": false,
+    "dispute": null
+  }
+}
