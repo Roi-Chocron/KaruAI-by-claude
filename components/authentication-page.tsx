@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/brand/logo';
 import { MarkedText } from '@/components/brand/marked-text';
 import { Slide } from '@/components/home/example-carousel';
+import { InAppEscape, useInAppBrowser } from '@/components/in-app-escape';
 import { LanguageSwitch } from '@/components/language-switch';
 import { UserLocaleRoot } from '@/components/locale-root';
 import { authMessages } from '@/messages/auth';
@@ -120,6 +121,10 @@ function SignIn({ locale }: { locale: Locale }) {
   const href = `/api/auth/google?next=${encodeURIComponent(next)}`;
   const error = errorCode ? t.errors[errorCode] ?? t.errors.failed : null;
   const example = homeMessages[locale].example;
+  // Inside Instagram, Facebook, TikTok...: Google won't sign anyone in there, so the page shows the way out first.
+  // The API sends such visitors back here with error=inapp too.
+  const detected = useInAppBrowser();
+  const inApp = detected ?? (errorCode === 'inapp' ? { app: 'webview' as const, os: 'other' as const } : null);
 
   return (
     <div className="min-h-screen bg-paper text-ink grid grid-cols-1 lg:grid-cols-2">
@@ -142,7 +147,9 @@ function SignIn({ locale }: { locale: Locale }) {
             </div>
           )}
 
-          <a href={href} className="btn mt-8 w-full border border-ink bg-paper text-ink hover:bg-mist py-3.5">
+          {inApp && <InAppEscape locale={locale} browser={inApp} tryAnywayHref={`${href}&force=1`} />}
+
+          <a href={inApp ? `${href}&force=1` : href} className={`btn mt-8 w-full border border-ink bg-paper text-ink hover:bg-mist py-3.5 ${inApp ? 'opacity-70' : ''}`}>
             <GoogleLogo />
             {t.google}
           </a>

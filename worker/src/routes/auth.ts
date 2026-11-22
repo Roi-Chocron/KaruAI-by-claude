@@ -5,6 +5,7 @@ import {
     SUSPENDED_MESSAGE, type AppContext,
 } from '../app';
 import { accessTimes } from './billing';
+import { detectInAppBrowser, isKnownInAppBrowser } from '../../../shared/in-app-browser';
 
 // Sign-in with Google (OAuth 2.0 authorization code flow with PKCE). There are no passwords.
 
@@ -35,6 +36,11 @@ const auth = createApp();
 // Starts the sign-in: remembers a random state, the PKCE verifier and where to go afterwards, then sends the
 // browser to Google
 auth.get('/google', async c => {
+    // Google refuses sign-in inside apps' built-in browsers: send those visitors to the page that helps them out,
+    // unless they chose to try anyway
+    if (c.req.query('force') !== '1' && isKnownInAppBrowser(detectInAppBrowser(c.req.header('user-agent')))) {
+        return c.redirect(`${c.env.APP_URL}/login?error=inapp&next=${encodeURIComponent(safeNext(c.req.query('next')))}`);
+    }
     if (!c.env.GOOGLE_CLIENT_ID || !c.env.GOOGLE_CLIENT_SECRET) return loginError(c, 'config');
     const limited = await rateLimit(c, 'authIp', clientIp(c));
     if (limited) return loginError(c, 'rate');

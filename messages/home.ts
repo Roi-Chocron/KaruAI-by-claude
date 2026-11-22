@@ -14,6 +14,7 @@ const en = {
     sub: 'Tell KaruAI what you want to say. It writes the slides, designs them and leaves the final touches to you.',
     cta: 'Make your first carousel',
     secondary: 'How it works',
+    inAppHint: 'Signing in works in your phone’s browser (Safari or Chrome), not inside this app.',
     examplesLabel: 'Made in KaruAI from one line: "Instagram mistakes small businesses make"',
   },
   example: {
@@ -89,6 +90,7 @@ const he: HomeMessages = {
     sub: 'ספרו ל־KaruAI מה אתם רוצים להגיד. הוא כותב את השקפים, מעצב אותם ומשאיר לכם את הליטוש האחרון.',
     cta: 'צרו את הקרוסלה הראשונה',
     secondary: 'איך זה עובד',
+    inAppHint: 'ההתחברות עובדת בדפדפן של הטלפון (Safari או Chrome), לא בתוך האפליקציה הזו.',
     examplesLabel: 'נוצר ב־KaruAI משורה אחת: "טעויות שעסקים קטנים עושים באינסטגרם"',
   },
   example: {

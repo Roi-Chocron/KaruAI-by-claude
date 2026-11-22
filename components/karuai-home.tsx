@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Menu, X } from 'lucide-react';
 import { PricingCards } from '@/components/pricing-cards';
 import { BusinessDetailsLine } from '@/components/business';
+import { useInAppBrowser } from '@/components/in-app-escape';
 import { Logo } from '@/components/brand/logo';
 import { MarkedText } from '@/components/brand/marked-text';
 import { ExampleCarousel } from '@/components/home/example-carousel';
@@ -14,6 +15,7 @@ import { useConsent } from '@/lib/consent';
 
 export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const inAppBrowser = useInAppBrowser();
   // While the cookie banner is up, room below the footer so it never sits on the last links
   const bannerShown = useConsent() === null;
   const t = homeMessages[locale];
@@ -101,6 +103,8 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
                   <Forward className="w-4 h-4" />
                 </Link>
                 <a href="#how-it-works" className="btn-secondary text-base px-6 py-3.5">{t.hero.secondary}</a>
+                {/* Opened from Instagram, Facebook or TikTok: Google sign-in needs the phone's own browser */}
+                {inAppBrowser && <p className="basis-full text-sm text-graphite">{t.hero.inAppHint}</p>}
               </div>
             </div>
             <p className="mt-14 mb-4 text-sm text-graphite">{t.hero.examplesLabel}</p>
