@@ -14,10 +14,11 @@ GEMINI_API_KEY=
 GEMINI_MODEL=
 POLLINATIONS_API_KEY=
 
-# Polar payments, against the sandbox (https://sandbox.polar.sh, test card 4242 4242 4242 4242).
-# Settings -> Developers: create an Organization Access Token (scopes checkouts:write, customer_sessions:write).
-# Settings -> Webhooks: add <public address>/api/billing/webhook (e.g. a `cloudflared tunnel` to localhost:3000),
-# format Raw, events subscription.*, and paste its secret here.
+# Polar payments, against the sandbox (https://sandbox.polar.sh, test card 4242 4242 4242 4242, any future date and CVC).
+# Settings -> Access Tokens: create an Organization Access Token with the scopes checkouts:write,
+# customer_sessions:write and subscriptions:read.
+# Settings -> Webhooks: an endpoint (format Raw, API version 2026-10, subscription.* events) gives the secret. Polar
+# can't reach localhost, so locally the plan follows Polar through the billing page's sync instead (see README).
 POLAR_SERVER=sandbox
 POLAR_ACCESS_TOKEN=
 POLAR_WEBHOOK_SECRET=

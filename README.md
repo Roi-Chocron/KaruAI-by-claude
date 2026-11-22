@@ -36,29 +36,51 @@ shows a "Dev login" form that takes just an email. The API refuses it unless `AP
 - `npm run typecheck` checks the site, the Worker and the tests.
 - GitHub Actions (`.github/workflows/ci.yml`) runs both plus the build on every push and pull request.
 
-## Plans
+## Plans and payments
 
-Prices, limits and features live in `shared/plans.ts`; the API enforces the monthly limits. The paid plans (Basic,
-Pro, VIP) are Polar products, sold through Polar's hosted checkout (`worker/src/routes/billing.ts`):
+Prices, limits and features live in `shared/plans.ts`; the API enforces the monthly limits. The paid plans (Basic
+₪29, Pro ₪59, VIP ₪119, monthly) are Polar products, sold through Polar's hosted checkout
+(`worker/src/polar.ts`, `worker/src/routes/billing.ts`):
 
-- `POST /api/billing/checkout` opens a checkout for a plan; `POST /api/billing/portal` opens Polar's customer portal
-  (change plan, card, cancel, invoices).
-- Polar's webhook `POST /api/billing/webhook` keeps the `subscriptions` table up to date, and each user's plan is the
-  best plan among their active subscriptions (free without one). An admin can still set a plan by hand on the Admin
-  page; the next webhook for that user overrides it.
-- `POLAR_SERVER` and the `POLAR_PRODUCT_*` ids are in `wrangler.jsonc` (production) and `.dev.vars` (sandbox).
+- `POST /api/billing/checkout` opens a checkout for a plan, charged in ILS; `POST /api/billing/portal` opens Polar's
+  customer portal (change plan, card, cancel, invoices). Users who already pay change plans in the portal.
+- The `subscriptions` table follows Polar, and each user's plan is the best plan among their subscriptions that are
+  `active` or `trialing` (free without one). It is kept up to date two ways, so a missed webhook only delays a change:
+  - Polar's webhook `POST /api/billing/webhook` (signed, Standard Webhooks).
+  - Asking Polar's API: the billing page calls `POST /api/billing/sync` when it loads and while it waits after a
+    checkout, and the daily cron looks up subscriptions whose paid period ended without an update.
+- An admin can still set a plan by hand on the Admin page; it stays until something changes on Polar for that user.
+- An account (or, for an admin, a user) can't be deleted while its subscription still renews: Polar would go on
+  charging it. Canceling first (it then ends at the end of the period) is enough.
+- Polar sends buyers back with a `customer_session_token` in the address; `app/layout.tsx` removes it before any
+  other script runs, so analytics and error reports never see it.
 
-Setting up Polar for production: in the Polar dashboard, Settings → Developers → New token (scopes
-`checkouts:write`, `customer_sessions:write`), and Settings → Webhooks → Add endpoint
-`<APP_URL>/api/billing/webhook`, format Raw, all `subscription.*` events. Then:
+### Local development (Polar sandbox)
 
-```bash
-npx wrangler secret put POLAR_ACCESS_TOKEN
-npx wrangler secret put POLAR_WEBHOOK_SECRET
-```
+`.dev.vars` points at the sandbox (https://sandbox.polar.sh, organization "Karu AI"): `POLAR_SERVER=sandbox`, an
+access token, the webhook secret and the three sandbox product ids. Pay with the test card 4242 4242 4242 4242, any
+future date, any CVC. Polar can't reach `localhost`, so locally the plan changes through the sync alone (when the
+billing page loads, and right after the checkout); the webhook is covered by `worker/test/billing.test.ts`.
 
-If the site is behind Cloudflare's Bot Fight Mode, turn it off for `/api/billing/webhook`, or Polar's calls get a 403.
+### Production setup (Polar live)
+
+1. In the live Polar dashboard (https://polar.sh), create three monthly products priced in ILS, matching
+   `shared/plans.ts`: Basic ₪29, Pro ₪59, VIP ₪119 (the sandbox products are the model). Put their ids in
+   `POLAR_PRODUCT_BASIC`, `POLAR_PRODUCT_PRO` and `POLAR_PRODUCT_VIP` in `wrangler.jsonc` (`POLAR_SERVER` is already
+   `production`). Until then the site says online payments are not set up.
+2. Settings → Access Tokens → Create token with exactly the scopes `checkouts:write`, `customer_sessions:write` and
+   `subscriptions:read`, then `npx wrangler secret put POLAR_ACCESS_TOKEN`.
+3. Settings → Webhooks → Add endpoint `<APP_URL>/api/billing/webhook`, format Raw, API version 2026-10, events
+   `subscription.created`, `subscription.updated`, `subscription.active`, `subscription.canceled`,
+   `subscription.uncanceled`, `subscription.revoked`, `subscription.past_due`; then
+   `npx wrangler secret put POLAR_WEBHOOK_SECRET` with its secret.
+4. If the site is behind Cloudflare's Bot Fight Mode, turn it off for `/api/billing/webhook`, or Polar's calls get a 403.
+
 Keep the prices in `shared/plans.ts` equal to the Polar prices: the site shows them, Polar charges its own.
+
+The Polar API version is pinned to 2026-10 (`POLAR_VERSION` in `worker/src/polar.ts`, and the webhook endpoint's API
+version). Polar deprecates it in January 2027 and removes it in April 2027: move both to the next version before then
+and run the tests.
 
 ## Deploying (first time)
 

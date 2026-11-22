@@ -9,8 +9,10 @@
   - [ ] Business mailing address
 - [ ] Deploy to production: create D1 and R2, put the real `database_id` and `APP_URL` in `wrangler.jsonc`, set the secrets
       (see "Deploying" in README.md).
-- [ ] Real prices and limits in `shared/plans.ts` (the current ones are placeholders).
-- [ ] Connect a payment provider (today an admin changes a user's plan by hand).
+- [ ] Confirm the prices and limits in `shared/plans.ts` (Basic ₪29, Pro ₪59, VIP ₪119). The sandbox products had
+      ₪35/₪70/₪140 ("30/60/100 posts a month") before they were aligned with `shared/plans.ts`.
+- [ ] Polar live setup (payments work end to end in the sandbox): live products, access token, webhook endpoint and
+      secrets — the steps are under "Production setup (Polar live)" in README.md.
 
 ## Improvements
 
