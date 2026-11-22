@@ -44,7 +44,7 @@ export default function TermsPage() {
       <section>
         <h2>5. Subscriptions & Payments</h2>
         <p>
-          We provide free and premium subscription plans (Pro, Agency). Subscriptions are billed in advance on a recurring monthly or annual basis. For cancellation conditions and refund eligibility, please review our <Link href="/refund">Refund & Cancellation Policy</Link>.
+          We provide a free plan and paid subscription plans (Basic, Pro, VIP). Paid plans are priced in Israeli shekels and billed in advance every month through our payment provider, Polar (polar.sh), until you cancel. For cancellation conditions and refund eligibility, please review our <Link href="/refund">Refund & Cancellation Policy</Link>.
         </p>
       </section>
 

@@ -6,7 +6,7 @@ import { AppShell, PageHeading } from '@/components/app-shell';
 import { adminMessages } from '@/messages/admin';
 import { appMessages } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
-import { PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
+import { PAID_PLAN_IDS, PLANS, PLAN_IDS, type PlanId } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser, User } from '@/types';
 
 type Setting = { key: string; value: string; source: 'admin' | 'env' | 'none'; envName: string; updatedAt: string | null };
@@ -230,7 +230,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
     { label: t.tiles.users, value: stats?.users },
     { label: t.tiles.active, value: stats?.activeLast7Days },
     { label: t.tiles.carousels, value: stats?.carousels },
-    { label: t.tiles.paying, value: stats ? (stats.plans.pro ?? 0) + (stats.plans.agency ?? 0) : undefined },
+    { label: t.tiles.paying, value: stats ? PAID_PLAN_IDS.reduce((sum, id) => sum + (stats.plans[id] ?? 0), 0) : undefined },
     { label: t.tiles.messages, value: stats?.month.messages },
     { label: t.tiles.images, value: stats?.month.images },
     { label: t.tiles.tokens, value: stats?.month.tokens },

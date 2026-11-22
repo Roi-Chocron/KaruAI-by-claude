@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useId, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { CreditCard, Loader2, Receipt } from 'lucide-react';
 import { AppShell, PageHeading } from '@/components/app-shell';
 import { appMessages } from '@/messages/app';
@@ -8,8 +8,8 @@ import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/locale';
 import { RequireAuth } from '@/lib/session';
 import { useTabTitle } from '@/lib/tab-title';
-import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
-import type { Plan } from '@/shared/plans';
+import { PricingCards } from '@/components/pricing-cards';
+import { formatPrice, isPaidPlanId, PLANS, type PaidPlanId, type Plan } from '@/shared/plans';
 import type { MonthlyUsage, PublicUser } from '@/types';
 
 export type AccountSummary = { user: PublicUser; plan: Plan; usage: MonthlyUsage; carouselCount: number };
@@ -67,15 +67,116 @@ export function UsageMeter({ label, used, limit, unlimited }: { label: string; u
   );
 }
 
+export type BillingSummary = {
+  enabled: boolean;
+  subscription: { plan: PaidPlanId; status: string; active: boolean; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
+};
+
+type BillingError = keyof (typeof appMessages)['en']['billing']['errors'];
+
+// A request the API answers with { url } (Polar's checkout or customer portal); its English errors become our own keys
+class BillingRequestError extends Error {
+  constructor(readonly key: BillingError) {
+    super(key);
+  }
+}
+
+async function postForUrl(path: string, body?: unknown): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: 'POST',
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new BillingRequestError('unavailable');
+  }
+  const data = await res.json().catch(() => null);
+  if (res.ok && typeof data?.url === 'string') return data.url;
+  if (res.status === 503) throw new BillingRequestError('notConfigured');
+  if (res.status === 409) throw new BillingRequestError('hasSubscription');
+  if (res.status === 502) throw new BillingRequestError('unavailable');
+  throw new BillingRequestError('failed');
+}
+
+async function fetchBilling(): Promise<BillingSummary> {
+  const res = await fetch('/api/billing');
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `Request failed with status ${res.status}`);
+  return data;
+}
+
+// A plan name inside a sentence, isolated so it reads correctly in right-to-left text
+const isolate = (name: string) => `\u2068${name}\u2069`;
+
+// After Polar's checkout the webhook may land a few seconds after the user does, so the page asks again a few times
+const ACTIVATION_POLLS = 15;
+const ACTIVATION_POLL_MS = 2000;
+
 function BillingPage({ locale }: { locale: Locale }) {
   const t = appMessages[locale].billing;
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [failed, setFailed] = useState(false);
-  const [yearly, setYearly] = useState(false);
+  const [actionError, setActionError] = useState<BillingError | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [activation, setActivation] = useState<'waiting' | 'slow' | null>(null);
+  const autoCheckout = useRef(false);
+
+  const load = useCallback(async () => {
+    const [nextAccount, nextBilling] = await Promise.all([fetchAccount(), fetchBilling()]);
+    setAccount(nextAccount);
+    setBilling(nextBilling);
+    return nextBilling;
+  }, []);
+
+  const go = useCallback(async (key: string, request: () => Promise<string>) => {
+    setBusy(key);
+    setActionError(null);
+    try {
+      window.location.href = await request();
+    } catch (err) {
+      setActionError(err instanceof BillingRequestError ? err.key : 'failed');
+      setBusy(null);
+    }
+  }, []);
+  const checkout = useCallback((plan: PaidPlanId) => go(plan, () => postForUrl('/api/billing/checkout', { plan })), [go]);
+  const openPortal = useCallback(() => go('portal', () => postForUrl('/api/billing/portal')), [go]);
 
   useEffect(() => {
-    fetchAccount().then(setAccount).catch(() => setFailed(true));
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    const returning = params.get('checkout') === 'success';
+    const wanted = params.get('plan');
+    if (returning || wanted) window.history.replaceState(null, '', '/billing');
+
+    let cancelled = false;
+    (async () => {
+      let state = await load();
+      if (returning && !state.subscription?.active) {
+        setActivation('waiting');
+        for (let i = 0; i < ACTIVATION_POLLS && !cancelled && !state.subscription?.active; i++) {
+          await new Promise(resolve => setTimeout(resolve, ACTIVATION_POLL_MS));
+          state = await load();
+        }
+        if (!cancelled) setActivation(state.subscription?.active ? null : 'slow');
+      }
+      // Coming from "Get <plan>" on the landing page: straight on to the checkout
+      if (!cancelled && isPaidPlanId(wanted) && state.enabled && !state.subscription?.active && !autoCheckout.current) {
+        autoCheckout.current = true;
+        checkout(wanted);
+      }
+    })().catch(() => {
+      if (!cancelled) setFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [load, checkout]);
+
+  const subscription = billing?.subscription ?? null;
+  const subscribed = !!subscription?.active;
+  const longDate = (iso: string) => new Date(iso).toLocaleDateString(intlLocale(locale), { dateStyle: 'long' });
 
   const limits = account && [
     { label: t.carousels, used: account.usage.carousels, limit: account.plan.limits.carouselsPerMonth },
@@ -84,13 +185,38 @@ function BillingPage({ locale }: { locale: Locale }) {
   ];
   const reached = limits?.filter(meter => meter.limit !== null && meter.used >= meter.limit) ?? [];
 
+  const subscriptionText = !billing?.enabled
+    ? t.paymentBody
+    : !subscription
+      ? t.freeBody
+      : subscription.active && subscription.currentPeriodEnd
+        ? (subscription.cancelAtPeriodEnd ? t.cancels : t.renews)(isolate(PLANS[subscription.plan].name), longDate(subscription.currentPeriodEnd))
+        : t.manageAny;
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <PageHeading title={t.title} sub={t.sub} />
 
-      {failed && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4 mb-8">{t.loadFailed}</p>}
+      <div aria-live="polite" className="empty:hidden space-y-4 mb-8">
+        {failed && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.loadFailed}</p>}
+        {actionError && <p role="alert" className="text-sm text-red-700 border border-red-700 rounded-xl p-4">{t.errors[actionError]}</p>}
+        {activation === 'waiting' && (
+          <p className="flex items-center gap-2 text-sm rounded-xl bg-lime text-ink p-4">
+            <Loader2 size={16} className="animate-spin flex-none" aria-hidden="true" /> {t.activating}
+          </p>
+        )}
+        {activation === 'slow' && <p className="text-sm rounded-xl border border-line p-4">{t.activationSlow}</p>}
+        {subscription && !subscription.active && subscription.status === 'past_due' && (
+          <p className="text-sm text-amber-900 rounded-xl border border-amber-500 bg-amber-50 p-4">{t.pastDue}</p>
+        )}
+        {busy && busy !== 'portal' && (
+          <p role="status" className="flex items-center gap-2 text-sm text-graphite">
+            <Loader2 size={16} className="animate-spin flex-none" aria-hidden="true" /> {t.redirecting}
+          </p>
+        )}
+      </div>
 
-      {!account || !limits ? (
+      {!account || !billing || !limits ? (
         !failed && (
           <div role="status" className="flex items-center gap-2 text-sm text-graphite">
             <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {appMessages[locale].shell.loading}
@@ -106,7 +232,7 @@ function BillingPage({ locale }: { locale: Locale }) {
                 <p className="text-sm text-paper/70 mt-3">{t.resets(resetDate(locale))}</p>
               </div>
               <p className="sm:text-end">
-                <span className="block font-display font-bold text-5xl sm:text-6xl leading-none"><bdi dir="ltr">${account.plan.monthlyPrice}</bdi></span>
+                <span className="block font-display font-bold text-5xl sm:text-6xl leading-none"><bdi dir="ltr">{formatPrice(account.plan.monthlyPrice)}</bdi></span>
                 <span className="block text-sm text-paper/70 mt-1">{t.perMonth}</span>
               </p>
             </div>
@@ -123,34 +249,53 @@ function BillingPage({ locale }: { locale: Locale }) {
 
           <div className="grid gap-4 content-start">
             <section className="rounded-2xl border border-line p-6">
-              <h2 className="flex items-center gap-2 font-semibold mb-2"><CreditCard size={18} strokeWidth={1.75} /> {t.payment}</h2>
-              <p className="text-sm text-graphite leading-relaxed">{t.paymentBody}</p>
+              <h2 className="flex items-center gap-2 font-semibold mb-2"><CreditCard size={18} strokeWidth={1.75} aria-hidden="true" /> {t.payment}</h2>
+              <p className="text-sm text-graphite leading-relaxed">{subscriptionText}</p>
+              {billing.enabled && subscription && (
+                <button type="button" onClick={openPortal} disabled={busy !== null} className="btn-secondary w-full mt-4 disabled:opacity-60">
+                  {busy === 'portal' && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {t.manage}
+                </button>
+              )}
             </section>
             <section className="rounded-2xl border border-line p-6">
-              <h2 className="flex items-center gap-2 font-semibold mb-2"><Receipt size={18} strokeWidth={1.75} /> {t.invoices}</h2>
-              <p className="text-sm text-graphite">{t.invoicesBody}</p>
+              <h2 className="flex items-center gap-2 font-semibold mb-2"><Receipt size={18} strokeWidth={1.75} aria-hidden="true" /> {t.invoices}</h2>
+              <p className="text-sm text-graphite">{billing.enabled && subscription ? t.invoicesPortal : t.invoicesBody}</p>
             </section>
           </div>
         </div>
       )}
 
       <section id="plans" aria-labelledby="plans-heading" className="mt-16 sm:mt-20 scroll-mt-24">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
-          <h2 id="plans-heading" className="font-display font-bold text-5xl md:text-6xl leading-none">{t.plans}</h2>
-          <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} locale={locale} />
-        </div>
+        <h2 id="plans-heading" className="font-display font-bold text-5xl md:text-6xl leading-none mb-8">{t.plans}</h2>
         <PricingCards
-          yearly={yearly}
           locale={locale}
-          action={plan => (
-            <button
-              type="button"
-              disabled
-              className={`btn w-full ${plan.id === account?.plan.id ? (plan.highlighted ? 'bg-lime text-ink' : 'bg-ink text-paper') : plan.highlighted ? 'border border-paper/30 text-paper/70' : 'border border-line text-graphite'}`}
-            >
-              {plan.id === account?.plan.id ? t.yourPlan : t.soon}
-            </button>
-          )}
+          action={plan => {
+            const current = plan.id === account?.plan.id;
+            const name = isolate(plan.name);
+            const label = current
+              ? t.yourPlan
+              : !billing?.enabled
+                ? t.soon
+                : subscribed
+                  ? plan.id === 'free' ? t.cancelInPortal : t.switchTo(name)
+                  : plan.id === 'free' ? t.included : t.upgrade(name);
+            const disabled = current || !billing?.enabled || busy !== null || (!subscribed && plan.id === 'free');
+            const style = current
+              ? plan.highlighted ? 'bg-lime text-ink' : 'bg-ink text-paper'
+              : disabled
+                ? plan.highlighted ? 'border border-paper/30 text-paper/70' : 'border border-line text-graphite'
+                : plan.highlighted ? 'btn-lime' : 'btn-secondary';
+            return (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => (subscribed ? openPortal() : isPaidPlanId(plan.id) && checkout(plan.id))}
+                className={`btn w-full whitespace-normal text-center ${style}`}
+              >
+                {busy === plan.id && <Loader2 size={16} className="animate-spin" aria-hidden="true" />} {label}
+              </button>
+            );
+          }}
         />
       </section>
     </main>

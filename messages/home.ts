@@ -52,12 +52,8 @@ const en = {
   pricing: {
     title: 'Pricing',
     sub: "Start on the free plan. Upgrade when a carousel a week isn't enough.",
-    monthly: 'Monthly',
-    yearly: 'Yearly',
-    period: 'Billing period',
-    saving: 'save 17%',
     perMonth: '/ month',
-    billedYearly: (total: number) => `$${total} billed yearly`,
+    billedMonthly: 'Prices in shekels, billed every month. Cancel any time.',
     choose: (plan: string) => `Get ${plan}`,
     startFree: 'Start free',
   },
@@ -129,12 +125,8 @@ const he: HomeMessages = {
   pricing: {
     title: 'מחירים',
     sub: 'מתחילים בתוכנית החינמית. משדרגים כשקרוסלה בשבוע כבר לא מספיקה.',
-    monthly: 'חודשי',
-    yearly: 'שנתי',
-    period: 'תקופת חיוב',
-    saving: 'חיסכון של 17%',
     perMonth: '/ חודש',
-    billedYearly: total => `$${total} בחיוב שנתי`,
+    billedMonthly: 'המחירים בשקלים, בחיוב חודשי. אפשר לבטל בכל רגע.',
     choose: plan => `שדרוג ל־${plan}`,
     startFree: 'מתחילים בחינם',
   },
@@ -164,14 +156,19 @@ export const planCopyHe: Record<PlanId, { badge: string; description: string; fe
     description: 'כדי לנסות את KaruAI וליצור את הקרוסלות הראשונות.',
     features: ['5 קרוסלות חדשות בחודש', '40 הודעות עיצוב ל־AI בחודש', '20 תמונות AI בחודש', 'עורך מלא, ייצוא PNG ו־ZIP', 'סימן מים קטן של KaruAI בקבצים'],
   },
+  basic: {
+    badge: 'למתחילים',
+    description: 'ליוצרים שמפרסמים כמה קרוסלות בחודש.',
+    features: ['20 קרוסלות חדשות בחודש', '250 הודעות עיצוב ל־AI בחודש', '120 תמונות AI בחודש', 'בלי סימן מים', 'תמיכה במייל'],
+  },
   pro: {
     badge: 'הכי פופולרי',
     description: 'ליוצרים ומשווקים שמפרסמים כל שבוע.',
-    features: ['50 קרוסלות חדשות בחודש', '600 הודעות עיצוב ל־AI בחודש', '300 תמונות AI בחודש', 'בלי סימן מים', 'תמיכה במייל'],
+    features: ['60 קרוסלות חדשות בחודש', '700 הודעות עיצוב ל־AI בחודש', '350 תמונות AI בחודש', 'בלי סימן מים', 'תמיכה במייל'],
   },
-  agency: {
+  vip: {
     badge: 'לצוותים',
-    description: 'לסוכנויות שמייצרות תוכן לכמה מותגים.',
-    features: ['קרוסלות ללא הגבלה', '2,500 הודעות עיצוב ל־AI בחודש', '1,200 תמונות AI בחודש', 'בלי סימן מים', 'תמיכה בעדיפות'],
+    description: 'לסוכנויות ולמשתמשים כבדים שמייצרים תוכן לכמה מותגים.',
+    features: ['קרוסלות ללא הגבלה', '2,000 הודעות עיצוב ל־AI בחודש', '1,000 תמונות AI בחודש', 'בלי סימן מים', 'תמיכה בעדיפות'],
   },
 };

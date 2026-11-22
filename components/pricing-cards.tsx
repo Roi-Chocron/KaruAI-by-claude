@@ -2,39 +2,19 @@
 
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
-import { PLANS, PLAN_IDS, type Plan } from '@/shared/plans';
+import { formatPrice, PLANS, PLAN_IDS, type Plan } from '@/shared/plans';
 import { homeMessages, planCopyHe } from '@/messages/home';
 import type { Locale } from '@/lib/i18n';
 
-export function MonthlyYearlyToggle({ yearly, onChange, locale = 'en' }: { yearly: boolean; onChange: (yearly: boolean) => void; locale?: Locale }) {
-  const t = homeMessages[locale].pricing;
-  const option = (value: boolean, label: ReactNode) => (
-    <button
-      type="button"
-      aria-pressed={yearly === value}
-      onClick={() => onChange(value)}
-      className={`min-h-10 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${yearly === value ? 'bg-ink text-paper' : 'text-graphite hover:text-ink'}`}
-    >
-      {label}
-    </button>
-  );
-  return (
-    <div role="group" aria-label={t.period} className="inline-flex self-start md:self-auto items-center gap-1 p-1 rounded-xl border border-line bg-paper">
-      {option(false, t.monthly)}
-      {option(true, <>{t.yearly} <span aria-hidden="true" className={`ms-1 rounded px-1.5 py-0.5 text-xs ${yearly ? 'bg-lime text-ink' : 'bg-mist text-ink'}`} dir="ltr">−17%</span><span className="sr-only">, {t.saving}</span></>)}
-    </div>
-  );
-}
-
 // The plan cards of the landing page and the billing page; `action` renders each card's button
-export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolean; action: (plan: Plan) => ReactNode; locale?: Locale }) {
+export function PricingCards({ action, locale = 'en' }: { action: (plan: Plan) => ReactNode; locale?: Locale }) {
   const t = homeMessages[locale].pricing;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+    <>
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
       {PLAN_IDS.map(id => {
         const plan = PLANS[id];
         const copy = locale === 'he' ? planCopyHe[id] : plan;
-        const price = yearly ? plan.yearlyMonthlyPrice : plan.monthlyPrice;
         const dark = plan.highlighted;
         return (
           <div
@@ -47,11 +27,10 @@ export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolea
                 <span className={`text-xs font-semibold px-2 py-1 rounded-md ${dark ? 'bg-lime text-ink' : 'bg-mist text-ink'}`}>{copy.badge}</span>
               </div>
               <p className={`text-sm mb-6 min-h-[40px] ${dark ? 'text-paper/70' : 'text-graphite'}`}>{copy.description}</p>
-              <div className="mb-6 flex items-baseline gap-2">
-                <span className="font-display font-bold text-7xl leading-none" dir="ltr">${price}</span>
+              <div className="mb-6 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-display font-bold text-7xl xl:text-6xl leading-none" dir="ltr">{formatPrice(plan.monthlyPrice)}</span>
                 <span className={`text-sm ${dark ? 'text-paper/70' : 'text-graphite'}`}>{t.perMonth}</span>
               </div>
-              {yearly && price > 0 && <p className={`-mt-4 mb-6 text-xs ${dark ? 'text-paper/70' : 'text-graphite'}`}>{t.billedYearly(price * 12)}</p>}
               <ul className={`space-y-3 mb-8 text-sm border-t pt-6 ${dark ? 'border-paper/15' : 'border-line'}`}>
                 {copy.features.map(feature => (
                   <li key={feature} className="flex items-start gap-2.5">
@@ -66,5 +45,7 @@ export function PricingCards({ yearly, action, locale = 'en' }: { yearly: boolea
         );
       })}
     </div>
+    <p className="mt-6 text-sm text-graphite">{t.billedMonthly}</p>
+    </>
   );
 }

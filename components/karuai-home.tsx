@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Menu, X } from 'lucide-react';
-import { MonthlyYearlyToggle, PricingCards } from '@/components/pricing-cards';
+import { PricingCards } from '@/components/pricing-cards';
 import { Logo } from '@/components/brand/logo';
 import { MarkedText } from '@/components/brand/marked-text';
 import { ExampleCarousel } from '@/components/home/example-carousel';
@@ -13,7 +13,6 @@ import { useConsent } from '@/lib/consent';
 
 export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [yearly, setYearly] = useState(false);
   // While the cookie banner is up, room below the footer so it never sits on the last links
   const bannerShown = useConsent() === null;
   const t = homeMessages[locale];
@@ -173,19 +172,15 @@ export default function KaruAIHome({ locale = 'en' }: { locale?: Locale }) {
         {/* Pricing */}
         <section id="pricing" className="scroll-mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-              <div>
-                <h2 className="font-display font-bold text-6xl md:text-8xl leading-none">{t.pricing.title}</h2>
-                <p className="mt-4 text-lg text-graphite">{t.pricing.sub}</p>
-              </div>
-              <MonthlyYearlyToggle yearly={yearly} onChange={setYearly} locale={locale} />
+            <div className="mb-12">
+              <h2 className="font-display font-bold text-6xl md:text-8xl leading-none">{t.pricing.title}</h2>
+              <p className="mt-4 text-lg text-graphite">{t.pricing.sub}</p>
             </div>
 
             <PricingCards
-              yearly={yearly}
               locale={locale}
               action={plan => (
-                <Link href="/login" className={`w-full ${plan.highlighted ? 'btn-lime' : 'btn-secondary'}`}>
+                <Link href={plan.monthlyPrice === 0 ? '/login' : `/login?next=${encodeURIComponent(`/billing?plan=${plan.id}`)}`} className={`w-full ${plan.highlighted ? 'btn-lime' : 'btn-secondary'}`}>
                   {plan.monthlyPrice === 0 ? t.pricing.startFree : t.pricing.choose(plan.name)}
                 </Link>
               )}
