@@ -170,14 +170,16 @@ billing.post('/webhook', async c => {
 
     const deliveryId = c.req.header('webhook-id')!;
     if (!(await markWebhookEvent(c.env.DB, deliveryId))) return c.body(null, 200);
+    let applied: boolean;
     try {
-        await saveSubscription(c.env.DB, row, ACCESS_STATUSES);
+        applied = await saveSubscription(c.env.DB, row, ACCESS_STATUSES);
     } catch (error) {
         // Let Polar's retry handle it again
         await unmarkWebhookEvent(c.env.DB, deliveryId).catch(() => undefined);
         throw error;
     }
-    console.log(JSON.stringify({ event: 'polar_webhook', type: event.type, subscription: row.id, status: row.status, plan: row.plan, userId: row.userId }));
+    // applied is false for a delivery older than what is stored (it changed nothing)
+    console.log(JSON.stringify({ event: 'polar_webhook', type: event.type, subscription: row.id, status: row.status, plan: row.plan, userId: row.userId, applied }));
     return c.body(null, 200);
 });
 

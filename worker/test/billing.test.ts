@@ -156,6 +156,23 @@ describe('checkout and portal', () => {
         expect((await api('/api/billing/checkout', { method: 'POST', cookie, json: { plan: 'vip' } })).status).toBe(409);
     });
 
+    it('leaves the email to the checkout page when Polar refuses it', async () => {
+        const { cookie } = await signIn();
+        const refused = { error: 'RequestValidationError', detail: [{ loc: ['body', 'customer_email'], msg: 'The domain name example.test does not accept email.' }] };
+        const calls = mockPolar((_url, body) => body.customer_email
+            ? Response.json(refused, { status: 422 })
+            : Response.json({ url: 'https://sandbox.polar.sh/checkout/def' }, { status: 201 }));
+        expect(await (await api('/api/billing/checkout', { method: 'POST', cookie, json: { plan: 'basic' } })).json()).toEqual({ url: 'https://sandbox.polar.sh/checkout/def' });
+        expect(calls.length).toBe(2);
+        expect(calls[1].body.customer_email).toBeUndefined();
+        expect(calls[1].body.products).toEqual(['prod-basic']);
+
+        // Any other refusal is reported
+        vi.restoreAllMocks();
+        mockPolar(() => Response.json({ error: 'RequestValidationError', detail: [{ loc: ['body', 'products'] }] }, { status: 422 }));
+        expect((await api('/api/billing/checkout', { method: 'POST', cookie, json: { plan: 'basic' } })).status).toBe(502);
+    });
+
     it('opens the portal for subscribers only and reports Polar failures', async () => {
         const { user, cookie } = await signIn();
         expect((await api('/api/billing/portal', { method: 'POST', cookie })).status).toBe(404);

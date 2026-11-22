@@ -57,7 +57,7 @@ export async function createCheckout(
     env: PolarEnv,
     options: { plan: PaidPlanId; userId: string; email: string; name: string; ip: string | null; successUrl: string; returnUrl: string }
 ): Promise<string> {
-    const checkout = await polarRequest<{ url: string }>(env, 'POST', '/v1/checkouts/', {
+    const body = {
         products: [productId(env, options.plan)],
         currency: CURRENCY,
         external_customer_id: options.userId,
@@ -69,8 +69,16 @@ export async function createCheckout(
         return_url: options.returnUrl,
         // Copied to the subscription, so its webhooks can name the user even if the customer has no external id
         metadata: { user_id: options.userId, plan: options.plan },
-    });
-    return checkout.url;
+    };
+    try {
+        return (await polarRequest<{ url: string }>(env, 'POST', '/v1/checkouts/', body)).url;
+    } catch (error) {
+        // Polar refuses an email it thinks cannot receive mail (it checks the domain); the buyer then types one on the
+        // checkout page instead
+        if (!(error instanceof PolarError) || error.status !== 422 || !error.message.includes('customer_email')) throw error;
+        console.warn(JSON.stringify({ event: 'polar_checkout_without_email', userId: options.userId }));
+        return (await polarRequest<{ url: string }>(env, 'POST', '/v1/checkouts/', { ...body, customer_email: undefined })).url;
+    }
 }
 
 // Polar's customer portal, where the user changes plan, updates the card, cancels and downloads invoices

@@ -160,11 +160,12 @@ const toSubscription = (row: any): SubscriptionRow => ({
 });
 
 // Stores the subscription unless the stored version is newer (webhooks can arrive out of order); then sets the
-// user's plan to the best plan among their subscriptions with one of `accessStatuses`, or free without one
-export async function saveSubscription(db: D1Database, subscription: SubscriptionRow, accessStatuses: string[]) {
+// user's plan to the best plan among their subscriptions with one of `accessStatuses`, or free without one.
+// False when a newer version was already stored.
+export async function saveSubscription(db: D1Database, subscription: SubscriptionRow, accessStatuses: string[]): Promise<boolean> {
     const statuses = accessStatuses.map(() => '?').join(', ');
     const ranks = PAID_PLAN_IDS.map((id, index) => `WHEN '${id}' THEN ${index + 1}`).join(' ');
-    await db.batch([
+    const [stored] = await db.batch([
         db.prepare(`INSERT INTO subscriptions (id, user_id, product_id, plan, status, current_period_end, cancel_at_period_end, modified_at, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET product_id = excluded.product_id, plan = excluded.plan, status = excluded.status,
@@ -177,6 +178,7 @@ export async function saveSubscription(db: D1Database, subscription: Subscriptio
             ORDER BY CASE plan ${ranks} ELSE 0 END DESC LIMIT 1), 'free') WHERE id = ?`)
             .bind(...accessStatuses, subscription.userId),
     ]);
+    return stored.meta.changes > 0;
 }
 
 // The user's subscription that gives them their plan, else their latest one

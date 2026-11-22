@@ -285,14 +285,16 @@ function BillingPage({ locale }: { locale: Locale }) {
           action={plan => {
             const current = plan.id === account?.plan.id;
             const name = isolate(plan.name);
+            // Already canceled: the free plan takes over when the paid period ends
+            const freeFrom = plan.id === 'free' && subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd;
             const label = current
               ? t.yourPlan
               : !billing?.enabled
                 ? t.soon
                 : subscribed
-                  ? plan.id === 'free' ? t.cancelInPortal : t.switchTo(name)
+                  ? plan.id === 'free' ? (freeFrom ? t.freeFrom(longDate(freeFrom)) : t.cancelInPortal) : t.switchTo(name)
                   : plan.id === 'free' ? t.included : t.upgrade(name);
-            const disabled = current || !billing?.enabled || busy !== null || (!subscribed && plan.id === 'free');
+            const disabled = current || !billing?.enabled || busy !== null || (plan.id === 'free' && (!subscribed || !!freeFrom));
             const style = current
               ? plan.highlighted ? 'bg-lime text-ink' : 'bg-ink text-paper'
               : disabled
