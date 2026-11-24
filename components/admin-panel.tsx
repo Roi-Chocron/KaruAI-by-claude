@@ -7,11 +7,12 @@ import { adminMessages } from '@/messages/admin';
 import { appMessages } from '@/messages/app';
 import type { Locale } from '@/lib/i18n';
 import { PLANS, PLAN_IDS, type PaidPlanId, type PlanId } from '@/shared/plans';
+import { microUsdToIls, planNetIls } from '@/shared/ai-pricing';
 import type { MonthlyUsage, PublicUser, User } from '@/types';
 
 type Setting = { key: string; value: string; source: 'admin' | 'env' | 'none'; envName: string; updatedAt: string | null };
 type Subscription = { plan: PaidPlanId; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean };
-type AdminUser = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'>; subscription: Subscription | null };
+type AdminUser = User & { carouselCount: number; usage: Omit<MonthlyUsage, 'month'>; monthCostMicroUsd: number; subscription: Subscription | null };
 type Stats = {
   users: number;
   activeLast7Days: number;
@@ -20,9 +21,19 @@ type Stats = {
   paying: number;
   comped: number;
   plans: Partial<Record<PlanId, number>>;
-  month: Omit<MonthlyUsage, 'month'>;
-  daily: { day: string; messages: number; images: number; tokens: number }[];
+  month: Omit<MonthlyUsage, 'month'> & { costMicroUsd: number };
+  daily: { day: string; messages: number; images: number; tokens: number; costMicroUsd: number }[];
+  topCost: { id: string; email: string; plan: PlanId; costMicroUsd: number; messages: number; images: number }[];
+  costPerPayingUserMicroUsd: number;
 };
+
+// An estimated AI cost in dollars, e.g. "$0.42"
+const formatUsd = (micro: number, locale: Locale) =>
+  new Intl.NumberFormat(locale === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: micro < 10_000 ? 3 : 2 }).format(micro / 1_000_000);
+const formatIls = (ils: number, locale: Locale) =>
+  new Intl.NumberFormat(locale === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(ils);
+// A paying user whose AI use costs more than their plan brings in
+const overRevenue = (plan: PlanId, micro: number) => plan !== 'free' && microUsdToIls(micro) > planNetIls(PLANS[plan].monthlyPrice);
 
 // Which settings hold secrets (shown masked, typed into a password field)
 const SECRET_SETTINGS = new Set(['gemini_api_key', 'pollinations_api_key']);
@@ -141,9 +152,10 @@ function DailyChart({ daily, locale }: { daily: Stats['daily']; locale: Locale }
   const byDay = new Map(daily.map(row => [row.day, row]));
   const rows = days.map(day => {
     const row = byDay.get(day);
-    return { day, messages: row?.messages ?? 0, images: row?.images ?? 0, tokens: row?.tokens ?? 0 };
+    return { day, messages: row?.messages ?? 0, images: row?.images ?? 0, tokens: row?.tokens ?? 0, cost: row?.costMicroUsd ?? 0 };
   });
   const max = Math.max(1, ...rows.map(row => row.messages + row.images));
+  const maxCost = Math.max(1, ...rows.map(row => row.cost));
   return (
     <>
       <div aria-hidden="true">
@@ -152,7 +164,17 @@ function DailyChart({ daily, locale }: { daily: Stats['daily']; locale: Locale }
             <span>{formatNumber(max, locale)}</span>
             <span>0</span>
           </div>
-          <div className="flex-1 min-w-0 flex items-end gap-1 sm:gap-1.5 h-40">
+          <div className="relative flex-1 min-w-0 flex items-end gap-1 sm:gap-1.5 h-40">
+            {/* The estimated AI cost per day, on its own scale, over the bars (above the day labels) */}
+            <svg className="absolute inset-x-0 top-0 h-[calc(100%-1.25rem)] w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline
+                fill="none"
+                stroke="#B5DE1F"
+                strokeWidth="2.5"
+                vectorEffect="non-scaling-stroke"
+                points={rows.map((row, i) => `${((i + 0.5) / rows.length) * 100},${100 - (row.cost / maxCost) * 95}`).join(' ')}
+              />
+            </svg>
             {rows.map(row => {
               const total = row.messages + row.images;
               return (
@@ -181,6 +203,7 @@ function DailyChart({ daily, locale }: { daily: Stats['daily']; locale: Locale }
               <th scope="col">{t.chartTable.messages}</th>
               <th scope="col">{t.chartTable.images}</th>
               <th scope="col">{t.chartTable.tokens}</th>
+              <th scope="col">{t.chartTable.cost}</th>
             </tr>
           </thead>
           <tbody>
@@ -190,6 +213,7 @@ function DailyChart({ daily, locale }: { daily: Stats['daily']; locale: Locale }
                 <td>{row.messages}</td>
                 <td>{row.images}</td>
                 <td>{formatNumber(row.tokens, locale)}</td>
+                <td>{formatUsd(row.cost, locale)}</td>
               </tr>
             ))}
           </tbody>
@@ -267,7 +291,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
     { label: t.tiles.paying, value: stats?.paying },
     { label: t.tiles.messages, value: stats?.month.messages },
     { label: t.tiles.images, value: stats?.month.images },
-    { label: t.tiles.tokens, value: stats?.month.tokens },
+    { label: t.tiles.tokens, value: stats?.month.costMicroUsd, text: stats && formatUsd(stats.month.costMicroUsd, locale) },
     { label: t.tiles.suspended, value: stats?.suspended },
   ];
   const select = 'min-h-10 border border-line bg-paper rounded-lg px-2 py-1.5 text-sm font-medium disabled:opacity-60';
@@ -315,6 +339,16 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
   const month = (user: AdminUser) => (
     <span className="whitespace-nowrap tabular-nums" title={t.monthTitle}>{user.usage.carousels} / {user.usage.messages} / {user.usage.images}</span>
   );
+  // This month's AI cost, red with an explanation when it is more than the user's plan brings in
+  const costCell = (user: AdminUser) => {
+    const over = overRevenue(user.plan, user.monthCostMicroUsd);
+    return (
+      <span className={`tabular-nums whitespace-nowrap ${over ? 'text-red-700 font-semibold' : ''}`} title={over ? t.costOverRevenue(formatIls(planNetIls(PLANS[user.plan].monthlyPrice), locale)) : undefined}>
+        <bdi dir="ltr">{formatUsd(user.monthCostMicroUsd, locale)}</bdi>
+        {over && <span className="sr-only"> {t.costOverRevenue(formatIls(planNetIls(PLANS[user.plan].monthlyPrice), locale))}</span>}
+      </span>
+    );
+  };
   const actions = (user: AdminUser) => (
     <>
       <button
@@ -348,7 +382,9 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
         {tiles.map((tile, i) => (
           <div key={tile.label} className={`p-5 sm:p-6 border-line ${i % 2 ? 'border-s' : ''} md:border-s ${i % 4 === 0 ? 'md:border-s-0' : ''} ${i >= 2 ? 'border-t' : ''} ${i < 4 ? 'md:border-t-0' : 'md:border-t'}`}>
             <p className="text-sm text-graphite">{tile.label}</p>
-            <p className="font-display font-bold text-4xl sm:text-5xl leading-none mt-2 tabular-nums break-all">{tile.value === undefined ? '—' : formatNumber(tile.value, locale)}</p>
+            <p className="font-display font-bold text-4xl sm:text-5xl leading-none mt-2 tabular-nums break-all">
+              {tile.value === undefined ? '—' : 'text' in tile && tile.text ? <bdi dir="ltr">{tile.text}</bdi> : formatNumber(tile.value, locale)}
+            </p>
           </div>
         ))}
       </div>
@@ -368,8 +404,45 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
               </ul>
             </div>
           </div>
-          <p className="text-sm text-graphite -mt-3 mb-5">{t.chartSub}</p>
+          <p className="text-sm text-graphite -mt-3 mb-5">{t.chartSub} {t.chartCostLegend}</p>
           <DailyChart daily={stats.daily} locale={locale} />
+        </section>
+      )}
+
+      {stats && (
+        <section className={card}>
+          <h2 className={sectionTitle}>{t.topCost}</h2>
+          <p className="text-sm text-graphite mt-3 mb-4 max-w-2xl">{t.topCostSub(formatUsd(stats.costPerPayingUserMicroUsd, locale))}</p>
+          {stats.topCost.length === 0 ? (
+            <p className="text-sm text-graphite">{t.topCostNone}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">{t.topCost}</caption>
+                <thead>
+                  <tr className="text-graphite border-b border-ink">
+                    {(['user', 'plan', 'use', 'cost', 'net'] as const).map(key => (
+                      <th key={key} scope="col" className="py-2 pe-3 text-start font-medium whitespace-nowrap">{t.topCostColumns[key]}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.topCost.map(row => {
+                    const over = overRevenue(row.plan, row.costMicroUsd);
+                    return (
+                      <tr key={row.id} className="border-b border-line last:border-0">
+                        <td className="py-2 pe-3 break-all"><bdi dir="ltr">{row.email}</bdi></td>
+                        <td className="py-2 pe-3"><bdi dir="ltr">{PLANS[row.plan]?.name ?? row.plan}</bdi></td>
+                        <td className="py-2 pe-3 tabular-nums">{row.messages} / {row.images}</td>
+                        <td className={`py-2 pe-3 tabular-nums ${over ? 'text-red-700 font-semibold' : ''}`}><bdi dir="ltr">{formatUsd(row.costMicroUsd, locale)}</bdi></td>
+                        <td className="py-2 pe-3 tabular-nums"><bdi dir="ltr">{formatIls(planNetIls(PLANS[row.plan]?.monthlyPrice ?? 0), locale)}</bdi></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 
@@ -411,6 +484,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
                       <div><dt className="text-graphite">{t.columns.carousels}</dt><dd className="tabular-nums">{user.carouselCount}</dd></div>
                       <div><dt className="text-graphite">{t.monthShort}</dt><dd>{month(user)}</dd></div>
                       <div><dt className="text-graphite">{t.columns.tokens}</dt><dd className="tabular-nums">{formatNumber(user.usage.tokens, locale)}</dd></div>
+                      <div><dt className="text-graphite">{t.columns.cost}</dt><dd>{costCell(user)}</dd></div>
                       <div><dt className="text-graphite">{t.columns.joined}</dt><dd>{formatDate(user.createdAt, locale, { dateStyle: 'medium' })}</dd></div>
                       <div><dt className="text-graphite">{t.columns.lastActive}</dt><dd>{formatDate(user.lastSeenAt, locale)}</dd></div>
                     </dl>
@@ -431,6 +505,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
                     <th scope="col" className="py-3 pe-3 text-start font-medium">{t.columns.carousels}</th>
                     <th scope="col" className="py-3 pe-3 text-start font-medium whitespace-nowrap" title={t.monthTitle}>{t.columns.month}</th>
                     <th scope="col" className="py-3 pe-3 text-start font-medium">{t.columns.tokens}</th>
+                    <th scope="col" className="py-3 pe-3 text-start font-medium whitespace-nowrap">{t.columns.cost}</th>
                     <th scope="col" className="py-3 pe-3 text-start font-medium">{t.columns.joined}</th>
                     <th scope="col" className="py-3 pe-3 text-start font-medium whitespace-nowrap">{t.columns.lastActive}</th>
                     <th scope="col" className="py-3"><span className="sr-only">{t.columns.actions}</span></th>
@@ -447,6 +522,7 @@ function Dashboard({ me, locale }: { me: PublicUser; locale: Locale }) {
                         <td className="py-3.5 pe-3 tabular-nums">{user.carouselCount}</td>
                         <td className="py-3.5 pe-3">{month(user)}</td>
                         <td className="py-3.5 pe-3 tabular-nums">{formatNumber(user.usage.tokens, locale)}</td>
+                        <td className="py-3.5 pe-3">{costCell(user)}</td>
                         <td className="py-3.5 pe-3 text-graphite whitespace-nowrap">{formatDate(user.createdAt, locale, { dateStyle: 'medium' })}</td>
                         <td className="py-3.5 pe-3 text-graphite whitespace-nowrap">{formatDate(user.lastSeenAt, locale)}</td>
                         <td className="py-3.5 text-end whitespace-nowrap">{!isMe && actions(user)}</td>

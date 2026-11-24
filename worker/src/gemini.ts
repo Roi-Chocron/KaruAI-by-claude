@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, ModelParams, ResponseSchema, SchemaType } from '@google/generative-ai';
+import type { TokenUsage } from '../../shared/ai-pricing';
 import type { ConversationState, KaruResponse } from '../../types';
 import { readJson, writeJson } from './storage';
 
@@ -151,7 +152,7 @@ export async function generateKaruResponse(options: {
     historyKey: string;
     turnContext?: string;
     systemPrompt?: string;
-}): Promise<KaruResponse> {
+}): Promise<KaruResponse & { tokens: TokenUsage; model: string }> {
     const { userInput, modelName, apiKey, bucket, historyKey, turnContext, systemPrompt = KARU_SYSTEM_PROMPT } = options;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set.');
 
@@ -175,6 +176,12 @@ export async function generateKaruResponse(options: {
     const usage = result.response.usageMetadata;
     const promptTokenCount = usage?.promptTokenCount || 0;
     const responseTokenCount = usage?.candidatesTokenCount || 0;
+    // What the turn is billed for: input (cached input is cheaper) and output, thinking included
+    const tokens: TokenUsage = {
+        input: promptTokenCount,
+        output: responseTokenCount + ((usage as { thoughtsTokenCount?: number } | undefined)?.thoughtsTokenCount || 0),
+        cached: usage?.cachedContentTokenCount || 0,
+    };
     // The tokens billed for this turn, and over the whole conversation
     const currentRequestTokens = usage?.totalTokenCount || promptTokenCount + responseTokenCount;
     const totalConversationTokens = (state.lastMetrics?.cumulativeConversationTokens || 0) + currentRequestTokens;
@@ -197,7 +204,7 @@ export async function generateKaruResponse(options: {
         },
     } satisfies ConversationState);
 
-    return { responseText, currentRequestTokens, totalConversationTokens };
+    return { responseText, currentRequestTokens, totalConversationTokens, tokens, model: modelName };
 }
 
 // --- Checking generated images ---
@@ -241,5 +248,7 @@ export async function moderateImage(options: { apiKey: string; image: ArrayBuffe
         { text: MODERATION_PROMPT },
     ]);
     const verdict = JSON.parse(result.response.text());
-    return { allowed: verdict?.allowed !== false, reason: typeof verdict?.reason === 'string' ? verdict.reason : '' };
+    const usage = result.response.usageMetadata;
+    const tokens: TokenUsage = { input: usage?.promptTokenCount || 0, output: usage?.candidatesTokenCount || 0, cached: 0 };
+    return { allowed: verdict?.allowed !== false, reason: typeof verdict?.reason === 'string' ? verdict.reason : '', tokens };
 }

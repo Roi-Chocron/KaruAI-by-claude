@@ -1,9 +1,10 @@
-import { addTokens, DEFAULT_GEMINI_MODEL, getCarouselRow, getSetting, lockCarouselChat, unlockCarouselChat } from '../db';
+import { addAiUsage, DEFAULT_GEMINI_MODEL, getCarouselRow, getSetting, lockCarouselChat, unlockCarouselChat } from '../db';
+import { geminiCostMicroUsd, imageCostMicroUsd } from '../../../shared/ai-pricing';
 import { chatHistoryKey, isCarouselId } from '../storage';
-import { generateKaruResponse, moderateImage } from '../gemini';
+import { generateKaruResponse, IMAGE_MODERATION_MODEL, moderateImage } from '../gemini';
 import { DEFAULT_IMAGE_MODEL, FALLBACK_IMAGE_MODEL, generatePollinationsImage, IMAGE_SAFETY, ImageServiceError } from '../images';
 import { monitoring } from '../monitoring';
-import { countUsage, createApp, errorJson, rateLimit, requireUser, useQuota, type AppContext } from '../app';
+import { createApp, errorJson, rateLimit, refundQuota, requireUser, useQuota, type AppContext } from '../app';
 
 // Caps on what one AI request may carry, so no account can send (or have replayed on later turns) huge prompts. The
 // editor's chat box allows 4,000 characters; the rest is headroom.
@@ -97,9 +98,13 @@ ai.post('/chat', requireUser, async c => {
     if (!(await lockCarouselChat(c.env.DB, carouselRow.id, CHAT_LOCK_SECONDS))) {
         return errorJson(c, 'KaruAI is still answering the previous message.', 429, { retryable: true, retryAfterSeconds: 5 });
     }
+    // The message is taken from the plan before the call and given back if it fails, so parallel requests can't
+    // overrun the limit and failures cost nothing
+    let reserved = false;
     try {
-        const quota = await useQuota(c, 'messages', false);
+        const quota = await useQuota(c, 'messages');
         if (quota) return quota;
+        reserved = true;
         const [modelName, apiKey] = await Promise.all([getSetting(c.env, 'gemini_model'), getSetting(c.env, 'gemini_api_key')]);
         const result = await generateKaruResponse({
             userInput: message.trim(),
@@ -109,10 +114,14 @@ ai.post('/chat', requireUser, async c => {
             historyKey: chatHistoryKey(carouselRow.id),
             turnContext,
         });
-        c.executionCtx.waitUntil(Promise.all([countUsage(c, 'messages'), addTokens(c.env.DB, user.id, result.currentRequestTokens)]));
-        return c.json(result);
+        reserved = false;
+        const costMicroUsd = geminiCostMicroUsd(result.model, result.tokens);
+        console.log(JSON.stringify({ event: 'gemini', model: result.model, ...result.tokens, costMicroUsd }));
+        c.executionCtx.waitUntil(addAiUsage(c.env.DB, user.id, { ...result.tokens, costMicroUsd }));
+        return c.json({ responseText: result.responseText, currentRequestTokens: result.currentRequestTokens, totalConversationTokens: result.totalConversationTokens });
     } catch (error: any) {
         console.error('[api/chat] generateKaruResponse failed:', error);
+        if (reserved) c.executionCtx.waitUntil(refundQuota(c, 'messages'));
         if (error?.message?.includes('GEMINI_API_KEY')) {
             return errorJson(c, 'No Gemini API key is set. An admin can add one on the Admin page.', 500);
         }
@@ -143,7 +152,7 @@ ai.post('/chat', requireUser, async c => {
 async function generateImage(c: AppContext, prompt: string, width: number, height: number) {
     const [model, apiKey] = await Promise.all([getSetting(c.env, 'pollinations_model'), getSetting(c.env, 'pollinations_api_key')]);
     const chosen = model || DEFAULT_IMAGE_MODEL;
-    const request = (name: string) => generatePollinationsImage(prompt, { width, height, safe: IMAGE_SAFETY, model: name, apiKey });
+    const request = async (name: string) => ({ response: await generatePollinationsImage(prompt, { width, height, safe: IMAGE_SAFETY, model: name, apiKey }), model: name });
     try {
         return await request(chosen);
     } catch (error) {
@@ -179,13 +188,22 @@ ai.post('/images', requireUser, async c => {
         return errorJson(c, '`width` and `height` must be integers between 64 and 2048.', 400);
     }
 
-    const quota = await useQuota(c, 'images', false);
+    const quota = await useQuota(c, 'images');
     if (quota) return quota;
+    const userId = c.get('user').id;
+    // Refused or failed images give the use back
+    const refuse = (response: Response) => {
+        c.executionCtx.waitUntil(refundQuota(c, 'images'));
+        return response;
+    };
     try {
-        const image = await generateImage(c, prompt.trim(), width, height);
+        const { response: image, model } = await generateImage(c, prompt.trim(), width, height);
         const contentType = image.headers.get('content-type')!;
+        let costMicroUsd = imageCostMicroUsd(model);
+        let body: BodyInit | null = image.body;
         if ((await getSetting(c.env, 'image_moderation')) !== 'off') {
             const bytes = await image.arrayBuffer();
+            body = bytes;
             const apiKey = await getSetting(c.env, 'gemini_api_key');
             const verdict = apiKey
                 ? await moderateImage({ apiKey, image: bytes, mimeType: contentType }).catch(error => {
@@ -194,17 +212,18 @@ ai.post('/images', requireUser, async c => {
                     return null;
                 })
                 : null;
+            if (verdict) costMicroUsd += geminiCostMicroUsd(IMAGE_MODERATION_MODEL, verdict.tokens);
             if (verdict && !verdict.allowed) {
-                console.warn(JSON.stringify({ event: 'image_refused', userId: c.get('user').id, reason: verdict.reason }));
-                return errorJson(c, 'This image was blocked by the safety check. Try describing it differently.', 422, { code: 'image_blocked', retryable: false });
+                console.warn(JSON.stringify({ event: 'image_refused', userId, reason: verdict.reason }));
+                c.executionCtx.waitUntil(addAiUsage(c.env.DB, userId, { input: 0, output: 0, cached: 0, costMicroUsd }));
+                return refuse(errorJson(c, 'This image was blocked by the safety check. Try describing it differently.', 422, { code: 'image_blocked', retryable: false }));
             }
-            c.executionCtx.waitUntil(countUsage(c, 'images'));
-            return new Response(bytes, { headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store' } });
         }
-        c.executionCtx.waitUntil(countUsage(c, 'images'));
-        return new Response(image.body, { headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store' } });
+        c.executionCtx.waitUntil(addAiUsage(c.env.DB, userId, { input: 0, output: 0, cached: 0, costMicroUsd }));
+        return new Response(body, { headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store' } });
     } catch (error) {
         console.error('[api/images] image generation failed:', error);
+        c.executionCtx.waitUntil(refundQuota(c, 'images'));
         if (!(error instanceof ImageServiceError)) return errorJson(c, 'The image could not be created. Try again.', 502, { code: 'image_failed' });
         if (error.code === 'image_blocked') return errorJson(c, error.message, 422, { code: 'image_blocked', retryable: false });
         if (error.code === 'image_unavailable') {

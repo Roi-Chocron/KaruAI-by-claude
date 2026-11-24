@@ -61,7 +61,7 @@ describe('AI chat', () => {
         const response = await api('/api/chat', { method: 'POST', cookie, json: { message: 'hello', carouselId } });
         expect(response.status).toBe(503);
         expect(await response.json()).toMatchObject({ retryable: true });
-        expect((await usage(cookie)).messages).toBe(0);
+        await vi.waitFor(async () => expect((await usage(cookie)).messages).toBe(0));
     });
 
     it("refuses another user's carousel", async () => {
@@ -79,6 +79,28 @@ describe('AI chat', () => {
         await env.DB.prepare('UPDATE usage_daily SET chat_requests = ? WHERE user_id = ?').bind(limit, user.id).run();
         const response = await api('/api/chat', { method: 'POST', cookie, json: { message: 'hi', carouselId } });
         expect(response.status).toBe(402);
+    });
+
+    it('never lets parallel requests go past the limit', async () => {
+        const { cookie, user } = await signIn();
+        const carousels = await Promise.all([0, 1, 2, 3].map(() => createCarousel(cookie)));
+        const limit = PLANS.free.limits.aiMessagesPerMonth!;
+        await env.DB.prepare('UPDATE usage_daily SET chat_requests = ? WHERE user_id = ?').bind(limit - 1, user.id).run();
+        mockUpstream(() => geminiReply({ title: 'T', slides: [] }));
+        const statuses = await Promise.all(carousels.map(carouselId => api('/api/chat', { method: 'POST', cookie, json: { message: 'hi', carouselId } }).then(r => r.status)));
+        expect(statuses.filter(status => status === 200).length).toBe(1);
+        expect(statuses.filter(status => status === 402).length).toBe(3);
+        expect((await usage(cookie)).messages).toBe(limit);
+    });
+
+    it('records the tokens and the estimated cost of each message', async () => {
+        const { cookie, user } = await signIn();
+        const carouselId = await createCarousel(cookie);
+        mockUpstream(() => geminiReply({ title: 'T', slides: [] }, 250));
+        await api('/api/chat', { method: 'POST', cookie, json: { message: 'hello', carouselId } });
+        // 240 input tokens at $0.50 and 10 output tokens at $3 per million, in millionths of a dollar
+        await vi.waitFor(async () => expect(await env.DB.prepare('SELECT input_tokens, output_tokens, cost_micro_usd FROM usage_daily WHERE user_id = ?')
+            .bind(user.id).first()).toEqual({ input_tokens: 240, output_tokens: 10, cost_micro_usd: 150 }));
     });
 
     it('rate-limits bursts', async () => {

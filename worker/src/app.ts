@@ -3,9 +3,9 @@ import { createMiddleware } from 'hono/factory';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { User } from '../../types';
 import { PLANS, type PlanLimits } from '../../shared/plans';
-import { addUsage, createSession, deleteSession, getMonthlyUsage, getUserBySession, hitRateWindow, SESSION_DAYS, type UsageColumn } from './db';
+import { addUsage, createSession, deleteSession, getUserBySession, hitRateWindow, refundUsage, reserveUsage, SESSION_DAYS, today, type UsageColumn } from './db';
 
-export type AppEnv = { Bindings: Env; Variables: { user: User } };
+export type AppEnv = { Bindings: Env; Variables: { user: User; quotaDay?: string } };
 export type AppContext = Context<AppEnv>;
 export const createApp = () => new Hono<AppEnv>();
 
@@ -130,26 +130,32 @@ const QUOTAS = {
 
 export type QuotaKind = keyof typeof QUOTAS;
 
-// A 402 response when the user's plan has no `kind` left this month, else null. Unless `count` is false it also
-// counts this use; AI requests pass false and call countUsage() only once they succeeded, so failed or retried
-// requests cost nothing. Admins are counted but never limited.
-export async function useQuota(c: AppContext, kind: QuotaKind, count = true): Promise<Response | null> {
+// Takes one `kind` from the user's plan for this month, or answers 402 when none is left. The check and the count are
+// one database statement, so parallel requests can't overrun the limit. A request that then fails gives the use back
+// with refundQuota(). Admins are counted but never limited.
+export async function useQuota(c: AppContext, kind: QuotaKind): Promise<Response | null> {
     const user = c.get('user');
     const quota = QUOTAS[kind];
     const plan = PLANS[user.plan] ?? PLANS.free;
     const limit = plan.limits[quota.limit];
-    if (limit !== null && user.role !== 'admin') {
-        const used = (await getMonthlyUsage(c.env.DB, user.id))[quota.usage];
-        if (used >= limit) {
-            return errorJson(c,
-                `You used all ${limit} ${quota.noun} of the ${plan.name} plan this month. Upgrade your plan or wait for next month.`,
-                402, { code: 'quota_exceeded', kind, limit, upgradeUrl: '/billing', retryable: false });
-        }
+    if (limit === null || user.role === 'admin') {
+        await addUsage(c.env.DB, user.id, quota.column);
+        c.set('quotaDay', today());
+        return null;
     }
-    if (count) await addUsage(c.env.DB, user.id, quota.column);
-    return null;
+    const day = await reserveUsage(c.env.DB, user.id, quota.column, limit);
+    if (day) {
+        c.set('quotaDay', day);
+        return null;
+    }
+    c.executionCtx.waitUntil(addUsage(c.env.DB, user.id, 'quota_hits').then(() => undefined));
+    return errorJson(c,
+        `You used all ${limit} ${quota.noun} of the ${plan.name} plan this month. Upgrade your plan or wait for next month.`,
+        402, { code: 'quota_exceeded', kind, limit, upgradeUrl: '/billing', retryable: false });
 }
 
-export async function countUsage(c: AppContext, kind: QuotaKind) {
-    await addUsage(c.env.DB, c.get('user').id, QUOTAS[kind].column);
+// Gives back the use useQuota() took, when the request failed or was refused
+export async function refundQuota(c: AppContext, kind: QuotaKind) {
+    const day = c.get('quotaDay');
+    if (day) await refundUsage(c.env.DB, c.get('user').id, QUOTAS[kind].column, day);
 }

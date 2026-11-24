@@ -88,6 +88,8 @@ export async function countAdmins(db: D1Database): Promise<number> {
 export type AdminUserRow = User & {
     carouselCount: number;
     usage: Omit<MonthlyUsage, 'month'>;
+    // This month's estimated AI cost, in millionths of a dollar
+    monthCostMicroUsd: number;
     // Their latest Polar subscription, for the admin's badges
     subscription: { plan: PaidPlanId; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
 };
@@ -103,7 +105,8 @@ export async function listUsersWithStats(db: D1Database): Promise<AdminUserRow[]
             COALESCE(SUM(usage_daily.carousels_created), 0) AS month_carousels,
             COALESCE(SUM(usage_daily.chat_requests), 0) AS month_messages,
             COALESCE(SUM(usage_daily.image_requests), 0) AS month_images,
-            COALESCE(SUM(usage_daily.tokens), 0) AS month_tokens
+            COALESCE(SUM(usage_daily.tokens), 0) AS month_tokens,
+            COALESCE(SUM(usage_daily.cost_micro_usd), 0) AS month_cost
         FROM users LEFT JOIN usage_daily ON usage_daily.user_id = users.id AND usage_daily.day >= ?
         GROUP BY users.id ORDER BY users.created_at DESC
     `).bind(monthStart()).all();
@@ -116,6 +119,7 @@ export async function listUsersWithStats(db: D1Database): Promise<AdminUserRow[]
             images: Number(row.month_images),
             tokens: Number(row.month_tokens),
         },
+        monthCostMicroUsd: Number(row.month_cost),
         subscription: row.sub_plan
             ? { plan: row.sub_plan, status: row.sub_status, currentPeriodEnd: row.sub_period_end ?? null, cancelAtPeriodEnd: !!row.sub_cancel }
             : null,
@@ -492,7 +496,7 @@ export async function hitRateWindow(db: D1Database, key: string, windowMs: numbe
     return { count: Number(row?.count ?? 1), resetsAt: windowStart + windowMs };
 }
 
-export type UsageColumn = 'carousels_created' | 'chat_requests' | 'image_requests';
+export type UsageColumn = 'carousels_created' | 'chat_requests' | 'image_requests' | 'blocked_requests' | 'exports' | 'quota_hits';
 
 // The first day of this calendar month (UTC), as stored in usage_daily.day
 export const monthStart = () => `${today().slice(0, 7)}-01`;
@@ -520,7 +524,7 @@ export async function listUsage(db: D1Database, userId: string) {
 export async function getAdminStats(db: D1Database, at: AccessTimes) {
     const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const twoWeeksAgo = new Date(Date.now() - 13 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-    const [totals, plans, month, daily] = await db.batch([
+    const [totals, plans, month, daily, top, payingCost] = await db.batch([
         db.prepare(`SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM users WHERE last_seen_at >= ?) AS active_week,
             (SELECT COUNT(*) FROM users WHERE suspended_at IS NOT NULL) AS suspended, (SELECT COUNT(*) FROM carousels) AS carousels,
             (SELECT COUNT(DISTINCT user_id) FROM subscriptions WHERE status IN (${ACCESS_STATUSES.map(status => `'${status}'`).join(', ')})
@@ -529,9 +533,16 @@ export async function getAdminStats(db: D1Database, at: AccessTimes) {
             .bind(weekAgo, at.graceStart, at.now),
         db.prepare('SELECT plan, COUNT(*) AS count FROM users GROUP BY plan'),
         db.prepare(`SELECT COALESCE(SUM(carousels_created), 0) AS carousels, COALESCE(SUM(chat_requests), 0) AS messages,
-            COALESCE(SUM(image_requests), 0) AS images, COALESCE(SUM(tokens), 0) AS tokens FROM usage_daily WHERE day >= ?`).bind(monthStart()),
-        db.prepare(`SELECT day, SUM(chat_requests) AS messages, SUM(image_requests) AS images, SUM(tokens) AS tokens
+            COALESCE(SUM(image_requests), 0) AS images, COALESCE(SUM(tokens), 0) AS tokens, COALESCE(SUM(cost_micro_usd), 0) AS cost
+            FROM usage_daily WHERE day >= ?`).bind(monthStart()),
+        db.prepare(`SELECT day, SUM(chat_requests) AS messages, SUM(image_requests) AS images, SUM(tokens) AS tokens, SUM(cost_micro_usd) AS cost
             FROM usage_daily WHERE day >= ? GROUP BY day ORDER BY day`).bind(twoWeeksAgo),
+        // The 20 users whose AI use cost the most this month
+        db.prepare(`SELECT users.id, users.email, users.plan, SUM(usage_daily.cost_micro_usd) AS cost, SUM(usage_daily.chat_requests) AS messages,
+            SUM(usage_daily.image_requests) AS images FROM usage_daily JOIN users ON users.id = usage_daily.user_id
+            WHERE usage_daily.day >= ? GROUP BY users.id HAVING cost > 0 ORDER BY cost DESC LIMIT 20`).bind(monthStart()),
+        db.prepare(`SELECT COALESCE(SUM(usage_daily.cost_micro_usd), 0) AS cost, COUNT(DISTINCT users.id) AS users FROM users
+            LEFT JOIN usage_daily ON usage_daily.user_id = users.id AND usage_daily.day >= ? WHERE users.plan != 'free'`).bind(monthStart()),
     ]);
     const t: any = totals.results[0];
     const m: any = month.results[0];
@@ -544,10 +555,18 @@ export async function getAdminStats(db: D1Database, at: AccessTimes) {
         paying: Number(t.paying),
         comped: Number(t.comped),
         plans: Object.fromEntries(plans.results.map((row: any) => [row.plan, Number(row.count)])),
-        month: { carousels: Number(m.carousels), messages: Number(m.messages), images: Number(m.images), tokens: Number(m.tokens) },
+        month: { carousels: Number(m.carousels), messages: Number(m.messages), images: Number(m.images), tokens: Number(m.tokens), costMicroUsd: Number(m.cost) },
         daily: daily.results.map((row: any) => ({
-            day: row.day, messages: Number(row.messages), images: Number(row.images), tokens: Number(row.tokens),
+            day: row.day, messages: Number(row.messages), images: Number(row.images), tokens: Number(row.tokens), costMicroUsd: Number(row.cost),
         })),
+        topCost: top.results.map((row: any) => ({
+            id: row.id, email: row.email, plan: row.plan, costMicroUsd: Number(row.cost), messages: Number(row.messages), images: Number(row.images),
+        })),
+        // This month's AI cost per user on a paid plan
+        costPerPayingUserMicroUsd: (() => {
+            const row: any = payingCost.results[0];
+            return Number(row?.users) ? Math.round(Number(row.cost) / Number(row.users)) : 0;
+        })(),
     };
 }
 
@@ -559,10 +578,32 @@ export async function addUsage(db: D1Database, userId: string, column: UsageColu
     return Number(row?.total ?? 1);
 }
 
-export async function addTokens(db: D1Database, userId: string, tokens: number) {
-    await db.prepare(`INSERT INTO usage_daily (user_id, day, tokens) VALUES (?, ?, ?)
-        ON CONFLICT(user_id, day) DO UPDATE SET tokens = tokens + excluded.tokens`)
-        .bind(userId, today(), tokens).run();
+// Counts one use only while this month's total is under `limit`, in one statement: D1 runs statements one at a time,
+// so parallel requests can't both take the last one. Returns the day it was counted on (to refund it), or null when
+// the limit is used up.
+export async function reserveUsage(db: D1Database, userId: string, column: UsageColumn, limit: number): Promise<string | null> {
+    const day = today();
+    const used = `(SELECT COALESCE(SUM(${column}), 0) FROM usage_daily WHERE user_id = ? AND day >= ?)`;
+    const row = await db.prepare(`INSERT INTO usage_daily (user_id, day, ${column}) SELECT ?, ?, 1 WHERE ${used} < ?
+        ON CONFLICT(user_id, day) DO UPDATE SET ${column} = ${column} + 1 WHERE ${used} < ?
+        RETURNING ${column} AS total`)
+        .bind(userId, day, userId, monthStart(), limit, userId, monthStart(), limit).first();
+    return row ? day : null;
+}
+
+// Gives back a use counted on `day`, when the request it was for failed
+export async function refundUsage(db: D1Database, userId: string, column: UsageColumn, day: string) {
+    await db.prepare(`UPDATE usage_daily SET ${column} = MAX(${column} - 1, 0) WHERE user_id = ? AND day = ?`).bind(userId, day).run();
+}
+
+// What an AI call used: its tokens and estimated cost (see shared/ai-pricing.ts)
+export async function addAiUsage(db: D1Database, userId: string, usage: { input: number; output: number; cached: number; costMicroUsd: number }) {
+    await db.prepare(`INSERT INTO usage_daily (user_id, day, tokens, input_tokens, output_tokens, cached_tokens, cost_micro_usd)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, day) DO UPDATE SET tokens = tokens + excluded.tokens, input_tokens = input_tokens + excluded.input_tokens,
+            output_tokens = output_tokens + excluded.output_tokens, cached_tokens = cached_tokens + excluded.cached_tokens,
+            cost_micro_usd = cost_micro_usd + excluded.cost_micro_usd`)
+        .bind(userId, today(), usage.input + usage.output, usage.input, usage.output, usage.cached, usage.costMicroUsd).run();
 }
 
 // The daily cron job: drops expired sessions, finished rate-limit windows, usage older than a year and old webhook ids
